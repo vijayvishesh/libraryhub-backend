@@ -1,0 +1,30 @@
+{
+   "compilerOptions": {
+       "target": "es6",
+       "module": "commonjs",
+       "pretty": true,
+       "sourceMap": true,
+       "inlineSourceMap": false,
+       "inlineSources": false,
+       "outDir": "dist",
+       "importHelpers": true,
+       "strict": true,
+       "noImplicitAny": false,
+       "strictNullChecks": false,
+       "noImplicitThis": true,
+       "alwaysStrict": true,
+       "noUnusedLocals": true,
+       "noUnusedParameters": false,
+       "noImplicitReturns": true,
+       "isolatedModules": true,
+       "noFallthroughCasesInSwitch": true,
+       "moduleResolution": "node",
+       "allowSyntheticDefaultImports": true,
+       "experimentalDecorators": true,
+       "emitDecoratorMetadata": true,
+        "lib": [
+            "ESNext",
+            "DOM"
+        ]
+   }
+}
