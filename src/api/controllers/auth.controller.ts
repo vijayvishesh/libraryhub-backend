@@ -1,0 +1,157 @@
+import {
+  Authorized,
+  Body,
+  CurrentUser,
+  Get,
+  HttpError,
+  InternalServerError,
+  JsonController,
+  Post,
+} from 'routing-controllers';
+import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
+import { Service } from 'typedi';
+import { AuthService } from '../services/auth.service';
+import {
+  LoginRequest,
+  LogoutRequest,
+  RefreshSessionRequest,
+  RegisterRequest,
+  SendOtpRequest,
+  VerifyOtpWithRoleRequest,
+} from './requests/auth.request';
+import {
+  AuthApiResponse,
+  AuthRegisterApiResponse,
+  CurrentSessionApiResponse,
+  CurrentSessionData,
+  LogoutApiResponse,
+  OtpSendApiResponse,
+  SessionTokenApiResponse,
+} from './responses/auth.response';
+import { ErrorResponseModel } from './responses/common.reponse';
+
+@Service()
+@JsonController('/v1/auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('/register')
+  @ResponseSchema(AuthRegisterApiResponse, { statusCode: 201 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async register(@Body() payload: RegisterRequest): Promise<AuthRegisterApiResponse> {
+    try {
+      const data = await this.authService.register(payload);
+      return new AuthRegisterApiResponse(data);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('REGISTER_FAILED');
+    }
+  }
+
+  @Post('/otp/send')
+  @ResponseSchema(OtpSendApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async sendOtp(@Body() payload: SendOtpRequest): Promise<OtpSendApiResponse> {
+    try {
+      const expiresIn = await this.authService.sendOtp(payload);
+      return new OtpSendApiResponse(expiresIn);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('SEND_OTP_FAILED');
+    }
+  }
+
+  @Post('/otp/verify')
+  @ResponseSchema(AuthApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async verifyOtp(@Body() payload: VerifyOtpWithRoleRequest): Promise<AuthApiResponse> {
+    try {
+      const data = await this.authService.verifyOtpAndLogin(payload);
+      return new AuthApiResponse(data);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('VERIFY_OTP_FAILED');
+    }
+  }
+
+  @Post('/login')
+  @ResponseSchema(AuthApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async login(@Body() payload: LoginRequest): Promise<AuthApiResponse> {
+    try {
+      const data = await this.authService.login(payload);
+      return new AuthApiResponse(data);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('LOGIN_FAILED');
+    }
+  }
+
+  @Get('/me')
+  @Authorized()
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(CurrentSessionApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async me(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+  ): Promise<CurrentSessionApiResponse> {
+    return new CurrentSessionApiResponse(session);
+  }
+
+  @Post('/refresh')
+  @ResponseSchema(SessionTokenApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async refresh(@Body() payload: RefreshSessionRequest): Promise<SessionTokenApiResponse> {
+    try {
+      const data = await this.authService.refreshSession(payload);
+      return new SessionTokenApiResponse(data);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('REFRESH_SESSION_FAILED');
+    }
+  }
+
+  @Post('/logout')
+  @ResponseSchema(LogoutApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async logout(@Body() payload: LogoutRequest): Promise<LogoutApiResponse> {
+    try {
+      const data = await this.authService.logout(payload);
+      return new LogoutApiResponse(data);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('LOGOUT_FAILED');
+    }
+  }
+}

@@ -3,9 +3,12 @@ import { Application } from 'express';
 import * as http from 'http';
 import { MicroframeworkLoader, MicroframeworkSettings } from 'microframework-w3tec';
 import { useExpressServer } from 'routing-controllers';
+import { authorizationChecker, currentUserChecker } from '../api/middlewares/auth.middleware';
 import { env } from '../env';
 
-export const expressLoader: MicroframeworkLoader = (settings: MicroframeworkSettings | undefined) => {
+export const expressLoader: MicroframeworkLoader = (
+  settings: MicroframeworkSettings | undefined,
+) => {
   try {
     if (settings) {
       const expressApp: Application = require('express')();
@@ -27,6 +30,8 @@ export const expressLoader: MicroframeworkLoader = (settings: MicroframeworkSett
         validation: true,
         routePrefix: env.app.routePrefix,
         defaultErrorHandler: false,
+        authorizationChecker,
+        currentUserChecker,
         controllers: env.app.dirs.controllers,
         middlewares: env.app.dirs.middlewares,
       });

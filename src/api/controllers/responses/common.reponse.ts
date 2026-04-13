@@ -1,43 +1,62 @@
-import { IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class CommonResponse<T = unknown> {
-  @IsNumber()
-  status!: number;
+  @IsBoolean()
+  success!: boolean;
 
   @ValidateNested()
   data!: T | null;
 
-  @IsOptional()
-  @IsString()
-  error!: null;
-
-  constructor(status: number, data: T | null = null) {
-    this.status = status;
+  constructor(success: boolean, data: T | null = null) {
+    this.success = success;
     this.data = data;
   }
 }
 
-export class ErrorResponseModel<T> {
-  @IsNumber()
-  status!: number;
+export class ErrorData {
+  @IsOptional()
+  @IsString()
+  field?: string;
 
   @IsOptional()
-  data?: null;
-
   @IsString()
-  error!: T | string | ErrorData[];
+  message?: string;
 
-  constructor(status: number, error: string | null | ErrorData[] = null) {
-    this.status = status;
-    this.error = error;
-    this.data = null;
+  @IsOptional()
+  @IsString()
+  errorCode?: string;
+
+  @IsOptional()
+  @IsString()
+  errorMessage?: string;
+
+  constructor(field?: string, message?: string) {
+    this.field = field;
+    this.message = message;
   }
 }
 
-export class ErrorData {
-  @IsString()
-  errorCode!: string;
+export class ErrorResponseModel {
+  @IsBoolean()
+  success!: boolean;
 
   @IsString()
-  errorMessage!: string;
+  code!: string;
+
+  @IsString()
+  message!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ErrorData)
+  details?: ErrorData[];
+
+  constructor(code: string, message: string, details: ErrorData[] = []) {
+    this.success = false;
+    this.code = code;
+    this.message = message;
+    this.details = details;
+  }
 }

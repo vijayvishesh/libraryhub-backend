@@ -75,6 +75,7 @@
     "jsonfile": "^6.1.0",
     "jsonwebtoken": "^9.0.3",
     "microframework-w3tec": "^0.6.3",
+    "mongodb": "^6.21.0",
     "mongoose": "^9.1.2",
     "morgan": "^1.10.0",
     "nocache": "^4.0.0",
@@ -88,6 +89,7 @@
     "tsconfig-paths": "^4.2.0",
     "tslib": "^2.8.1",
     "typedi": "^0.10.0",
+    "typeorm": "^0.3.28",
     "typeorm-seeding": "^1.6.1",
     "uuid": "^13.0.0",
     "winston": "^3.17.0"
