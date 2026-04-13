@@ -1,10 +1,17 @@
 import * as express from 'express';
 import { ExpressErrorMiddlewareInterface, HttpError, Middleware } from 'routing-controllers';
-
 import { Service } from 'typedi';
+import { ErrorData } from '../controllers/responses/common.reponse';
 // import { isDatabaseConnected } from '../../database/config/ormconfig.default';
 import { Logger, LoggerInterface } from '../../decorators/Logger';
 import { env } from '../../env';
+
+type ValidationErrorShape = {
+  property?: string;
+  constraints?: Record<string, string>;
+  children?: ValidationErrorShape[];
+};
+
 @Service()
 @Middleware({ type: 'after' })
 export class ErrorHandlerMiddleware implements ExpressErrorMiddlewareInterface {
@@ -57,18 +64,23 @@ export class ErrorHandlerMiddleware implements ExpressErrorMiddlewareInterface {
       });
 
       res.status(503).json({
-        status: 503,
-        data: null,
-        error: 'Database connection lost. Please try again later.',
+        success: false,
+        code: 'DATABASE_CONNECTION_LOST',
+        message: 'Database connection lost. Please try again later.',
+        details: [],
       });
       return;
     }
 
-    res.status(error.httpCode || 500);
-    res.json({
-      name: error.name,
-      message: error.message,
-      errors: error[`errors`] || [],
+    const responseCode = error.httpCode || 500;
+    const validationErrors = this.formatValidationErrors(error[`errors`]);
+    const hasValidationErrors = validationErrors.length > 0;
+
+    res.status(responseCode).json({
+      success: false,
+      code: this.resolveErrorCode(error.name, error.message),
+      message: this.getClientMessage(error.name, error.message, hasValidationErrors),
+      details: validationErrors,
     });
 
     if (this.isProduction) {
@@ -76,5 +88,81 @@ export class ErrorHandlerMiddleware implements ExpressErrorMiddlewareInterface {
     } else {
       this.log.error(error.name, error.stack);
     }
+  }
+
+  private getClientMessage(
+    errorName: string,
+    errorMessage: string,
+    hasValidationErrors: boolean,
+  ): string {
+    if (hasValidationErrors || errorName === 'BadRequestError') {
+      return 'Validation failed. Please check the request fields.';
+    }
+
+    if (!errorMessage) {
+      return 'Something went wrong. Please try again.';
+    }
+
+    if (this.isErrorCode(errorMessage)) {
+      return this.humanizeErrorCode(errorMessage);
+    }
+
+    return errorMessage;
+  }
+
+  private isErrorCode(value: string): boolean {
+    return /^[A-Z0-9]+(?:_[A-Z0-9]+)*$/.test(value);
+  }
+
+  private resolveErrorCode(errorName: string, errorMessage: string): string {
+    if (this.isErrorCode(errorMessage)) {
+      return errorMessage;
+    }
+
+    if (this.isErrorCode(errorName)) {
+      return errorName;
+    }
+
+    return 'INTERNAL_SERVER_ERROR';
+  }
+
+  private humanizeErrorCode(errorCode: string): string {
+    return errorCode
+      .split('_')
+      .map(word => {
+        if (word === 'OTP' || word === 'JWT' || word === 'ID') {
+          return word;
+        }
+
+        return word.charAt(0) + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  }
+
+  private formatValidationErrors(validationErrors: unknown): ErrorData[] {
+    if (!Array.isArray(validationErrors)) {
+      return [];
+    }
+
+    const output: ErrorData[] = [];
+    const walk = (errors: ValidationErrorShape[], parentPath = ''): void => {
+      for (const validationError of errors) {
+        const property = validationError.property || 'field';
+        const fieldPath = parentPath ? `${parentPath}.${property}` : property;
+
+        if (validationError.constraints) {
+          for (const message of Object.values(validationError.constraints)) {
+            output.push(new ErrorData(fieldPath, message));
+          }
+        }
+
+        if (validationError.children && validationError.children.length > 0) {
+          walk(validationError.children, fieldPath);
+        }
+      }
+    };
+
+    walk(validationErrors as ValidationErrorShape[]);
+    return output;
   }
 }

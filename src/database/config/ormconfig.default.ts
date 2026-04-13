@@ -1,10 +1,52 @@
-import mongoose from 'mongoose';
+import { DataSource } from 'typeorm';
+import { AuthSessionModel } from '../../api/models/authSession.model';
+import { LibraryModel } from '../../api/models/library.model';
+import { PendingOwnerSignupModel } from '../../api/models/pendingOwnerSignup.model';
+import { PendingStudentSignupModel } from '../../api/models/pendingStudentSignup.model';
+import { StudentModel } from '../../api/models/student.model';
+import { TenantModel } from '../../api/models/tenant.model';
+import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
 
+let appDataSource: DataSource | null = null;
 let isConnected = false;
 let connectionAttempts = 0;
+
 const MAX_RETRY_ATTEMPTS = 5;
-const RETRY_DELAY = 5000; // 5 seconds
+const RETRY_DELAY_MS = 5000;
+
+const createDataSource = (): DataSource =>
+  new DataSource({
+    type: 'mongodb',
+    url: env.db.DB_URL,
+    entities: [
+      UserModel,
+      TenantModel,
+      StudentModel,
+      LibraryModel,
+      PendingOwnerSignupModel,
+      PendingStudentSignupModel,
+      AuthSessionModel,
+    ],
+    synchronize: true,
+    logging: false,
+  });
+
+const resolveHostFromUrl = (url: string): string | undefined => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return undefined;
+  }
+};
+
+export const getDataSource = (): DataSource => {
+  if (!appDataSource || !appDataSource.isInitialized) {
+    throw new Error('Database connection is not initialized');
+  }
+
+  return appDataSource;
+};
 
 export const connectDatabase = async (): Promise<void> => {
   if (!env.db.enabled) {
@@ -14,110 +56,87 @@ export const connectDatabase = async (): Promise<void> => {
   }
 
   try {
-    // Configure mongoose with resilient connection options
-    mongoose.set('strictQuery', false);
+    if (appDataSource?.isInitialized) {
+      isConnected = true;
+      connectionAttempts = 0;
+      return;
+    }
 
-    await mongoose.connect(env.db.DB_URL, {
-      sanitizeFilter: true,
-      maxPoolSize: 10, // Maintain up to 10 socket connections
-      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      socketTimeoutMS: 30000, // Close sockets after 30 seconds of inactivity
-      retryWrites: true,
-      retryReads: true,
-    });
+    appDataSource = createDataSource();
+    await appDataSource.initialize();
 
     isConnected = true;
     connectionAttempts = 0;
   } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
     isConnected = false;
+    console.error('Error connecting to MongoDB with TypeORM:', error);
 
-    // Implement retry logic
     if (connectionAttempts < MAX_RETRY_ATTEMPTS) {
-      connectionAttempts++;
-      console.warn(`Retrying connection... Attempt ${connectionAttempts}/${MAX_RETRY_ATTEMPTS}`);
-      setTimeout(() => connectDatabase(), RETRY_DELAY);
-    } else {
-      console.error('Max connection attempts reached. Please check your MongoDB connection.');
-      // Don't exit the process, let the application handle gracefully
+      connectionAttempts += 1;
+      console.warn(
+        `Retrying database connection... Attempt ${connectionAttempts}/${MAX_RETRY_ATTEMPTS}`,
+      );
+      setTimeout(() => {
+        void connectDatabase();
+      }, RETRY_DELAY_MS);
+      return;
     }
+
+    console.error('Max database connection retry attempts reached.');
   }
 };
 
-const db = mongoose.connection;
-
-db.on('connecting', () => {
-  isConnected = false;
-});
-
-db.on('error', (error) => {
-  console.error(`MongoDB connection error: ${error}`);
-  isConnected = false;
-});
-
-db.on('connected', () => {
-  isConnected = true;
-  connectionAttempts = 0;
-});
-
-db.on('reconnected', () => {
-  isConnected = true;
-  connectionAttempts = 0;
-});
-
-db.on('disconnected', () => {
-  console.warn('MongoDB disconnected! Attempting to reconnect...');
-  isConnected = false;
-
-  // Attempt to reconnect
-  if (connectionAttempts < MAX_RETRY_ATTEMPTS) {
-    setTimeout(() => connectDatabase(), RETRY_DELAY);
-  }
-});
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  await disconnectDatabase();
-  process.exit(0);
-});
-
 export const disconnectDatabase = async (): Promise<void> => {
   if (!env.db.enabled) {
+    isConnected = false;
+    appDataSource = null;
+    return;
+  }
+
+  if (!appDataSource || !appDataSource.isInitialized) {
     isConnected = false;
     return;
   }
 
   try {
-    await mongoose.disconnect();
+    await appDataSource.destroy();
     isConnected = false;
+    appDataSource = null;
   } catch (error) {
-    console.error('Error disconnecting from MongoDB:', error);
+    console.error('Error disconnecting MongoDB DataSource:', error);
   }
 };
 
-// Health check function
-export const isDatabaseConnected = (): boolean => isConnected && mongoose.connection.readyState === 1;
+export const isDatabaseConnected = (): boolean =>
+  Boolean(env.db.enabled && isConnected && appDataSource?.isInitialized);
 
 export const isDatabaseEnabled = (): boolean => env.db.enabled;
 
-// Database health check with detailed status
 export const getDatabaseStatus = (): {
   enabled: boolean;
   connected: boolean;
   readyState: string;
   host?: string;
 } => {
-  const readyStates: Record<number, string> = {
-    [0]: 'disconnected',
-    [1]: 'connected',
-    [2]: 'connecting',
-    [3]: 'disconnecting',
-  };
+  if (!env.db.enabled) {
+    return {
+      enabled: false,
+      connected: false,
+      readyState: 'disabled',
+      host: resolveHostFromUrl(env.db.DB_URL),
+    };
+  }
 
+  const connected = isDatabaseConnected();
   return {
-    enabled: env.db.enabled,
-    connected: isConnected && mongoose.connection.readyState === 1,
-    readyState: env.db.enabled ? readyStates[mongoose.connection.readyState] || 'unknown' : 'disabled',
-    host: mongoose.connection.host,
+    enabled: true,
+    connected,
+    readyState: connected ? 'connected' : 'disconnected',
+    host: resolveHostFromUrl(env.db.DB_URL),
   };
 };
+
+process.on('SIGINT', async () => {
+  await disconnectDatabase();
+  process.exit(0);
+});

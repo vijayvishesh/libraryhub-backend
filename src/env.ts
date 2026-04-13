@@ -12,10 +12,7 @@ import {
 } from './lib/env';
 
 dotenv.config({
-  path: path.join(
-    process.cwd(),
-    `.env${process.env.NODE_ENV === 'test' ? '.test' : ''}`,
-  ),
+  path: path.join(process.cwd(), `.env${process.env.NODE_ENV === 'test' ? '.test' : ''}`),
 });
 
 export const env = {
@@ -70,8 +67,7 @@ export const env = {
     optionsOrigins: getOsEnvArray('AWS_API_GATEWAY_OPTIONS_ORIGINS'),
   },
   s3: {
-    bucket:
-      getOsEnvOptional('S3_BUCKET') || getOsEnvOptional('S3_BUCKET_NAME') || '',
+    bucket: getOsEnvOptional('S3_BUCKET') || getOsEnvOptional('S3_BUCKET_NAME') || '',
     region: getOsEnvOptional('S3_REGION') || '',
     accessKeyId: getOsEnvOptional('S3_ACCESS_KEY_ID'),
     secretAccessKey: getOsEnvOptional('S3_SECRET_ACCESS_KEY'),
@@ -101,8 +97,6 @@ export const env = {
   cookie: {
     secure: toBool(getOsEnvOptional('COOKIE_SECURE') || 'false'),
     httpOnly: toBool(getOsEnvOptional('COOKIE_HTTP_ONLY') || 'true'),
-    sameSite:
-      (getOsEnvOptional('COOKIE_SAME_SITE') as 'strict' | 'lax' | 'none') ||
-      'lax',
+    sameSite: (getOsEnvOptional('COOKIE_SAME_SITE') as 'strict' | 'lax' | 'none') || 'lax',
   },
 };

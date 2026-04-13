@@ -47,6 +47,12 @@ const start = async (): Promise<void> => {
   await banner(log);
 };
 
-start()
-  // eslint-disable-next-line no-console
-  .catch((error) => console.trace(`Application is crashed: ${error}`));
+start().catch((error: unknown) => {
+  if (error instanceof Error) {
+    console.error('Application crashed:', error.message);
+    console.error(error.stack);
+    return;
+  }
+
+  console.error('Application crashed with non-error payload:', error);
+});
