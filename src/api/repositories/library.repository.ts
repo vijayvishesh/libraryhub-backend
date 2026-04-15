@@ -3,7 +3,12 @@ import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { LibraryModel } from '../models/library.model';
-import { CreateLibraryInput, LibraryRecord, ListLibrariesQuery, ListLibrariesResult } from './types/library.repository.types';
+import {
+  CreateLibraryInput,
+  LibraryRecord,
+  ListLibrariesQuery,
+  ListLibrariesResult,
+} from './types/library.repository.types';
 
 type WithObjectId = {
   id: ObjectId;
@@ -48,16 +53,14 @@ export class LibraryRepository {
     };
 
     if (query.city) {
-      filter.city = { $regex: `^${query.city}$`, $options: 'i' };
+      const escapedCity = query.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.city = { $regex: `^${escapedCity}$`, $options: 'i' };
     }
 
     if (query.search) {
-      const searchRegex = { $regex: query.search, $options: 'i' };
-      filter.$or = [
-        { name: searchRegex },
-        { city: searchRegex },
-        { contactPhone: searchRegex },
-      ];
+      const escapedSearch = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escapedSearch, $options: 'i' };
+      filter.$or = [{ name: searchRegex }, { city: searchRegex }, { contactPhone: searchRegex }];
     }
 
     const [libraries, total] = await Promise.all([

@@ -43,7 +43,7 @@ export class AuthController {
   public async register(@Body() payload: RegisterRequest): Promise<AuthRegisterApiResponse> {
     try {
       const data = await this.authService.register(payload);
-      return new AuthRegisterApiResponse(data);
+      return new AuthRegisterApiResponse(data, 201);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
@@ -61,7 +61,7 @@ export class AuthController {
   public async sendOtp(@Body() payload: SendOtpRequest): Promise<OtpSendApiResponse> {
     try {
       const expiresIn = await this.authService.sendOtp(payload);
-      return new OtpSendApiResponse(expiresIn);
+      return new OtpSendApiResponse(expiresIn, 200);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
@@ -79,7 +79,7 @@ export class AuthController {
   public async verifyOtp(@Body() payload: VerifyOtpWithRoleRequest): Promise<AuthApiResponse> {
     try {
       const data = await this.authService.verifyOtpAndLogin(payload);
-      return new AuthApiResponse(data);
+      return new AuthApiResponse(data, 200);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
@@ -97,7 +97,7 @@ export class AuthController {
   public async login(@Body() payload: LoginRequest): Promise<AuthApiResponse> {
     try {
       const data = await this.authService.login(payload);
-      return new AuthApiResponse(data);
+      return new AuthApiResponse(data, 200);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
@@ -116,7 +116,7 @@ export class AuthController {
   public async me(
     @CurrentUser({ required: true }) session: CurrentSessionData,
   ): Promise<CurrentSessionApiResponse> {
-    return new CurrentSessionApiResponse(session);
+    return new CurrentSessionApiResponse(session, 200);
   }
 
   @Post('/refresh')
@@ -127,7 +127,7 @@ export class AuthController {
   public async refresh(@Body() payload: RefreshSessionRequest): Promise<SessionTokenApiResponse> {
     try {
       const data = await this.authService.refreshSession(payload);
-      return new SessionTokenApiResponse(data);
+      return new SessionTokenApiResponse(data, 200);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
@@ -145,7 +145,7 @@ export class AuthController {
   public async logout(@Body() payload: LogoutRequest): Promise<LogoutApiResponse> {
     try {
       const data = await this.authService.logout(payload);
-      return new LogoutApiResponse(data);
+      return new LogoutApiResponse(data, 200);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;

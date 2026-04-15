@@ -38,7 +38,7 @@ export class LibraryController {
   ): Promise<LibrarySetupApiResponse> {
     try {
       const data = await this.libraryService.getLibraryByOwnerId(session.user.id);
-      return new LibrarySetupApiResponse(data);
+      return new LibrarySetupApiResponse(data, 200);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
@@ -59,6 +59,7 @@ export class LibraryController {
       return new ListedLibrariesApiResponse(
         result.libraries,
         new PaginationMetaData(result.page, result.limit, result.total),
+        200,
       );
     } catch (error) {
       if (error instanceof HttpError) {
@@ -83,7 +84,7 @@ export class LibraryController {
   ): Promise<LibrarySetupApiResponse> {
     try {
       const data = await this.libraryService.setupLibrary(session.user.id, payload);
-      return new LibrarySetupApiResponse(data);
+      return new LibrarySetupApiResponse(data, 200);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;

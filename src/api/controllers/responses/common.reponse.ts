@@ -1,15 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class CommonResponse<T = unknown> {
-  @IsBoolean()
-  success!: boolean;
+  @IsNumber()
+  responseCode!: number;
 
   @ValidateNested()
   data!: T | null;
 
-  constructor(success: boolean, data: T | null = null) {
-    this.success = success;
+  constructor(responseCode: number, data: T | null = null) {
+    this.responseCode = responseCode;
     this.data = data;
   }
 }
@@ -38,11 +38,8 @@ export class ErrorData {
 }
 
 export class ErrorResponseModel {
-  @IsBoolean()
-  success!: boolean;
-
-  @IsString()
-  code!: string;
+  @IsNumber()
+  responseCode!: number;
 
   @IsString()
   message!: string;
@@ -51,12 +48,15 @@ export class ErrorResponseModel {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ErrorData)
-  details?: ErrorData[];
+  data?: ErrorData[];
 
-  constructor(code: string, message: string, details: ErrorData[] = []) {
-    this.success = false;
-    this.code = code;
+  constructor(responseCode?: number, message?: string, data: ErrorData[] = []) {
+    if (typeof responseCode !== 'number' || typeof message !== 'string') {
+      return;
+    }
+
+    this.responseCode = responseCode;
     this.message = message;
-    this.details = details;
+    this.data = data;
   }
 }

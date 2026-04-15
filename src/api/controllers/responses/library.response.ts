@@ -236,15 +236,19 @@ export class LibrarySetupData {
 }
 
 export class LibrarySetupApiResponse {
-  @IsBoolean()
-  success!: boolean;
+  @IsNumber()
+  responseCode!: number;
 
   @ValidateNested()
   @Type(() => LibrarySetupData)
   data!: LibrarySetupData;
 
-  constructor(data: LibrarySetupData) {
-    this.success = true;
+  constructor(data?: LibrarySetupData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
     this.data = data;
   }
 }
@@ -280,22 +284,36 @@ export class PaginationMetaData {
   }
 }
 
-export class ListedLibrariesApiResponse {
-  @IsBoolean()
-  success!: boolean;
-
+export class ListedLibrariesData {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => LibrarySetupData)
-  data!: LibrarySetupData[];
+  libraries!: LibrarySetupData[];
 
   @ValidateNested()
   @Type(() => PaginationMetaData)
   meta!: PaginationMetaData;
 
-  constructor(data: LibrarySetupData[], meta: PaginationMetaData) {
-    this.success = true;
-    this.data = data;
+  constructor(libraries: LibrarySetupData[], meta: PaginationMetaData) {
+    this.libraries = libraries;
     this.meta = meta;
+  }
+}
+
+export class ListedLibrariesApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => ListedLibrariesData)
+  data!: ListedLibrariesData;
+
+  constructor(libraries?: LibrarySetupData[], meta?: PaginationMetaData, responseCode = 200) {
+    if (!libraries || !meta || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = new ListedLibrariesData(libraries, meta);
   }
 }

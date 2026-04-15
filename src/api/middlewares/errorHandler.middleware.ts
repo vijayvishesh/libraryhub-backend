@@ -64,10 +64,9 @@ export class ErrorHandlerMiddleware implements ExpressErrorMiddlewareInterface {
       });
 
       res.status(503).json({
-        success: false,
-        code: 'DATABASE_CONNECTION_LOST',
+        responseCode: 503,
         message: 'Database connection lost. Please try again later.',
-        details: [],
+        data: [],
       });
       return;
     }
@@ -77,10 +76,9 @@ export class ErrorHandlerMiddleware implements ExpressErrorMiddlewareInterface {
     const hasValidationErrors = validationErrors.length > 0;
 
     res.status(responseCode).json({
-      success: false,
-      code: this.resolveErrorCode(error.name, error.message),
+      responseCode,
       message: this.getClientMessage(error.name, error.message, hasValidationErrors),
-      details: validationErrors,
+      data: validationErrors,
     });
 
     if (this.isProduction) {
@@ -112,18 +110,6 @@ export class ErrorHandlerMiddleware implements ExpressErrorMiddlewareInterface {
 
   private isErrorCode(value: string): boolean {
     return /^[A-Z0-9]+(?:_[A-Z0-9]+)*$/.test(value);
-  }
-
-  private resolveErrorCode(errorName: string, errorMessage: string): string {
-    if (this.isErrorCode(errorMessage)) {
-      return errorMessage;
-    }
-
-    if (this.isErrorCode(errorName)) {
-      return errorName;
-    }
-
-    return 'INTERNAL_SERVER_ERROR';
   }
 
   private humanizeErrorCode(errorCode: string): string {

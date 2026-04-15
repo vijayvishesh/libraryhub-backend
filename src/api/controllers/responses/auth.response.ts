@@ -213,30 +213,24 @@ export class AuthRegisterData {
 }
 
 export class AuthRegisterApiResponse {
-  @IsBoolean()
-  success!: boolean;
+  @IsNumber()
+  responseCode!: number;
 
-  @IsString()
-  message!: string;
+  @ValidateNested()
+  @Type(() => AuthRegisterData)
+  data!: AuthRegisterData;
 
-  @IsString()
-  userId!: string;
-
-  constructor(data?: AuthRegisterData) {
-    if (!data) {
+  constructor(data?: AuthRegisterData, responseCode = 201) {
+    if (!data || typeof responseCode !== 'number') {
       return;
     }
 
-    this.success = true;
-    this.message = data.message;
-    this.userId = data.userId;
+    this.responseCode = responseCode;
+    this.data = data;
   }
 }
 
-export class AuthApiResponse {
-  @IsBoolean()
-  success!: boolean;
-
+export class AuthPayloadData {
   @ValidateNested()
   @Type(() => TokenPairData)
   tokens!: TokenPairData;
@@ -250,9 +244,26 @@ export class AuthApiResponse {
       return;
     }
 
-    this.success = true;
     this.tokens = new TokenPairData(data.accessToken, data.refreshToken);
     this.user = new UserProfileData(data.user);
+  }
+}
+
+export class AuthApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => AuthPayloadData)
+  data!: AuthPayloadData;
+
+  constructor(data?: AuthData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = new AuthPayloadData(data);
   }
 }
 
@@ -275,10 +286,7 @@ export class CurrentSessionData {
   }
 }
 
-export class CurrentSessionApiResponse {
-  @IsBoolean()
-  success!: boolean;
-
+export class CurrentSessionPayloadData {
   @ValidateNested()
   @Type(() => UserProfileData)
   user!: UserProfileData;
@@ -288,8 +296,25 @@ export class CurrentSessionApiResponse {
       return;
     }
 
-    this.success = true;
     this.user = new UserProfileData(data.user);
+  }
+}
+
+export class CurrentSessionApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => CurrentSessionPayloadData)
+  data!: CurrentSessionPayloadData;
+
+  constructor(data?: CurrentSessionData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = new CurrentSessionPayloadData(data);
   }
 }
 
@@ -318,10 +343,7 @@ export class OtpActionData {
   }
 }
 
-export class OtpActionApiResponse {
-  @IsBoolean()
-  success!: boolean;
-
+export class OtpActionPayloadData {
   @IsString()
   message!: string;
 
@@ -334,7 +356,6 @@ export class OtpActionApiResponse {
       return;
     }
 
-    this.success = true;
     this.message = data.message;
 
     if (data.userId) {
@@ -343,16 +364,48 @@ export class OtpActionApiResponse {
   }
 }
 
-export class OtpSendApiResponse {
-  @IsBoolean()
-  success!: boolean;
+export class OtpActionApiResponse {
+  @IsNumber()
+  responseCode!: number;
 
+  @ValidateNested()
+  @Type(() => OtpActionPayloadData)
+  data!: OtpActionPayloadData;
+
+  constructor(data?: OtpActionData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = new OtpActionPayloadData(data);
+  }
+}
+
+export class OtpSendData {
   @IsNumber()
   expiresIn!: number;
 
   constructor(expiresIn: number) {
-    this.success = true;
     this.expiresIn = expiresIn;
+  }
+}
+
+export class OtpSendApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => OtpSendData)
+  data!: OtpSendData;
+
+  constructor(expiresIn?: number, responseCode = 200) {
+    if (typeof expiresIn !== 'number' || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = new OtpSendData(expiresIn);
   }
 }
 
@@ -369,7 +422,7 @@ export class SessionTokenData {
   }
 }
 
-export class SessionTokenApiResponse {
+export class SessionTokenPayloadData {
   @ValidateNested()
   @Type(() => TokenPairData)
   tokens!: TokenPairData;
@@ -383,6 +436,24 @@ export class SessionTokenApiResponse {
   }
 }
 
+export class SessionTokenApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => SessionTokenPayloadData)
+  data!: SessionTokenPayloadData;
+
+  constructor(data?: SessionTokenData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = new SessionTokenPayloadData(data);
+  }
+}
+
 export class LogoutData {
   @IsString()
   message!: string;
@@ -393,18 +464,19 @@ export class LogoutData {
 }
 
 export class LogoutApiResponse {
-  @IsBoolean()
-  success!: boolean;
+  @IsNumber()
+  responseCode!: number;
 
-  @IsString()
-  message!: string;
+  @ValidateNested()
+  @Type(() => LogoutData)
+  data!: LogoutData;
 
-  constructor(data?: LogoutData) {
-    if (!data) {
+  constructor(data?: LogoutData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
       return;
     }
 
-    this.success = true;
-    this.message = data.message;
+    this.responseCode = responseCode;
+    this.data = data;
   }
 }

@@ -6,7 +6,7 @@ import { isDatabaseConnected, isDatabaseEnabled } from '../../database/config/or
 @Service()
 @Middleware({ type: 'before' })
 export class DbHealthMiddleware implements ExpressMiddlewareInterface {
-  public use(req: Request, res: Response, next: NextFunction) {
+  public use(_req: Request, res: Response, next: NextFunction) {
     if (!isDatabaseEnabled()) {
       next();
       return;
@@ -14,10 +14,9 @@ export class DbHealthMiddleware implements ExpressMiddlewareInterface {
 
     if (!isDatabaseConnected()) {
       res.status(503).json({
-        status: 503,
-        data: null,
-        error: 'Database connection unavailable. Please try again later.',
-        message: 'Service temporarily unavailable',
+        responseCode: 503,
+        message: 'Database connection unavailable. Please try again later.',
+        data: [],
       });
       return;
     }
