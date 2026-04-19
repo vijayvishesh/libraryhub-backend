@@ -7,6 +7,9 @@ import {
 import {
   LibraryLocationData,
   LibraryPhotoData,
+  LibrarySeatingData,
+  LibrarySeatingRangeData,
+  LibrarySeatingSectionData,
   LibrarySetupData,
   LibrarySlotData,
   LibraryStatsData,
@@ -114,19 +117,29 @@ export class LibraryService {
       ownerId: owner.id,
       name: payload.name?.trim() ?? base?.name ?? tenant.name,
       description: payload.description?.trim() ?? base?.description ?? '',
-      contactPhone: payload.contactPhone?.trim() ?? base?.contactPhone ?? owner.phone,
-      contactEmail: payload.contactEmail?.trim() ?? base?.contactEmail ?? null,
+      contactPhone:
+        payload.contactPhone?.trim() ?? payload.ownerPhone?.trim() ?? base?.contactPhone ?? owner.phone,
+      contactEmail:
+        payload.contactEmail?.trim() ?? payload.ownerEmail?.trim() ?? base?.contactEmail ?? null,
       address: payload.address?.trim() ?? base?.address ?? '',
       city: payload.city?.trim() ?? base?.city ?? tenant.city,
       state: payload.state?.trim() ?? base?.state ?? '',
       pincode: payload.pincode?.trim() ?? base?.pincode ?? '',
-      location: {
-        type: payload.location?.type ?? base?.location.type ?? 'Point',
-        coordinates: payload.location
-          ? [payload.location.coordinates[0], payload.location.coordinates[1]]
-          : (base?.location.coordinates ?? [0, 0]),
-      },
-      totalSeats: payload.totalSeats ?? base?.totalSeats ?? 1,
+      location: payload.location
+        ? {
+            type: payload.location.type,
+            coordinates: [payload.location.coordinates[0], payload.location.coordinates[1]] as [number, number],
+          }
+        : payload.coordinates
+        ? {
+            type: 'Point',
+            coordinates: [payload.coordinates.lng, payload.coordinates.lat] as [number, number],
+          }
+        : {
+            type: base?.location.type ?? 'Point',
+            coordinates: base?.location.coordinates ?? [0, 0],
+          },
+      totalSeats: payload.totalSeats ?? payload.seating?.total ?? base?.totalSeats ?? 1,
       facilities: payload.facilities ?? base?.facilities ?? [],
       slots:
         payload.slots?.map(slot => ({
@@ -139,6 +152,7 @@ export class LibraryService {
         })) ??
         base?.slots ??
         [],
+      seating: payload.seating ?? base?.seating,
       photos:
         payload.photos?.map((photo, index) => ({
           url: photo.url.trim(),
@@ -176,6 +190,33 @@ export class LibraryService {
       pincode: library.pincode,
       location: new LibraryLocationData(library.location.type, library.location.coordinates),
       totalSeats: library.totalSeats,
+      seating: library.seating
+        ? new LibrarySeatingData({
+            mode: library.seating.mode,
+            total: library.seating.total,
+            filled: library.seating.filled,
+            available: library.seating.available,
+            arrangement: library.seating.arrangement,
+            boys: library.seating.boys,
+            girls: library.seating.girls,
+            open: library.seating.open,
+            ranges: library.seating.ranges?.map(
+              range => new LibrarySeatingRangeData(range.from, range.to, range.gender),
+            ),
+            genderMode: library.seating.genderMode,
+            sections: library.seating.sections?.map(
+              section =>
+                new LibrarySeatingSectionData(
+                  section.id,
+                  section.name,
+                  section.capacity,
+                  section.filled,
+                  section.available,
+                  section.gender,
+                ),
+            ),
+          })
+        : undefined,
       facilities: library.facilities,
       slots: library.slots.map(
         slot =>

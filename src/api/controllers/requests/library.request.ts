@@ -17,7 +17,14 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { LIBRARY_FACILITY_ENUM, LIBRARY_SLOT_TYPE_ENUM } from '../../constants/library.constants';
+import {
+  LIBRARY_FACILITY_ENUM,
+  LIBRARY_SLOT_TYPE_ENUM,
+  LIBRARY_SEATING_ARRANGEMENT_ENUM,
+  LIBRARY_SEATING_GENDER_ENUM,
+  LIBRARY_SEATING_GENDER_MODE_ENUM,
+  LIBRARY_SEATING_MODE_ENUM,
+} from '../../constants/library.constants';
 
 const TIME_FORMAT_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -31,6 +38,14 @@ export class LibraryGeoLocationRequest {
   @ArrayMaxSize(2)
   @IsNumber({}, { each: true })
   coordinates!: [number, number];
+}
+
+export class LibraryGeoCoordinatesRequest {
+  @IsNumber()
+  lat!: number;
+
+  @IsNumber()
+  lng!: number;
 }
 
 export class LibrarySlotRequest {
@@ -74,6 +89,101 @@ export class LibraryPhotoRequest {
   order?: number;
 }
 
+export class LibrarySeatingRangeRequest {
+  @IsNumber()
+  @Min(0)
+  from!: number;
+
+  @IsNumber()
+  @Min(0)
+  to!: number;
+
+  @IsString()
+  @IsIn([...LIBRARY_SEATING_GENDER_ENUM])
+  gender!: (typeof LIBRARY_SEATING_GENDER_ENUM)[number];
+}
+
+export class LibrarySeatingSectionRequest {
+  @IsNumber()
+  @Min(0)
+  id!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsNumber()
+  @Min(0)
+  capacity!: number;
+
+  @IsNumber()
+  @Min(0)
+  filled!: number;
+
+  @IsNumber()
+  @Min(0)
+  available!: number;
+
+  @IsString()
+  @IsIn([...LIBRARY_SEATING_GENDER_ENUM])
+  gender!: (typeof LIBRARY_SEATING_GENDER_ENUM)[number];
+}
+
+export class LibrarySeatingRequest {
+  @IsString()
+  @IsIn([...LIBRARY_SEATING_MODE_ENUM])
+  mode!: (typeof LIBRARY_SEATING_MODE_ENUM)[number];
+
+  @IsNumber()
+  @Min(0)
+  total!: number;
+
+  @IsNumber()
+  @Min(0)
+  filled!: number;
+
+  @IsNumber()
+  @Min(0)
+  available!: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...LIBRARY_SEATING_ARRANGEMENT_ENUM])
+  arrangement?: (typeof LIBRARY_SEATING_ARRANGEMENT_ENUM)[number];
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  boys?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  girls?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  open?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySeatingRangeRequest)
+  ranges?: LibrarySeatingRangeRequest[];
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...LIBRARY_SEATING_GENDER_MODE_ENUM])
+  genderMode?: (typeof LIBRARY_SEATING_GENDER_MODE_ENUM)[number];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySeatingSectionRequest)
+  sections?: LibrarySeatingSectionRequest[];
+}
+
 export class LibraryStatsRequest {
   @IsOptional()
   @IsNumber()
@@ -112,8 +222,17 @@ export class LibrarySetupRequest {
   contactPhone?: string;
 
   @IsOptional()
+  @IsString()
+  @Matches(/^[0-9]{10}$/, { message: 'ownerPhone must be a valid 10-digit number' })
+  ownerPhone?: string;
+
+  @IsOptional()
   @IsEmail()
   contactEmail?: string;
+
+  @IsOptional()
+  @IsEmail()
+  ownerEmail?: string;
 
   @IsOptional()
   @IsString()
@@ -136,6 +255,11 @@ export class LibrarySetupRequest {
   @ValidateNested()
   @Type(() => LibraryGeoLocationRequest)
   location?: LibraryGeoLocationRequest;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LibraryGeoCoordinatesRequest)
+  coordinates?: LibraryGeoCoordinatesRequest;
 
   @IsOptional()
   @IsNumber()
@@ -177,6 +301,11 @@ export class LibrarySetupRequest {
   @IsOptional()
   @IsString()
   openingHours?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LibrarySeatingRequest)
+  seating?: LibrarySeatingRequest;
 
   @IsOptional()
   @ValidateNested()

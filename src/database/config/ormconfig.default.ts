@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { ActivityModel } from '../../api/models/activity.model';
 import { AuthSessionModel } from '../../api/models/authSession.model';
 import { LibraryModel } from '../../api/models/library.model';
 import { PendingOwnerSignupModel } from '../../api/models/pendingOwnerSignup.model';
@@ -6,6 +7,7 @@ import { PendingStudentSignupModel } from '../../api/models/pendingStudentSignup
 import { StudentModel } from '../../api/models/student.model';
 import { TenantModel } from '../../api/models/tenant.model';
 import { UserModel } from '../../api/models/user.model';
+import { MemberModel } from '../../api/models/member.model';
 import { env } from '../../env';
 
 let appDataSource: DataSource | null = null;
@@ -19,6 +21,13 @@ const createDataSource = (): DataSource =>
   new DataSource({
     type: 'mongodb',
     url: env.db.DB_URL,
+    ssl: true,
+    extra: {
+      tls: true,
+      tlsInsecure: false,
+      retryWrites: true,
+      w: 'majority',
+    },
     entities: [
       UserModel,
       TenantModel,
@@ -27,6 +36,8 @@ const createDataSource = (): DataSource =>
       PendingOwnerSignupModel,
       PendingStudentSignupModel,
       AuthSessionModel,
+      MemberModel,
+      ActivityModel,
     ],
     synchronize: true,
     logging: false,

@@ -1,0 +1,12 @@
+export const ACTIVITY_ACTION_TYPES = [
+  'CHECKED_STUDENT',
+  'PAYMENT_RECEIVED',
+  'MEMBERSHIP_EXPIRED',
+  'NEW_MEMBER_ADDED',
+  'LIBRARY_CREATED',
+  'LIBRARY_UPDATED',
+  'USER_LOGGED_IN',
+  'USER_LOGGED_OUT',
+] as const;
+
+export type ActivityActionType = (typeof ACTIVITY_ACTION_TYPES)[number];

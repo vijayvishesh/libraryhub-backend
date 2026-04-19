@@ -11,6 +11,7 @@ import {
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
+import { ActivityService } from '../services/activity.service';
 import { LibraryService } from '../services/library.service';
 import { LibraryListQueryRequest, LibrarySetupRequest } from './requests/library.request';
 import { CurrentSessionData } from './responses/auth.response';
@@ -24,7 +25,10 @@ import {
 @Service()
 @JsonController('/v1/libraries')
 export class LibraryController {
-  constructor(private readonly libraryService: LibraryService) {}
+  constructor(
+    private readonly libraryService: LibraryService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   @Get('/my')
   @Authorized('OWNER')
@@ -84,6 +88,15 @@ export class LibraryController {
   ): Promise<LibrarySetupApiResponse> {
     try {
       const data = await this.libraryService.setupLibrary(session.user.id, payload);
+
+      // Log the activity
+      await this.activityService.logActivity(
+        session.user.id,
+        'LIBRARY_CREATED',
+        `User created a new library: ${data.name}`,
+        { libraryId: data.id, libraryName: data.name },
+      );
+
       return new LibrarySetupApiResponse(data, 200);
     } catch (error) {
       if (error instanceof HttpError) {

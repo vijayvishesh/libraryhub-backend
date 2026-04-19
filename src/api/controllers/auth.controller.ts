@@ -10,6 +10,7 @@ import {
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
+import { ActivityService } from '../services/activity.service';
 import { AuthService } from '../services/auth.service';
 import {
   LoginRequest,
@@ -33,7 +34,10 @@ import { ErrorResponseModel } from './responses/common.reponse';
 @Service()
 @JsonController('/v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   @Post('/register')
   @ResponseSchema(AuthRegisterApiResponse, { statusCode: 201 })
@@ -97,6 +101,15 @@ export class AuthController {
   public async login(@Body() payload: LoginRequest): Promise<AuthApiResponse> {
     try {
       const data = await this.authService.login(payload);
+
+      // Log the activity
+      await this.activityService.logActivity(
+        data.user.id,
+        'USER_LOGGED_IN',
+        `User logged in: ${data.user.phone}`,
+        { phone: data.user.phone, role: data.user.role },
+      );
+
       return new AuthApiResponse(data, 200);
     } catch (error) {
       if (error instanceof HttpError) {

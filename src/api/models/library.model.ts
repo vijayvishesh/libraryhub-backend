@@ -23,6 +23,35 @@ export type LibraryPhoto = {
   uploadedAt: Date;
 };
 
+export type LibrarySeatingRange = {
+  from: number;
+  to: number;
+  gender: 'any' | 'male' | 'female';
+};
+
+export type LibrarySeatingSection = {
+  id: number;
+  name: string;
+  capacity: number;
+  filled: number;
+  available: number;
+  gender: 'any' | 'male' | 'female';
+};
+
+export type LibrarySeating = {
+  mode: 'general' | 'section';
+  total: number;
+  filled: number;
+  available: number;
+  arrangement?: 'open' | 'split' | 'custom';
+  boys?: number;
+  girls?: number;
+  open?: number;
+  ranges?: LibrarySeatingRange[];
+  genderMode?: 'mixed' | 'separate';
+  sections?: LibrarySeatingSection[];
+};
+
 export type LibraryStats = {
   totalMembers: number;
   activeMembers: number;
@@ -70,6 +99,9 @@ export class LibraryModel {
 
   @Column()
   totalSeats!: number;
+
+  @Column()
+  seating?: LibrarySeating;
 
   @Column()
   facilities!: LibraryFacility[];

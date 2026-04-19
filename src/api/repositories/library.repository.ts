@@ -105,6 +105,7 @@ export class LibraryRepository {
     existingLibrary.pincode = input.pincode;
     existingLibrary.location = input.location;
     existingLibrary.totalSeats = input.totalSeats;
+    existingLibrary.seating = input.seating;
     existingLibrary.facilities = input.facilities;
     existingLibrary.slots = input.slots;
     existingLibrary.photos = input.photos;
@@ -162,6 +163,7 @@ export class LibraryRepository {
       pincode: library.pincode,
       location: library.location,
       totalSeats: library.totalSeats,
+      seating: library.seating,
       facilities: library.facilities,
       slots: library.slots,
       photos: library.photos,

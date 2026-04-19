@@ -58,6 +58,128 @@ export class LibrarySlotData {
   }
 }
 
+export class LibrarySeatingRangeData {
+  @IsNumber()
+  from!: number;
+
+  @IsNumber()
+  to!: number;
+
+  @IsString()
+  gender!: string;
+
+  constructor(from: number, to: number, gender: string) {
+    this.from = from;
+    this.to = to;
+    this.gender = gender;
+  }
+}
+
+export class LibrarySeatingSectionData {
+  @IsNumber()
+  id!: number;
+
+  @IsString()
+  name!: string;
+
+  @IsNumber()
+  capacity!: number;
+
+  @IsNumber()
+  filled!: number;
+
+  @IsNumber()
+  available!: number;
+
+  @IsString()
+  gender!: string;
+
+  constructor(id: number, name: string, capacity: number, filled: number, available: number, gender: string) {
+    this.id = id;
+    this.name = name;
+    this.capacity = capacity;
+    this.filled = filled;
+    this.available = available;
+    this.gender = gender;
+  }
+}
+
+export class LibrarySeatingData {
+  @IsString()
+  mode!: string;
+
+  @IsNumber()
+  total!: number;
+
+  @IsNumber()
+  filled!: number;
+
+  @IsNumber()
+  available!: number;
+
+  @IsOptional()
+  @IsString()
+  arrangement?: string;
+
+  @IsOptional()
+  @IsNumber()
+  boys?: number;
+
+  @IsOptional()
+  @IsNumber()
+  girls?: number;
+
+  @IsOptional()
+  @IsNumber()
+  open?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySeatingRangeData)
+  ranges?: LibrarySeatingRangeData[];
+
+  @IsOptional()
+  @IsString()
+  genderMode?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySeatingSectionData)
+  sections?: LibrarySeatingSectionData[];
+
+  constructor(params?: {
+    mode: string;
+    total: number;
+    filled: number;
+    available: number;
+    arrangement?: string;
+    boys?: number;
+    girls?: number;
+    open?: number;
+    ranges?: LibrarySeatingRangeData[];
+    genderMode?: string;
+    sections?: LibrarySeatingSectionData[];
+  }) {
+    if (!params) {
+      return;
+    }
+
+    this.mode = params.mode;
+    this.total = params.total;
+    this.filled = params.filled;
+    this.available = params.available;
+    this.arrangement = params.arrangement;
+    this.boys = params.boys;
+    this.girls = params.girls;
+    this.open = params.open;
+    this.ranges = params.ranges;
+    this.genderMode = params.genderMode;
+    this.sections = params.sections;
+  }
+}
+
 export class LibraryPhotoData {
   @IsString()
   url!: string;
@@ -140,6 +262,11 @@ export class LibrarySetupData {
   @IsNumber()
   totalSeats!: number;
 
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LibrarySeatingData)
+  seating?: LibrarySeatingData;
+
   @IsArray()
   @IsString({ each: true })
   facilities!: string[];
@@ -193,6 +320,7 @@ export class LibrarySetupData {
     pincode: string;
     location: LibraryLocationData;
     totalSeats: number;
+    seating?: LibrarySeatingData;
     facilities: string[];
     slots: LibrarySlotData[];
     photos: LibraryPhotoData[];
@@ -221,6 +349,7 @@ export class LibrarySetupData {
     this.pincode = params.pincode;
     this.location = params.location;
     this.totalSeats = params.totalSeats;
+    this.seating = params.seating;
     this.facilities = params.facilities;
     this.slots = params.slots;
     this.photos = params.photos;
