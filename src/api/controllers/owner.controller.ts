@@ -22,7 +22,6 @@ import {
   ListMembersQueryRequest,
   UpdateMemberRequest,
 } from './requests/member.request';
-import { OwnerDashboardQueryRequest } from './requests/owner.request';
 import { CurrentSessionData } from './responses/auth.response';
 import { ErrorResponseModel } from './responses/common.reponse';
 import {
@@ -56,16 +55,14 @@ export class OwnerController {
   @Authorized('OWNER')
   @OpenAPI({ security: [{ bearerAuth: [] }] })
   @ResponseSchema(OwnerDashboardApiResponse, { statusCode: 200 })
-  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
   public async getDashboard(
     @CurrentUser({ required: true }) session: CurrentSessionData,
-    @QueryParams() query: OwnerDashboardQueryRequest,
   ): Promise<OwnerDashboardApiResponse> {
     try {
-      const dashboard = await this.ownerService.getDashboard(session.user.id, query.slotId);
+      const dashboard = await this.ownerService.getDashboard(session.user.id);
       return new OwnerDashboardApiResponse(
         new OwnerDashboardData({
           library: new OwnerDashboardLibraryData(

@@ -68,10 +68,11 @@ export class ListMyBookingsQueryRequest {
 }
 
 export class LibrarySeatMapQueryRequest {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @IsIn([...LIBRARY_SLOT_TYPE_ENUM])
-  slotId!: string;
+  slotId?: string;
 
   @IsOptional()
   @IsString()
