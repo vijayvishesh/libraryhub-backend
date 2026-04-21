@@ -133,56 +133,47 @@ export class OwnerService {
     startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
     const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-    const pipeline = [
-      {
-        $match: {
-          libraryId,
-          status: { $in: ['confirmed', 'checked_in', 'checked_out'] },
-          createdAt: { $gte: startOfYesterday, $lt: startOfNextMonth },
-        },
-      },
-      {
-        $group: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          _id: {
-            $switch: {
-              branches: [
-                {
-                  case: {
-                    $and: [
-                      { $gte: ['$createdAt', startOfToday] },
-                      { $lt: ['$createdAt', startOfTomorrow] },
-                    ],
-                  },
-                  then: 'today',
-                },
-                {
-                  case: {
-                    $and: [
-                      { $gte: ['$createdAt', startOfYesterday] },
-                      { $lt: ['$createdAt', startOfToday] },
-                    ],
-                  },
-                  then: 'yesterday',
-                },
-              ],
-              default: 'other',
+    const timeBucketGroup = this.buildTimeBucketGroup(
+      startOfToday,
+      startOfTomorrow,
+      startOfYesterday,
+    );
+
+    const ds = getDataSource();
+    const [bookingResults, memberResults] = await Promise.all([
+      ds
+        .getMongoRepository(BookingModel)
+        .aggregate([
+          {
+            $match: {
+              libraryId,
+              status: { $in: ['confirmed', 'checked_in', 'checked_out'] },
+              createdAt: { $gte: startOfYesterday, $lt: startOfNextMonth },
             },
           },
-          revenue: { $sum: '$amount' },
-        },
-      },
-    ];
-
-    const results = await getDataSource()
-      .getMongoRepository(BookingModel)
-      .aggregate(pipeline)
-      .toArray();
+          { $group: { ...timeBucketGroup, revenue: { $sum: '$amount' } } },
+        ])
+        .toArray(),
+      ds
+        .getMongoRepository(MemberModel)
+        .aggregate([
+          {
+            $match: {
+              libraryId,
+              status: { $in: ['active', 'pending'] },
+              planAmount: { $gt: 0 },
+              createdAt: { $gte: startOfYesterday, $lt: startOfNextMonth },
+            },
+          },
+          { $group: { ...timeBucketGroup, revenue: { $sum: '$planAmount' } } },
+        ])
+        .toArray(),
+    ]);
 
     const revenueMap: Record<string, number> = {};
-    for (const row of results) {
+    for (const row of [...bookingResults, ...memberResults]) {
       const key = row['_id'] as string;
-      revenueMap[key] = row.revenue || 0;
+      revenueMap[key] = (revenueMap[key] || 0) + (row.revenue || 0);
     }
 
     const todayRevenue = revenueMap['today'] || 0;
@@ -198,6 +189,37 @@ export class OwnerService {
         : Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100);
 
     return { today: todayRevenue, todayChange, monthly: monthlyRevenue };
+  }
+
+  private buildTimeBucketGroup(startOfToday: Date, startOfTomorrow: Date, startOfYesterday: Date) {
+    return {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      _id: {
+        $switch: {
+          branches: [
+            {
+              case: {
+                $and: [
+                  { $gte: ['$createdAt', startOfToday] },
+                  { $lt: ['$createdAt', startOfTomorrow] },
+                ],
+              },
+              then: 'today',
+            },
+            {
+              case: {
+                $and: [
+                  { $gte: ['$createdAt', startOfYesterday] },
+                  { $lt: ['$createdAt', startOfToday] },
+                ],
+              },
+              then: 'yesterday',
+            },
+          ],
+          default: 'other',
+        },
+      },
+    };
   }
 
   private async getPendingSeatCount(libraryId: string, slotId: string): Promise<number> {
