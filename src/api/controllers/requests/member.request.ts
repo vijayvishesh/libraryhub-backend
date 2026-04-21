@@ -1,5 +1,18 @@
 import { Type } from 'class-transformer';
-import { IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
+
+const MEMBER_STATUS_ENUM = ['active', 'inactive', 'expired', 'pending'] as const;
 
 export class AddMemberRequest {
   @IsString()
@@ -10,9 +23,10 @@ export class AddMemberRequest {
   @Matches(/^[6-9]\d{9}$/, { message: 'Invalid mobile number' })
   mobileNo!: string;
 
+  @IsOptional()
   @IsString()
   @Matches(/^\d{12}$/, { message: 'Aadhar must be 12 digits' })
-  aadharId!: string;
+  aadharId?: string;
 
   @IsOptional()
   @IsEmail()
@@ -22,4 +36,131 @@ export class AddMemberRequest {
   @IsInt()
   @Min(1)
   duration!: number;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  seatId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  slotId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...MEMBER_STATUS_ENUM])
+  status?: (typeof MEMBER_STATUS_ENUM)[number];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  planAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'startDate must be YYYY-MM-DD' })
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'endDate must be YYYY-MM-DD' })
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class UpdateMemberRequest {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  fullName?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[6-9]\d{9}$/, { message: 'Invalid mobile number' })
+  mobileNo?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{12}$/, { message: 'Aadhar must be 12 digits' })
+  aadharId?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  duration?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  seatId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  slotId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...MEMBER_STATUS_ENUM])
+  status?: (typeof MEMBER_STATUS_ENUM)[number];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  planAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'startDate must be YYYY-MM-DD' })
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'endDate must be YYYY-MM-DD' })
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class ListMembersQueryRequest {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...MEMBER_STATUS_ENUM])
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  slotId?: string;
 }

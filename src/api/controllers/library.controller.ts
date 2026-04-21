@@ -6,15 +6,27 @@ import {
   HttpError,
   InternalServerError,
   JsonController,
+  Param,
   Post,
   QueryParams,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { ActivityService } from '../services/activity.service';
+import { BookingService } from '../services/booking.service';
 import { LibraryService } from '../services/library.service';
+import { LibrarySeatMapQueryRequest } from './requests/booking.request';
 import { LibraryListQueryRequest, LibrarySetupRequest } from './requests/library.request';
 import { CurrentSessionData } from './responses/auth.response';
+import {
+  LibraryPaymentOptionData,
+  LibraryPaymentOptionsApiResponse,
+  OwnerSeatOverviewApiResponse,
+  OwnerSeatOverviewData,
+  SeatMapApiResponse,
+  SeatMapData,
+  SeatMapSeatData,
+} from './responses/booking.response';
 import { ErrorResponseModel } from './responses/common.reponse';
 import {
   LibrarySetupApiResponse,
@@ -27,6 +39,7 @@ import {
 export class LibraryController {
   constructor(
     private readonly libraryService: LibraryService,
+    private readonly bookingService: BookingService,
     private readonly activityService: ActivityService,
   ) {}
 
@@ -52,8 +65,55 @@ export class LibraryController {
     }
   }
 
+  @Get('/my/seats')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(OwnerSeatOverviewApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getMyLibrarySeatOverview(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @QueryParams() query: LibrarySeatMapQueryRequest,
+  ): Promise<OwnerSeatOverviewApiResponse> {
+    try {
+      const library = await this.libraryService.getLibraryByOwnerId(session.user.id);
+      const seatMap = await this.bookingService.getLibrarySeatMap(
+        library.id,
+        query.slotId,
+        query.sectionId,
+      );
+      const mappedSeats = seatMap.seats.map(item => new SeatMapSeatData(item));
+      const occupiedSeats = seatMap.seats.filter(item => item.occupied).length;
+      const totalSeats = seatMap.seats.length;
+
+      return new OwnerSeatOverviewApiResponse(
+        new OwnerSeatOverviewData({
+          libraryId: seatMap.libraryId,
+          slotId: seatMap.slotId,
+          sectionId: seatMap.sectionId,
+          totalSeats,
+          occupiedSeats,
+          availableSeats: totalSeats - occupiedSeats,
+          seats: mappedSeats,
+        }),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GET_MY_LIBRARY_SEAT_OVERVIEW_FAILED');
+    }
+  }
+
   @Get('/')
+  @Authorized('STUDENT')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
   @ResponseSchema(ListedLibrariesApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
   public async listLibraries(
     @QueryParams() query: LibraryListQueryRequest,
@@ -71,6 +131,92 @@ export class LibraryController {
       }
 
       throw new InternalServerError('LIST_LIBRARIES_FAILED');
+    }
+  }
+
+  @Get('/:libraryId')
+  @Authorized('STUDENT')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(LibrarySetupApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getLibraryById(
+    @Param('libraryId') libraryId: string,
+  ): Promise<LibrarySetupApiResponse> {
+    try {
+      const data = await this.libraryService.getLibraryById(libraryId);
+      return new LibrarySetupApiResponse(data, 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GET_LIBRARY_BY_ID_FAILED');
+    }
+  }
+
+  @Get('/:libraryId/seats')
+  @Authorized('STUDENT')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(SeatMapApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getLibrarySeatMap(
+    @Param('libraryId') libraryId: string,
+    @QueryParams() query: LibrarySeatMapQueryRequest,
+  ): Promise<SeatMapApiResponse> {
+    try {
+      const seatMap = await this.bookingService.getLibrarySeatMap(
+        libraryId,
+        query.slotId,
+        query.sectionId,
+      );
+
+      return new SeatMapApiResponse(
+        new SeatMapData({
+          libraryId: seatMap.libraryId,
+          slotId: seatMap.slotId,
+          sectionId: seatMap.sectionId,
+          seats: seatMap.seats.map(item => new SeatMapSeatData(item)),
+        }),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GET_LIBRARY_SEAT_MAP_FAILED');
+    }
+  }
+
+  @Get('/:libraryId/payment-methods')
+  @Authorized('STUDENT')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(LibraryPaymentOptionsApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getLibraryPaymentMethods(
+    @Param('libraryId') libraryId: string,
+  ): Promise<LibraryPaymentOptionsApiResponse> {
+    try {
+      const methods = await this.bookingService.getLibraryPaymentOptions(libraryId);
+      return new LibraryPaymentOptionsApiResponse(
+        methods.map(
+          method => new LibraryPaymentOptionData(method.type, method.label, method.enabled),
+        ),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GET_LIBRARY_PAYMENT_METHODS_FAILED');
     }
   }
 

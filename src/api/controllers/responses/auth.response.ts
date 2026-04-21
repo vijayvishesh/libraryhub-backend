@@ -37,6 +37,9 @@ export class AuthUserData {
   phone!: string;
 
   @IsString()
+  gender!: 'male' | 'female' | 'other';
+
+  @IsString()
   role!: string;
 
   @IsOptional()
@@ -51,6 +54,7 @@ export class AuthUserData {
     id: string,
     name: string,
     phone: string,
+    gender: 'male' | 'female' | 'other',
     role: string,
     statusFlags?: {
       hasCreatedLibrary?: boolean;
@@ -60,6 +64,7 @@ export class AuthUserData {
     this.id = id;
     this.name = name;
     this.phone = phone;
+    this.gender = gender;
     this.role = role;
 
     if (typeof statusFlags?.hasCreatedLibrary === 'boolean') {
@@ -159,6 +164,9 @@ export class UserProfileData {
   @IsString()
   role!: string;
 
+  @IsString()
+  gender!: 'male' | 'female' | 'other';
+
   @IsBoolean()
   isVerified!: boolean;
 
@@ -183,6 +191,7 @@ export class UserProfileData {
     this.name = user.name;
     this.phone = toE164IndianPhone(user.phone);
     this.role = toOpenApiRole(user.role);
+    this.gender = user.gender;
     this.isVerified = true;
 
     if (typeof user.hasCreatedLibrary === 'boolean') {

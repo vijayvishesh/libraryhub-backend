@@ -38,6 +38,7 @@ export type StudentRecord = {
   id: string;
   name: string;
   phone: string;
+  gender: 'male' | 'female' | 'other';
   password: string;
   isPhoneVerified: boolean;
   hasJoinedLibrary: boolean;
@@ -47,6 +48,7 @@ export type StudentRecord = {
 export type CreateStudentInput = {
   name: string;
   phone: string;
+  gender: 'male' | 'female' | 'other';
   password: string;
   isPhoneVerified: boolean;
   hasJoinedLibrary: boolean;
@@ -80,6 +82,7 @@ export type PendingStudentSignupRecord = {
   id: string;
   name: string;
   phone: string;
+  gender: 'male' | 'female' | 'other';
   password: string;
   otp: string;
   expiresAt: Date;
@@ -90,6 +93,7 @@ export type PendingStudentSignupRecord = {
 export type UpsertPendingStudentSignupInput = {
   name: string;
   phone: string;
+  gender: 'male' | 'female' | 'other';
   password: string;
   otp: string;
   expiresAt: Date;

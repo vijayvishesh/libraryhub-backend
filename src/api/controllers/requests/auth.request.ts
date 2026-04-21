@@ -6,9 +6,11 @@ const trimString = ({ value }: { value: unknown }) =>
 
 const PHONE_REGEX = /^(?:\+91)?[6-9][0-9]{9}$/;
 const USER_ROLE_ENUM = ['owner', 'student'] as const;
+const USER_GENDER_ENUM = ['male', 'female', 'other'] as const;
 const OTP_PURPOSE_ENUM = ['verify', 'login', 'reset'] as const;
 
 export type AuthRequestRole = (typeof USER_ROLE_ENUM)[number];
+export type AuthRequestGender = (typeof USER_GENDER_ENUM)[number];
 
 export class RegisterRequest {
   @Transform(({ value, obj }: { value: unknown; obj?: { username?: unknown } }) => {
@@ -42,6 +44,11 @@ export class RegisterRequest {
   @IsNotEmpty()
   @IsIn([...USER_ROLE_ENUM])
   role!: AuthRequestRole;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsIn([...USER_GENDER_ENUM])
+  gender?: AuthRequestGender;
 }
 
 export class RegisterOwnerRequest {

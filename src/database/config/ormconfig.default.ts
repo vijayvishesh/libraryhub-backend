@@ -1,13 +1,15 @@
 import { DataSource } from 'typeorm';
 import { ActivityModel } from '../../api/models/activity.model';
 import { AuthSessionModel } from '../../api/models/authSession.model';
+import { BookingModel } from '../../api/models/booking.model';
 import { LibraryModel } from '../../api/models/library.model';
+import { LibrarySeatModel } from '../../api/models/librarySeat.model';
+import { MemberModel } from '../../api/models/member.model';
 import { PendingOwnerSignupModel } from '../../api/models/pendingOwnerSignup.model';
 import { PendingStudentSignupModel } from '../../api/models/pendingStudentSignup.model';
 import { StudentModel } from '../../api/models/student.model';
 import { TenantModel } from '../../api/models/tenant.model';
 import { UserModel } from '../../api/models/user.model';
-import { MemberModel } from '../../api/models/member.model';
 import { env } from '../../env';
 
 let appDataSource: DataSource | null = null;
@@ -33,9 +35,11 @@ const createDataSource = (): DataSource =>
       TenantModel,
       StudentModel,
       LibraryModel,
+      LibrarySeatModel,
       PendingOwnerSignupModel,
       PendingStudentSignupModel,
       AuthSessionModel,
+      BookingModel,
       MemberModel,
       ActivityModel,
     ],

@@ -1,4 +1,12 @@
-import { LibraryFacility, LibrarySeatingArrangement, LibrarySeatingGender, LibrarySeatingGenderMode, LibrarySeatingMode, LibrarySlotType } from '../../constants/library.constants';
+import {
+  LibraryFacility,
+  LibraryPaymentMethod,
+  LibrarySeatingArrangement,
+  LibrarySeatingGender,
+  LibrarySeatingGenderMode,
+  LibrarySeatingMode,
+  LibrarySlotType,
+} from '../../constants/library.constants';
 
 export type CreateLibrarySlotInput = {
   slotType: LibrarySlotType;
@@ -21,6 +29,12 @@ export type CreateLibraryStatsInput = {
   activeMembers: number;
   rating: number;
   reviewCount: number;
+};
+
+export type CreateLibraryPaymentMethodConfigInput = {
+  type: LibraryPaymentMethod;
+  enabled: boolean;
+  label: string;
 };
 
 export type LibrarySeatingRange = {
@@ -71,6 +85,7 @@ export type CreateLibraryInput = {
   slots: CreateLibrarySlotInput[];
   seating?: LibrarySeating;
   photos: CreateLibraryPhotoInput[];
+  paymentMethods: CreateLibraryPaymentMethodConfigInput[];
   isActive: boolean;
   isMarketplaceVisible: boolean;
   isOpen: boolean;

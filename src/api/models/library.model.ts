@@ -1,6 +1,10 @@
 import { ObjectId } from 'mongodb';
 import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
-import { LibraryFacility, LibrarySlotType } from '../constants/library.constants';
+import {
+  LibraryFacility,
+  LibraryPaymentMethod,
+  LibrarySlotType,
+} from '../constants/library.constants';
 
 export type LibraryLocation = {
   type: 'Point';
@@ -59,6 +63,12 @@ export type LibraryStats = {
   reviewCount: number;
 };
 
+export type LibraryPaymentMethodConfig = {
+  type: LibraryPaymentMethod;
+  enabled: boolean;
+  label: string;
+};
+
 @Entity('libraries')
 @Index('idx_libraries_owner_id', ['ownerId'])
 @Index('idx_libraries_city_active', ['city', 'isActive'])
@@ -111,6 +121,9 @@ export class LibraryModel {
 
   @Column()
   photos!: LibraryPhoto[];
+
+  @Column()
+  paymentMethods!: LibraryPaymentMethodConfig[];
 
   @Column()
   isActive!: boolean;
