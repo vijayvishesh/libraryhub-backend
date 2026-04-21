@@ -56,12 +56,11 @@ export class OwnerService {
     private readonly activityService: ActivityService,
   ) {}
 
-  public async getDashboard(ownerId: string, slotId?: string): Promise<OwnerDashboardResult> {
+  public async getDashboard(ownerId: string): Promise<OwnerDashboardResult> {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
-      const resolvedSlotId = this.resolveSlotId(library, slotId);
-      const seatMap = await this.bookingService.getLibrarySeatMap(library.id, resolvedSlotId);
-      const pendingSeatCount = await this.getPendingSeatCount(library.id, resolvedSlotId);
+      const seatMap = await this.bookingService.getLibrarySeatMap(library.id);
+      const pendingSeatCount = await this.getPendingSeatCount(library.id);
       const occupiedSeatCount = seatMap.seats.filter(item => item.occupied).length;
       const totalSeatCount = seatMap.seats.length;
       const freeSeatCount = Math.max(0, totalSeatCount - occupiedSeatCount - pendingSeatCount);
@@ -104,24 +103,6 @@ export class OwnerService {
     }
 
     return library;
-  }
-
-  private resolveSlotId(library: LibraryRecord, slotId?: string): string {
-    if (slotId) {
-      const requestedSlot = library.slots.find(slot => slot.slotType === slotId && slot.isActive);
-      if (!requestedSlot) {
-        throw new NotFoundError('SLOT_NOT_FOUND');
-      }
-
-      return requestedSlot.slotType;
-    }
-
-    const defaultSlot = library.slots.find(slot => slot.isActive);
-    if (!defaultSlot) {
-      throw new NotFoundError('SLOT_NOT_FOUND');
-    }
-
-    return defaultSlot.slotType;
   }
 
   private async getRevenueStats(libraryId: string): Promise<OwnerDashboardRevenue> {
@@ -222,14 +203,13 @@ export class OwnerService {
     };
   }
 
-  private async getPendingSeatCount(libraryId: string, slotId: string): Promise<number> {
+  private async getPendingSeatCount(libraryId: string): Promise<number> {
     const bookingRepository = getDataSource().getMongoRepository(BookingModel);
     const todayIsoDate = new Date().toISOString().slice(0, 10);
 
     return bookingRepository.count({
       where: {
         libraryId,
-        slotType: slotId,
         status: 'pending',
         validUntil: { $gte: todayIsoDate },
       },

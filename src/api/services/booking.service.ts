@@ -68,22 +68,22 @@ export class BookingService {
 
   public async getLibrarySeatMap(
     libraryId: string,
-    slotId: string,
+    slotId?: string,
     sectionId?: string,
   ): Promise<SeatMapResult> {
     try {
       const library = await this.getLibraryOrThrow(libraryId);
-      const slot = this.getLibrarySlotOrThrow(library, slotId);
+      const slot = slotId ? this.getLibrarySlotOrThrow(library, slotId) : undefined;
       const resolvedSectionId = this.resolveSectionIdForLibrary(library, sectionId);
       const seatMap = await this.resolveSeatMapWithFallback(
         library,
-        slot.slotType,
+        slot?.slotType,
         resolvedSectionId || undefined,
       );
 
       return {
         libraryId: library.id,
-        slotId: slot.slotType,
+        slotId: slot?.slotType || 'all',
         sectionId: resolvedSectionId || undefined,
         seats: seatMap,
       };
@@ -353,7 +353,7 @@ export class BookingService {
 
   private async resolveSeatMapWithFallback(
     library: LibraryRecord,
-    slotType: string,
+    slotType?: string,
     sectionId?: string,
   ): Promise<SeatMapItem[]> {
     const [occupiedSeatIds, memberSeatIds] = await Promise.all([

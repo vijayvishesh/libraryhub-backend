@@ -63,16 +63,19 @@ export class BookingRepository {
 
   public async findActiveSeatIdsByLibraryAndSlot(
     libraryId: string,
-    slotType: string,
+    slotType?: string,
     sectionId?: string,
   ): Promise<string[]> {
     const todayIsoDate = new Date().toISOString().slice(0, 10);
     const whereFilter: Record<string, unknown> = {
       libraryId,
-      slotType,
       status: { $in: [...ACTIVE_BOOKING_STATUSES] },
       validUntil: { $gte: todayIsoDate },
     };
+
+    if (slotType) {
+      whereFilter.slotType = slotType;
+    }
 
     if (sectionId) {
       whereFilter.sectionId = sectionId;
