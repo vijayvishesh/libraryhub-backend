@@ -14,6 +14,9 @@ export class PendingStudentSignupModel {
   phone!: string;
 
   @Column()
+  gender!: 'male' | 'female' | 'other';
+
+  @Column()
   password!: string;
 
   @Column()

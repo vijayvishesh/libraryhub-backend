@@ -3,8 +3,9 @@ import { createHash } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { HttpError, InternalServerError, UnauthorizedError } from 'routing-controllers';
 import { Service } from 'typedi';
-import { AuthJwtPayload, AuthTokenType } from '../../types/jwtToken.types';
+import { AuthJwtPayload, AuthTokenType, AuthUserGender } from '../../types/jwtToken.types';
 import {
+  AuthRequestGender,
   AuthRequestRole,
   LoginRequest,
   LogoutRequest,
@@ -37,6 +38,7 @@ const PASSWORD_SALT_ROUNDS = 10;
 const OTP_EXPIRY_MINUTES = 10;
 const STATIC_OTP = '555555';
 const SESSION_TOKEN_PLACEHOLDER_HASH = 'SESSION_PENDING_TOKEN_HASH';
+const DEFAULT_OWNER_GENDER: AuthUserGender = 'other';
 
 type AuthTokens = {
   accessToken: string;
@@ -47,6 +49,9 @@ type AuthTokenIdentity = {
   sub: string;
   tid: string;
   sid: string;
+  name: string;
+  phone: string;
+  gender: AuthUserGender;
   role: AuthOwnerRecord['role'];
 };
 
@@ -84,6 +89,7 @@ export class AuthService {
       const pendingStudent = await this.authRepository.upsertPendingStudentSignup({
         name: payload.name.trim(),
         phone,
+        gender: this.normalizeRequestGender(payload.gender),
         password: hashedPassword,
         otp: STATIC_OTP,
         expiresAt,
@@ -167,6 +173,7 @@ export class AuthService {
       const student = await this.authRepository.createStudent({
         name: pendingStudentSignup.name,
         phone,
+        gender: pendingStudentSignup.gender,
         password: pendingStudentSignup.password,
         isPhoneVerified: true,
         hasJoinedLibrary: false,
@@ -249,6 +256,9 @@ export class AuthService {
           sub: owner.id,
           tid: tenant.id,
           sid: session.id,
+          name: owner.name,
+          phone: owner.phone,
+          gender: DEFAULT_OWNER_GENDER,
           role: owner.role,
         });
 
@@ -270,6 +280,9 @@ export class AuthService {
         sub: student.id,
         tid: session.tenantId,
         sid: session.id,
+        name: student.name,
+        phone: student.phone,
+        gender: student.gender,
         role: student.role,
       });
 
@@ -324,7 +337,7 @@ export class AuthService {
         }
 
         return new CurrentSessionData(
-          new AuthUserData(owner.id, owner.name, owner.phone, owner.role, {
+          new AuthUserData(owner.id, owner.name, owner.phone, DEFAULT_OWNER_GENDER, owner.role, {
             hasCreatedLibrary: owner.hasCreatedLibrary,
           }),
           new AuthTenantData(tenant.id, tenant.name, tenant.city, tenant.isSetupCompleted),
@@ -337,7 +350,7 @@ export class AuthService {
       }
 
       return new CurrentSessionData(
-        new AuthUserData(student.id, student.name, student.phone, student.role, {
+        new AuthUserData(student.id, student.name, student.phone, student.gender, student.role, {
           hasJoinedLibrary: student.hasJoinedLibrary,
         }),
       );
@@ -362,6 +375,9 @@ export class AuthService {
       sub: owner.id,
       tid: tenant.id,
       sid: authSession.id,
+      name: owner.name,
+      phone: owner.phone,
+      gender: DEFAULT_OWNER_GENDER,
       role: owner.role,
     });
 
@@ -374,7 +390,7 @@ export class AuthService {
     return new AuthData(
       tokens.accessToken,
       tokens.refreshToken,
-      new AuthUserData(owner.id, owner.name, owner.phone, owner.role, {
+      new AuthUserData(owner.id, owner.name, owner.phone, DEFAULT_OWNER_GENDER, owner.role, {
         hasCreatedLibrary: owner.hasCreatedLibrary,
       }),
       new AuthTenantData(tenant.id, tenant.name, tenant.city, tenant.isSetupCompleted),
@@ -394,6 +410,9 @@ export class AuthService {
       sub: student.id,
       tid: '',
       sid: authSession.id,
+      name: student.name,
+      phone: student.phone,
+      gender: student.gender,
       role: student.role,
     });
 
@@ -406,7 +425,7 @@ export class AuthService {
     return new AuthData(
       tokens.accessToken,
       tokens.refreshToken,
-      new AuthUserData(student.id, student.name, student.phone, student.role, {
+      new AuthUserData(student.id, student.name, student.phone, student.gender, student.role, {
         hasJoinedLibrary: student.hasJoinedLibrary,
       }),
     );
@@ -432,6 +451,14 @@ export class AuthService {
 
   private normalizeRequestRole(role: AuthRequestRole): 'OWNER' | 'STUDENT' {
     return role === 'owner' ? 'OWNER' : 'STUDENT';
+  }
+
+  private normalizeRequestGender(gender?: AuthRequestGender): AuthUserGender {
+    if (!gender) {
+      return 'other';
+    }
+
+    return gender;
   }
 
   private extractBearerToken(authorizationHeader?: string): string {
@@ -478,11 +505,15 @@ export class AuthService {
     }
 
     const role = payload.role;
+    const gender = payload.gender;
     const tokenType = payload.type;
     return (
       typeof payload.sub === 'string' &&
       typeof payload.tid === 'string' &&
       typeof payload.sid === 'string' &&
+      typeof payload.name === 'string' &&
+      typeof payload.phone === 'string' &&
+      (gender === 'male' || gender === 'female' || gender === 'other') &&
       (role === 'OWNER' || role === 'STUDENT') &&
       (tokenType === 'access' || tokenType === 'refresh') &&
       tokenType === expectedType

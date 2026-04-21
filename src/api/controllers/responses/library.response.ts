@@ -94,7 +94,14 @@ export class LibrarySeatingSectionData {
   @IsString()
   gender!: string;
 
-  constructor(id: number, name: string, capacity: number, filled: number, available: number, gender: string) {
+  constructor(
+    id: number,
+    name: string,
+    capacity: number,
+    filled: number,
+    available: number,
+    gender: string,
+  ) {
     this.id = id;
     this.name = name;
     this.capacity = capacity;
@@ -223,6 +230,23 @@ export class LibraryStatsData {
   }
 }
 
+export class LibraryPaymentMethodData {
+  @IsString()
+  type!: string;
+
+  @IsBoolean()
+  enabled!: boolean;
+
+  @IsString()
+  label!: string;
+
+  constructor(type: string, enabled: boolean, label: string) {
+    this.type = type;
+    this.enabled = enabled;
+    this.label = label;
+  }
+}
+
 export class LibrarySetupData {
   @IsString()
   id!: string;
@@ -297,6 +321,11 @@ export class LibrarySetupData {
   @Type(() => LibraryStatsData)
   stats!: LibraryStatsData;
 
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibraryPaymentMethodData)
+  paymentMethods!: LibraryPaymentMethodData[];
+
   @IsOptional()
   @IsString()
   deletedAt?: string;
@@ -329,6 +358,7 @@ export class LibrarySetupData {
     isOpen: boolean;
     openingHours: string;
     stats: LibraryStatsData;
+    paymentMethods: LibraryPaymentMethodData[];
     deletedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -358,6 +388,7 @@ export class LibrarySetupData {
     this.isOpen = params.isOpen;
     this.openingHours = params.openingHours;
     this.stats = params.stats;
+    this.paymentMethods = params.paymentMethods;
     this.deletedAt = params.deletedAt ? params.deletedAt.toISOString() : undefined;
     this.createdAt = params.createdAt.toISOString();
     this.updatedAt = params.updatedAt.toISOString();

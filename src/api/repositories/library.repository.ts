@@ -42,6 +42,29 @@ export class LibraryRepository {
     return this.mapLibrary(library);
   }
 
+  public async findLibraryById(libraryId: string): Promise<LibraryRecord | null> {
+    const objectId = this.tryParseObjectId(libraryId);
+    if (!objectId) {
+      return null;
+    }
+
+    const library = await this.getLibraryRepository().findOneById(objectId);
+    if (!library) {
+      return null;
+    }
+
+    return this.mapLibrary(library);
+  }
+
+  public async findAllLibraries(): Promise<LibraryRecord[]> {
+    const libraries = await this.getLibraryRepository().find({
+      where: { deletedAt: null },
+      order: { updatedAt: 'DESC' },
+    });
+
+    return libraries.map(library => this.mapLibrary(library));
+  }
+
   public async findListedLibraries(query: ListLibrariesQuery): Promise<ListLibrariesResult> {
     await this.ensureIndexes();
 
@@ -109,6 +132,7 @@ export class LibraryRepository {
     existingLibrary.facilities = input.facilities;
     existingLibrary.slots = input.slots;
     existingLibrary.photos = input.photos;
+    existingLibrary.paymentMethods = input.paymentMethods;
     existingLibrary.isActive = input.isActive;
     existingLibrary.isMarketplaceVisible = input.isMarketplaceVisible;
     existingLibrary.isOpen = input.isOpen;
@@ -167,6 +191,7 @@ export class LibraryRepository {
       facilities: library.facilities,
       slots: library.slots,
       photos: library.photos,
+      paymentMethods: library.paymentMethods ?? [],
       isActive: library.isActive,
       isMarketplaceVisible: library.isMarketplaceVisible,
       isOpen: library.isOpen,

@@ -6,6 +6,7 @@ import {
 } from '../controllers/requests/library.request';
 import {
   LibraryLocationData,
+  LibraryPaymentMethodData,
   LibraryPhotoData,
   LibrarySeatingData,
   LibrarySeatingRangeData,
@@ -18,6 +19,7 @@ import { AuthRepository } from '../repositories/auth.repositories';
 import { LibraryRepository } from '../repositories/library.repository';
 import { AuthOwnerRecord, AuthTenantRecord } from '../repositories/types/auth.repository.types';
 import { CreateLibraryInput, LibraryRecord } from '../repositories/types/library.repository.types';
+import { LibrarySeatService } from './librarySeat.service';
 
 export type ListedLibrariesResult = {
   libraries: LibrarySetupData[];
@@ -31,6 +33,7 @@ export class LibraryService {
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly libraryRepository: LibraryRepository,
+    private readonly librarySeatService: LibrarySeatService,
   ) {}
 
   public async setupLibrary(
@@ -63,6 +66,13 @@ export class LibraryService {
         this.authRepository.updateTenantSetupCompleted(owner.tenantId, true),
         this.authRepository.updateOwnerHasCreatedLibrary(owner.id, true),
       ]);
+
+      try {
+        await this.librarySeatService.syncLibrarySeatsFromLibrary(library);
+      } catch {
+        // Seat inventory sync should not block library create/update.
+      }
+
       return this.mapLibrarySetupData(library);
     } catch (error) {
       this.rethrowLibraryError(error, 'LIBRARY_SETUP_FAILED');
@@ -79,6 +89,23 @@ export class LibraryService {
       return this.mapLibrarySetupData(library);
     } catch (error) {
       this.rethrowLibraryError(error, 'GET_OWNER_LIBRARY_FAILED');
+    }
+  }
+
+  public async getLibraryById(libraryId: string): Promise<LibrarySetupData> {
+    try {
+      const library = await this.libraryRepository.findLibraryById(libraryId.trim());
+      if (!library || library.deletedAt) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+
+      if (!library.isActive || !library.isMarketplaceVisible) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+
+      return this.mapLibrarySetupData(library);
+    } catch (error) {
+      this.rethrowLibraryError(error, 'GET_LIBRARY_BY_ID_FAILED');
     }
   }
 
@@ -118,7 +145,10 @@ export class LibraryService {
       name: payload.name?.trim() ?? base?.name ?? tenant.name,
       description: payload.description?.trim() ?? base?.description ?? '',
       contactPhone:
-        payload.contactPhone?.trim() ?? payload.ownerPhone?.trim() ?? base?.contactPhone ?? owner.phone,
+        payload.contactPhone?.trim() ??
+        payload.ownerPhone?.trim() ??
+        base?.contactPhone ??
+        owner.phone,
       contactEmail:
         payload.contactEmail?.trim() ?? payload.ownerEmail?.trim() ?? base?.contactEmail ?? null,
       address: payload.address?.trim() ?? base?.address ?? '',
@@ -128,17 +158,20 @@ export class LibraryService {
       location: payload.location
         ? {
             type: payload.location.type,
-            coordinates: [payload.location.coordinates[0], payload.location.coordinates[1]] as [number, number],
+            coordinates: [payload.location.coordinates[0], payload.location.coordinates[1]] as [
+              number,
+              number,
+            ],
           }
         : payload.coordinates
-        ? {
-            type: 'Point',
-            coordinates: [payload.coordinates.lng, payload.coordinates.lat] as [number, number],
-          }
-        : {
-            type: base?.location.type ?? 'Point',
-            coordinates: base?.location.coordinates ?? [0, 0],
-          },
+          ? {
+              type: 'Point',
+              coordinates: [payload.coordinates.lng, payload.coordinates.lat] as [number, number],
+            }
+          : {
+              type: base?.location.type ?? 'Point',
+              coordinates: base?.location.coordinates ?? [0, 0],
+            },
       totalSeats: payload.totalSeats ?? payload.seating?.total ?? base?.totalSeats ?? 1,
       facilities: payload.facilities ?? base?.facilities ?? [],
       slots:
@@ -172,6 +205,14 @@ export class LibraryService {
         rating: payload.stats?.rating ?? base?.stats.rating ?? 0,
         reviewCount: payload.stats?.reviewCount ?? base?.stats.reviewCount ?? 0,
       },
+      paymentMethods:
+        payload.paymentMethods?.map(method => ({
+          type: method.type,
+          enabled: method.enabled ?? true,
+          label: method.label?.trim() || this.getPaymentMethodDefaultLabel(method.type),
+        })) ??
+        base?.paymentMethods ??
+        this.getDefaultPaymentMethods(),
       deletedAt: base?.deletedAt ?? null,
     };
   }
@@ -242,10 +283,43 @@ export class LibraryService {
         library.stats.rating,
         library.stats.reviewCount,
       ),
+      paymentMethods: library.paymentMethods.map(
+        method => new LibraryPaymentMethodData(method.type, method.enabled, method.label),
+      ),
       deletedAt: library.deletedAt,
       createdAt: library.createdAt,
       updatedAt: library.updatedAt,
     });
+  }
+
+  private getDefaultPaymentMethods(): LibraryRecord['paymentMethods'] {
+    return [
+      { type: 'upi', enabled: true, label: 'UPI' },
+      { type: 'cash', enabled: true, label: 'Cash' },
+      { type: 'card', enabled: false, label: 'Card' },
+      { type: 'wallet', enabled: false, label: 'Wallet' },
+      { type: 'online', enabled: false, label: 'Online' },
+    ];
+  }
+
+  private getPaymentMethodDefaultLabel(type: string): string {
+    if (type === 'upi') {
+      return 'UPI';
+    }
+
+    if (type === 'cash') {
+      return 'Cash';
+    }
+
+    if (type === 'card') {
+      return 'Card';
+    }
+
+    if (type === 'wallet') {
+      return 'Wallet';
+    }
+
+    return 'Online';
   }
 
   private rethrowLibraryError(error: unknown, defaultMessage: string): never {

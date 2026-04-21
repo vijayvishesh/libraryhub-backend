@@ -1,7 +1,18 @@
 import { Service } from 'typedi';
 import { getDataSource } from '../../database/config/ormconfig.default';
-import { ActivityModel, ActivityMetadata } from '../models/activity.model';
 import { ActivityActionType } from '../constants/activity.constants';
+import { ActivityMetadata, ActivityModel } from '../models/activity.model';
+
+export type ActivityRecord = {
+  id: string;
+  userId: string;
+  actionType: ActivityActionType;
+  description: string;
+  metadata?: ActivityMetadata;
+  timestamp: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 @Service()
 export class ActivityService {
@@ -9,13 +20,6 @@ export class ActivityService {
     return getDataSource().getMongoRepository(ActivityModel);
   }
 
-  /**
-   * Logs a user activity to the database.
-   * @param userId - The ID of the user performing the action.
-   * @param actionType - The type of action performed.
-   * @param description - A human-readable description of the activity.
-   * @param metadata - Optional additional data related to the activity.
-   */
   public async logActivity(
     userId: string,
     actionType: ActivityActionType,
@@ -37,10 +41,28 @@ export class ActivityService {
       });
 
       await activityRepository.save(activity);
-    } catch (error) {
-      // Log the error but don't throw to avoid disrupting the main flow
-      console.error('Failed to log activity:', error);
-      // In a production app, you might want to use a proper logger here
+    } catch {
+      // non-critical, don't disrupt the main flow
     }
+  }
+
+  public async listRecentActivities(userId: string, limit = 3): Promise<ActivityRecord[]> {
+    const activityRepository = this.getActivityRepository();
+    const activities = await activityRepository.find({
+      where: { userId: userId.trim() },
+      order: { timestamp: 'DESC' },
+      take: Math.max(1, Math.min(limit, 20)),
+    });
+
+    return activities.map(item => ({
+      id: item.id.toHexString(),
+      userId: item.userId,
+      actionType: item.actionType,
+      description: item.description,
+      metadata: item.metadata,
+      timestamp: item.timestamp,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
   }
 }

@@ -19,11 +19,12 @@ import {
 } from 'class-validator';
 import {
   LIBRARY_FACILITY_ENUM,
-  LIBRARY_SLOT_TYPE_ENUM,
+  LIBRARY_PAYMENT_METHOD_ENUM,
   LIBRARY_SEATING_ARRANGEMENT_ENUM,
   LIBRARY_SEATING_GENDER_ENUM,
   LIBRARY_SEATING_GENDER_MODE_ENUM,
   LIBRARY_SEATING_MODE_ENUM,
+  LIBRARY_SLOT_TYPE_ENUM,
 } from '../../constants/library.constants';
 
 const TIME_FORMAT_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -207,6 +208,21 @@ export class LibraryStatsRequest {
   reviewCount?: number;
 }
 
+export class LibraryPaymentMethodRequest {
+  @IsString()
+  @IsIn([...LIBRARY_PAYMENT_METHOD_ENUM])
+  type!: (typeof LIBRARY_PAYMENT_METHOD_ENUM)[number];
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  label?: string;
+}
+
 export class LibrarySetupRequest {
   @IsOptional()
   @IsString()
@@ -275,7 +291,7 @@ export class LibrarySetupRequest {
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(3)
+  @ArrayMaxSize(4)
   @ValidateNested({ each: true })
   @Type(() => LibrarySlotRequest)
   slots?: LibrarySlotRequest[];
@@ -311,6 +327,12 @@ export class LibrarySetupRequest {
   @ValidateNested()
   @Type(() => LibraryStatsRequest)
   stats?: LibraryStatsRequest;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibraryPaymentMethodRequest)
+  paymentMethods?: LibraryPaymentMethodRequest[];
 }
 
 export class LibraryListQueryRequest {
@@ -334,4 +356,19 @@ export class LibraryListQueryRequest {
   @IsOptional()
   @IsString()
   city?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lat?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lng?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...LIBRARY_SEATING_GENDER_ENUM])
+  gender?: string;
 }

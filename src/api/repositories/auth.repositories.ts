@@ -177,6 +177,7 @@ export class AuthRepository {
     const student = studentRepository.create({
       name: input.name,
       phone: input.phone,
+      gender: input.gender,
       password: input.password,
       isPhoneVerified: input.isPhoneVerified,
       hasJoinedLibrary: input.hasJoinedLibrary,
@@ -248,6 +249,7 @@ export class AuthRepository {
     if (existing) {
       existing.name = input.name;
       existing.password = input.password;
+      existing.gender = input.gender;
       existing.otp = input.otp;
       existing.expiresAt = input.expiresAt;
       existing.updatedAt = now;
@@ -259,6 +261,7 @@ export class AuthRepository {
     const pending = pendingRepository.create({
       name: input.name,
       phone: input.phone,
+      gender: input.gender,
       password: input.password,
       otp: input.otp,
       expiresAt: input.expiresAt,
@@ -283,6 +286,25 @@ export class AuthRepository {
 
   public async deletePendingStudentSignupByPhone(phone: string): Promise<void> {
     await this.getPendingStudentSignupRepository().deleteOne({ phone });
+  }
+
+  public async updateStudentHasJoinedLibrary(
+    studentId: string,
+    hasJoinedLibrary: boolean,
+  ): Promise<void> {
+    const objectId = this.tryParseObjectId(studentId);
+    if (!objectId) {
+      return;
+    }
+
+    const studentRepository = this.getStudentRepository();
+    const student = await studentRepository.findOneById(objectId);
+    if (!student) {
+      return;
+    }
+
+    student.hasJoinedLibrary = hasJoinedLibrary;
+    await studentRepository.save(student);
   }
 
   public async createAuthSession(input: CreateAuthSessionInput): Promise<AuthSessionRecord> {
@@ -388,6 +410,7 @@ export class AuthRepository {
       id: this.toHexString(student),
       name: student.name,
       phone: student.phone,
+      gender: student.gender || 'other',
       password: student.password,
       isPhoneVerified: student.isPhoneVerified,
       hasJoinedLibrary: student.hasJoinedLibrary ?? false,
@@ -415,6 +438,7 @@ export class AuthRepository {
       id: this.toHexString(pending),
       name: pending.name,
       phone: pending.phone,
+      gender: pending.gender || 'other',
       password: pending.password,
       otp: pending.otp,
       expiresAt: pending.expiresAt,

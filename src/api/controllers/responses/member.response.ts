@@ -1,4 +1,5 @@
-import { IsEmail, IsNumber, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsEmail, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class MemberData {
   @IsString()
@@ -10,8 +11,13 @@ export class MemberData {
   @IsString()
   mobileNo!: string;
 
+  @IsOptional()
   @IsString()
-  aadharId!: string;
+  aadharId?: string;
+
+  @IsOptional()
+  @IsString()
+  studentId?: string;
 
   @IsOptional()
   @IsEmail()
@@ -23,6 +29,33 @@ export class MemberData {
   @IsString()
   libraryId!: string;
 
+  @IsOptional()
+  @IsString()
+  seatId?: string;
+
+  @IsOptional()
+  @IsString()
+  slotId?: string;
+
+  @IsString()
+  status!: string;
+
+  @IsOptional()
+  @IsNumber()
+  planAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
   @IsString()
   createdAt!: string;
 
@@ -33,10 +66,18 @@ export class MemberData {
     id: string;
     fullName: string;
     mobileNo: string;
-    aadharId: string;
+    aadharId: string | null;
+    studentId: string | null;
     email: string | null;
     duration: number;
     libraryId: string;
+    seatId: string | null;
+    slotId: string | null;
+    status: string;
+    planAmount: number | null;
+    startDate: string | null;
+    endDate: string | null;
+    notes: string | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -47,10 +88,18 @@ export class MemberData {
     this.id = data.id;
     this.fullName = data.fullName;
     this.mobileNo = data.mobileNo;
-    this.aadharId = data.aadharId;
+    this.aadharId = data.aadharId ?? undefined;
+    this.studentId = data.studentId ?? undefined;
     this.email = data.email ?? undefined;
     this.duration = data.duration;
     this.libraryId = data.libraryId;
+    this.seatId = data.seatId ?? undefined;
+    this.slotId = data.slotId ?? undefined;
+    this.status = data.status;
+    this.planAmount = data.planAmount ?? undefined;
+    this.startDate = data.startDate ?? undefined;
+    this.endDate = data.endDate ?? undefined;
+    this.notes = data.notes ?? undefined;
     this.createdAt = data.createdAt.toISOString();
     this.updatedAt = data.updatedAt.toISOString();
   }
@@ -64,6 +113,91 @@ export class MemberCreateApiResponse {
   message!: string;
 
   constructor(message: string, responseCode = 201) {
+    this.responseCode = responseCode;
+    this.message = message;
+  }
+}
+
+export class MemberDetailApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => MemberData)
+  data!: MemberData;
+
+  constructor(data?: MemberData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}
+
+export class MemberListPayloadData {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MemberData)
+  members!: MemberData[];
+
+  @IsNumber()
+  page!: number;
+
+  @IsNumber()
+  limit!: number;
+
+  @IsNumber()
+  total!: number;
+
+  constructor(members?: MemberData[], page?: number, limit?: number, total?: number) {
+    if (
+      !members ||
+      typeof page !== 'number' ||
+      typeof limit !== 'number' ||
+      typeof total !== 'number'
+    ) {
+      return;
+    }
+
+    this.members = members;
+    this.page = page;
+    this.limit = limit;
+    this.total = total;
+  }
+}
+
+export class MemberListApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => MemberListPayloadData)
+  data!: MemberListPayloadData;
+
+  constructor(data?: MemberListPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}
+
+export class MemberActionApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @IsString()
+  message!: string;
+
+  constructor(message?: string, responseCode = 200) {
+    if (!message || typeof responseCode !== 'number') {
+      return;
+    }
+
     this.responseCode = responseCode;
     this.message = message;
   }
