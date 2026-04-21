@@ -356,12 +356,11 @@ export class BookingService {
     slotType: string,
     sectionId?: string,
   ): Promise<SeatMapItem[]> {
-    const occupiedSeatIds = await this.bookingRepository.findActiveSeatIdsByLibraryAndSlot(
-      library.id,
-      slotType,
-      sectionId,
-    );
-    const occupiedSet = new Set(occupiedSeatIds);
+    const [occupiedSeatIds, memberSeatIds] = await Promise.all([
+      this.bookingRepository.findActiveSeatIdsByLibraryAndSlot(library.id, slotType, sectionId),
+      this.memberRepository.findActiveMemberSeatIds(library.id, slotType, sectionId),
+    ]);
+    const occupiedSet = new Set([...occupiedSeatIds, ...memberSeatIds]);
 
     try {
       await this.librarySeatService.ensureLibrarySeatInventory(library);

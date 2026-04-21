@@ -50,6 +50,17 @@ export class MemberService {
         throw new HttpError(409, 'MEMBER_ALREADY_EXISTS');
       }
 
+      if (seatId) {
+        const seatConflict = await this.memberRepository.findActiveMemberBySeat(
+          library.id,
+          seatId,
+          slotId || undefined,
+        );
+        if (seatConflict) {
+          throw new HttpError(409, 'SEAT_ALREADY_ASSIGNED');
+        }
+      }
+
       const member = await this.memberRepository.createMember({
         fullName,
         mobileNo,
@@ -163,6 +174,20 @@ export class MemberService {
         );
         if (duplicateMember) {
           throw new HttpError(409, 'MEMBER_ALREADY_EXISTS');
+        }
+      }
+
+      const newSeatId = payload.seatId === undefined ? existingMember.seatId : payload.seatId?.trim() || null;
+      const newSlotId = payload.slotId === undefined ? existingMember.slotId : payload.slotId?.trim() || null;
+      if (newSeatId && (newSeatId !== existingMember.seatId || newSlotId !== existingMember.slotId)) {
+        const seatConflict = await this.memberRepository.findActiveMemberBySeat(
+          library.id,
+          newSeatId,
+          newSlotId || undefined,
+          existingMember.id,
+        );
+        if (seatConflict) {
+          throw new HttpError(409, 'SEAT_ALREADY_ASSIGNED');
         }
       }
 

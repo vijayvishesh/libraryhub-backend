@@ -223,6 +223,60 @@ export class MemberRepository {
     return this.mapMember(member);
   }
 
+  public async findActiveMemberSeatIds(
+    libraryId: string,
+    slotId?: string,
+    sectionId?: string,
+  ): Promise<string[]> {
+    const whereFilter: Record<string, unknown> = {
+      libraryId,
+      status: { $in: ['active', 'pending'] },
+      seatId: { $ne: null },
+    };
+
+    if (slotId) {
+      whereFilter.slotId = slotId;
+    }
+
+    const members = await this.getMemberRepository().find({ where: whereFilter });
+
+    let seatIds = members.map(m => m.seatId).filter((id): id is string => id !== null);
+
+    if (sectionId) {
+      const prefix = `SEC-${sectionId}-`;
+      seatIds = seatIds.filter(id => id.startsWith(prefix));
+    }
+
+    return seatIds;
+  }
+
+  public async findActiveMemberBySeat(
+    libraryId: string,
+    seatId: string,
+    slotId?: string,
+    excludeMemberId?: string,
+  ): Promise<MemberRecord | null> {
+    const whereFilter: Record<string, unknown> = {
+      libraryId,
+      seatId,
+      status: { $in: ['active', 'pending'] },
+    };
+
+    if (slotId) {
+      whereFilter.slotId = slotId;
+    }
+
+    if (excludeMemberId) {
+      const objectId = this.tryParseObjectId(excludeMemberId);
+      if (objectId) {
+        whereFilter['_id'] = { $ne: objectId };
+      }
+    }
+
+    const member = await this.getMemberRepository().findOneBy(whereFilter);
+    return member ? this.mapMember(member) : null;
+  }
+
   private async ensureIndexes(): Promise<void> {
     if (this.indexesEnsured) {
       return;
