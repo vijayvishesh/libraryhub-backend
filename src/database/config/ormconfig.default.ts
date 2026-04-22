@@ -11,6 +11,7 @@ import { StudentModel } from '../../api/models/student.model';
 import { TenantModel } from '../../api/models/tenant.model';
 import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
+import { StudyTimetableModel } from '../../api/models/studyTimetable.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -42,6 +43,7 @@ const createDataSource = (): DataSource =>
       BookingModel,
       MemberModel,
       ActivityModel,
+      StudyTimetableModel
     ],
     synchronize: true,
     logging: false,

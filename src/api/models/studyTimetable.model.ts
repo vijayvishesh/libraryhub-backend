@@ -1,25 +1,31 @@
 import { ObjectId } from 'mongodb';
 import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
 
-export type TimetableDay = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+export type TimetableDay =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
 
 export type TimetableReminder = {
   enabled: boolean;
-  minutesBefore?: number; // e.g. 10, 15, 30
+  minutesBefore?: number;
 };
 
 export type TimetableSubject = {
   subjectName: string;
   days: TimetableDay[];
-  startTime: string;   // "HH:mm" 24hr format e.g. "09:00"
-  endTime: string;     // "HH:mm" 24hr format e.g. "11:00"
-  color: string;       // hex color e.g. "#FF5733"
+  startTime: string;
+  endTime: string;
+  color: string;
   reminder: TimetableReminder;
 };
 
 @Entity('study_timetables')
 @Index('idx_study_timetables_student_id', ['studentId'])
-@Index('idx_study_timetables_library_id', ['libraryId'])
 export class StudyTimetableModel {
   @ObjectIdColumn()
   id!: ObjectId;
@@ -28,7 +34,7 @@ export class StudyTimetableModel {
   studentId!: string;
 
   @Column()
-  title!: string; // e.g. "My Weekly Study Plan"
+  title!: string;
 
   @Column()
   subjects!: TimetableSubject[];

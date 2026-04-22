@@ -1,3 +1,4 @@
+import { NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { StudyTimetableRepository } from '../repositories/studyTimetable.repository';
 import {
@@ -5,8 +6,6 @@ import {
   StudyTimetableRecord,
   UpdateStudyTimetableInput,
 } from '../repositories/types/studyTimetable.repository.types';
-// import { NotFoundError } from '../errors/notFound.error';
-// import { ConflictError } from '../errors/conflict.error';
 
 @Service()
 export class StudyTimetableService {
@@ -14,40 +13,28 @@ export class StudyTimetableService {
     private readonly studyTimetableRepository: StudyTimetableRepository,
   ) {}
 
-  // ─── List ───────────────────────────────────────────────────────────────────
-
-  async listTimetables(
-    studentId: string,
-  ): Promise<StudyTimetableRecord[]> {
-    return this.studyTimetableRepository.findByStudentAndLibrary(studentId);
-  }
-
-  async listAllStudentTimetables(studentId: string): Promise<StudyTimetableRecord[]> {
+  public async listAllStudentTimetables(studentId: string): Promise<StudyTimetableRecord[]> {
     return this.studyTimetableRepository.findByStudent(studentId);
   }
 
-  // ─── Get One ────────────────────────────────────────────────────────────────
-
-  async getTimetableById(
+  public async getTimetableById(
     id: string,
     studentId: string,
   ): Promise<StudyTimetableRecord> {
     const record = await this.studyTimetableRepository.findById(id);
 
     if (!record || record.deletedAt) {
-    //   throw new NotFoundError('Study timetable not found');
+      throw new NotFoundError('TIMETABLE_NOT_FOUND');
     }
 
     if (record.studentId !== studentId) {
-    //   throw new NotFoundError('Study timetable not found');
+      throw new NotFoundError('TIMETABLE_NOT_FOUND');
     }
 
     return record;
   }
 
-  // ─── Create ─────────────────────────────────────────────────────────────────
-
-  async createTimetable(
+  public async createTimetable(
     studentId: string,
     input: Omit<CreateStudyTimetableInput, 'studentId'>,
   ): Promise<StudyTimetableRecord> {
@@ -57,35 +44,29 @@ export class StudyTimetableService {
     });
   }
 
-  // ─── Update ─────────────────────────────────────────────────────────────────
-
-  async updateTimetable(
+  public async updateTimetable(
     id: string,
     studentId: string,
     input: UpdateStudyTimetableInput,
   ): Promise<StudyTimetableRecord> {
-    // Ownership check
     await this.getTimetableById(id, studentId);
 
     const updated = await this.studyTimetableRepository.update(id, input);
 
     if (!updated) {
-    //   throw new NotFoundError('Study timetable not found');
+      throw new NotFoundError('TIMETABLE_NOT_FOUND');
     }
 
     return updated;
   }
 
-  // ─── Delete ─────────────────────────────────────────────────────────────────
-
-  async deleteTimetable(id: string, studentId: string): Promise<void> {
-    // Ownership check
+  public async deleteTimetable(id: string, studentId: string): Promise<void> {
     await this.getTimetableById(id, studentId);
 
     const deleted = await this.studyTimetableRepository.softDelete(id);
 
     if (!deleted) {
-    //   throw new NotFoundError('Study timetable not found');
+      throw new NotFoundError('TIMETABLE_NOT_FOUND');
     }
   }
 }
