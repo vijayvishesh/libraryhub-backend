@@ -8,10 +8,10 @@ import { MemberModel } from '../../api/models/member.model';
 import { PendingOwnerSignupModel } from '../../api/models/pendingOwnerSignup.model';
 import { PendingStudentSignupModel } from '../../api/models/pendingStudentSignup.model';
 import { StudentModel } from '../../api/models/student.model';
+import { StudyTimetableModel } from '../../api/models/studyTimetable.model';
 import { TenantModel } from '../../api/models/tenant.model';
 import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
-import { StudyTimetableModel } from '../../api/models/studyTimetable.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -20,17 +20,21 @@ let connectionAttempts = 0;
 const MAX_RETRY_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 5000;
 
+const isAtlas = env.db.DB_URL.includes('mongodb+srv');
+
 const createDataSource = (): DataSource =>
   new DataSource({
     type: 'mongodb',
     url: env.db.DB_URL,
-    ssl: true,
-    extra: {
-      tls: true,
-      tlsInsecure: false,
-      retryWrites: true,
-      w: 'majority',
-    },
+    ssl: isAtlas,
+    extra: isAtlas
+      ? {
+          tls: true,
+          tlsInsecure: false,
+          retryWrites: true,
+          w: 'majority',
+        }
+      : {},
     entities: [
       UserModel,
       TenantModel,
@@ -43,7 +47,7 @@ const createDataSource = (): DataSource =>
       BookingModel,
       MemberModel,
       ActivityModel,
-      StudyTimetableModel
+      StudyTimetableModel,
     ],
     synchronize: true,
     logging: false,
@@ -82,11 +86,13 @@ export const connectDatabase = async (): Promise<void> => {
     appDataSource = createDataSource();
     await appDataSource.initialize();
 
+    console.log('✅ MongoDB Connected Successfully');
+
     isConnected = true;
     connectionAttempts = 0;
   } catch (error) {
     isConnected = false;
-    console.error('Error connecting to MongoDB with TypeORM:', error);
+    console.error('❌ Error connecting to MongoDB with TypeORM:', error);
 
     if (connectionAttempts < MAX_RETRY_ATTEMPTS) {
       connectionAttempts += 1;
@@ -99,7 +105,7 @@ export const connectDatabase = async (): Promise<void> => {
       return;
     }
 
-    console.error('Max database connection retry attempts reached.');
+    console.error('❌ Max database connection retry attempts reached.');
   }
 };
 
@@ -117,6 +123,7 @@ export const disconnectDatabase = async (): Promise<void> => {
 
   try {
     await appDataSource.destroy();
+    console.log('🔌 MongoDB Disconnected');
     isConnected = false;
     appDataSource = null;
   } catch (error) {
