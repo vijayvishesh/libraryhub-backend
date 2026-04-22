@@ -38,3 +38,25 @@ export type ListStudentBookingsResult = {
   bookings: BookingRecord[];
   total: number;
 };
+
+export type ListLibraryFeeBookingsInput = {
+  libraryId: string;
+  tab: 'pending' | 'received_today';
+  fromDate: string;
+  toDate: string;
+  page: number;
+  limit: number;
+};
+
+export type ListLibraryFeeBookingsResult = {
+  bookings: BookingRecord[];
+  total: number;
+};
+
+export type FeeCollectionSummary = {
+  todayAmount: number;
+  todayPayments: number;
+  monthAmount: number;
+  monthPayments: number;
+  pendingCount: number;
+};

@@ -2,10 +2,14 @@ import { ObjectId } from 'mongodb';
 import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
+import { LibraryPaymentMethod } from '../constants/library.constants';
 import { BookingModel } from '../models/booking.model';
 import {
   BookingRecord,
   CreateBookingInput,
+  FeeCollectionSummary,
+  ListLibraryFeeBookingsInput,
+  ListLibraryFeeBookingsResult,
   ListStudentBookingsInput,
   ListStudentBookingsResult,
 } from './types/booking.repository.types';
@@ -15,6 +19,7 @@ type WithObjectId = {
 };
 
 const ACTIVE_BOOKING_STATUSES = ['confirmed', 'checked_in'] as const;
+const PAID_BOOKING_STATUSES = ['confirmed', 'checked_in', 'checked_out'] as const;
 
 @Service()
 export class BookingRepository {
@@ -112,6 +117,113 @@ export class BookingRepository {
     };
   }
 
+  public async listLibraryFeeBookings(
+    input: ListLibraryFeeBookingsInput,
+  ): Promise<ListLibraryFeeBookingsResult> {
+    await this.ensureIndexes();
+
+    const bookingRepository = this.getBookingRepository();
+    const startDateUtc = new Date(`${input.fromDate}T00:00:00.000Z`);
+    const endDateExclusiveUtc = new Date(`${input.toDate}T00:00:00.000Z`);
+    endDateExclusiveUtc.setUTCDate(endDateExclusiveUtc.getUTCDate() + 1);
+
+    const whereFilter: Record<string, unknown> = {
+      libraryId: input.libraryId,
+    };
+
+    if (input.tab === 'pending') {
+      whereFilter.status = 'pending';
+    } else {
+      whereFilter.status = { $in: [...PAID_BOOKING_STATUSES] };
+      whereFilter.updatedAt = { $gte: startDateUtc, $lt: endDateExclusiveUtc };
+    }
+
+    const [bookings, total] = await Promise.all([
+      bookingRepository.find({
+        where: whereFilter,
+        order: { updatedAt: 'DESC' },
+        skip: (input.page - 1) * input.limit,
+        take: input.limit,
+      }),
+      bookingRepository.count({ where: whereFilter }),
+    ]);
+
+    return {
+      bookings: bookings.map(item => this.mapBooking(item)),
+      total,
+    };
+  }
+
+  public async getFeeCollectionSummary(libraryId: string): Promise<FeeCollectionSummary> {
+    await this.ensureIndexes();
+
+    const now = new Date();
+    const startOfToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+    const bookingRepository = this.getBookingRepository();
+
+    const [todayRows, monthRows, pendingCount] = await Promise.all([
+      bookingRepository
+        .aggregate([
+          {
+            $match: {
+              libraryId,
+              status: { $in: [...PAID_BOOKING_STATUSES] },
+              updatedAt: { $gte: startOfToday, $lt: startOfTomorrow },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              amount: { $sum: '$amount' },
+              count: { $sum: 1 },
+            },
+          },
+        ])
+        .toArray(),
+      bookingRepository
+        .aggregate([
+          {
+            $match: {
+              libraryId,
+              status: { $in: [...PAID_BOOKING_STATUSES] },
+              updatedAt: { $gte: startOfMonth, $lt: startOfTomorrow },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              amount: { $sum: '$amount' },
+              count: { $sum: 1 },
+            },
+          },
+        ])
+        .toArray(),
+      bookingRepository.count({
+        where: {
+          libraryId,
+          status: 'pending',
+        },
+      }),
+    ]);
+
+    const todayRow = todayRows[0];
+    const monthRow = monthRows[0];
+
+    return {
+      todayAmount: todayRow?.amount || 0,
+      todayPayments: todayRow?.count || 0,
+      monthAmount: monthRow?.amount || 0,
+      monthPayments: monthRow?.count || 0,
+      pendingCount,
+    };
+  }
+
   public async findStudentBookingById(
     studentId: string,
     bookingId: string,
@@ -130,6 +242,48 @@ export class BookingRepository {
     return this.mapBooking(booking);
   }
 
+  public async findLibraryBookingById(
+    libraryId: string,
+    bookingId: string,
+  ): Promise<BookingRecord | null> {
+    const objectId = this.tryParseObjectId(bookingId);
+    if (!objectId) {
+      return null;
+    }
+
+    const booking = await this.getBookingRepository().findOneById(objectId);
+    if (!booking || booking.libraryId !== libraryId) {
+      return null;
+    }
+
+    return this.mapBooking(booking);
+  }
+
+  public async markBookingPaid(
+    bookingId: string,
+    paymentMethod?: LibraryPaymentMethod,
+  ): Promise<BookingRecord | null> {
+    const objectId = this.tryParseObjectId(bookingId);
+    if (!objectId) {
+      return null;
+    }
+
+    const bookingRepository = this.getBookingRepository();
+    const booking = await bookingRepository.findOneById(objectId);
+    if (!booking) {
+      return null;
+    }
+
+    booking.status = 'confirmed';
+    if (paymentMethod) {
+      booking.paymentMethod = paymentMethod;
+    }
+    booking.updatedAt = new Date();
+
+    const saved = await bookingRepository.save(booking);
+    return this.mapBooking(saved);
+  }
+
   private async ensureIndexes(): Promise<void> {
     if (this.indexesEnsured) {
       return;
@@ -146,6 +300,10 @@ export class BookingRepository {
     await this.createIndexSafely(
       { libraryId: 1, slotType: 1, sectionId: 1, status: 1, validUntil: 1 },
       { name: 'idx_bookings_library_slot_section_active' },
+    );
+    await this.createIndexSafely(
+      { libraryId: 1, status: 1, updatedAt: -1 },
+      { name: 'idx_bookings_library_status_updated_at' },
     );
 
     this.indexesEnsured = true;

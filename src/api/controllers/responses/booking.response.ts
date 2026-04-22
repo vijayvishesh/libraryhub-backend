@@ -371,3 +371,192 @@ export class BookingDetailApiResponse {
     this.data = data;
   }
 }
+
+export class OwnerFeeCollectionSummaryData {
+  @IsNumber()
+  todayAmount!: number;
+
+  @IsNumber()
+  todayPayments!: number;
+
+  @IsNumber()
+  monthAmount!: number;
+
+  @IsNumber()
+  monthPayments!: number;
+
+  @IsNumber()
+  pendingCount!: number;
+
+  constructor(params?: {
+    todayAmount: number;
+    todayPayments: number;
+    monthAmount: number;
+    monthPayments: number;
+    pendingCount: number;
+  }) {
+    if (!params) {
+      return;
+    }
+
+    this.todayAmount = params.todayAmount;
+    this.todayPayments = params.todayPayments;
+    this.monthAmount = params.monthAmount;
+    this.monthPayments = params.monthPayments;
+    this.pendingCount = params.pendingCount;
+  }
+}
+
+export class OwnerFeeCollectionItemData {
+  @IsString()
+  bookingId!: string;
+
+  @IsString()
+  studentId!: string;
+
+  @IsString()
+  studentName!: string;
+
+  @IsString()
+  studentPhone!: string;
+
+  @IsString()
+  seatId!: string;
+
+  @IsString()
+  slotName!: string;
+
+  @IsNumber()
+  amount!: number;
+
+  @IsString()
+  paymentMethod!: string;
+
+  @IsString()
+  status!: string;
+
+  @IsString()
+  dueDate!: string;
+
+  @IsOptional()
+  @IsString()
+  paidAt?: string;
+
+  @IsNumber()
+  overdueDays!: number;
+
+  constructor(params?: {
+    bookingId: string;
+    studentId: string;
+    studentName: string;
+    studentPhone: string;
+    seatId: string;
+    slotName: string;
+    amount: number;
+    paymentMethod: string;
+    status: string;
+    dueDate: string;
+    paidAt: string | null;
+    overdueDays: number;
+  }) {
+    if (!params) {
+      return;
+    }
+
+    this.bookingId = params.bookingId;
+    this.studentId = params.studentId;
+    this.studentName = params.studentName;
+    this.studentPhone = params.studentPhone;
+    this.seatId = params.seatId;
+    this.slotName = params.slotName;
+    this.amount = params.amount;
+    this.paymentMethod = params.paymentMethod;
+    this.status = params.status;
+    this.dueDate = params.dueDate;
+    this.paidAt = params.paidAt || undefined;
+    this.overdueDays = params.overdueDays;
+  }
+}
+
+export class OwnerFeeCollectionPayloadData {
+  @ValidateNested()
+  @Type(() => OwnerFeeCollectionSummaryData)
+  summary!: OwnerFeeCollectionSummaryData;
+
+  @IsString()
+  tab!: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OwnerFeeCollectionItemData)
+  items!: OwnerFeeCollectionItemData[];
+
+  @IsNumber()
+  page!: number;
+
+  @IsNumber()
+  limit!: number;
+
+  @IsNumber()
+  total!: number;
+
+  constructor(params?: {
+    summary: OwnerFeeCollectionSummaryData;
+    tab: string;
+    items: OwnerFeeCollectionItemData[];
+    page: number;
+    limit: number;
+    total: number;
+  }) {
+    if (!params) {
+      return;
+    }
+
+    this.summary = params.summary;
+    this.tab = params.tab;
+    this.items = params.items;
+    this.page = params.page;
+    this.limit = params.limit;
+    this.total = params.total;
+  }
+}
+
+export class OwnerFeeCollectionApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => OwnerFeeCollectionPayloadData)
+  data!: OwnerFeeCollectionPayloadData;
+
+  constructor(data?: OwnerFeeCollectionPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}
+
+export class BookingMarkPaidApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @IsString()
+  message!: string;
+
+  @ValidateNested()
+  @Type(() => OwnerFeeCollectionItemData)
+  data!: OwnerFeeCollectionItemData;
+
+  constructor(message?: string, data?: OwnerFeeCollectionItemData, responseCode = 200) {
+    if (!message || !data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.message = message;
+    this.data = data;
+  }
+}

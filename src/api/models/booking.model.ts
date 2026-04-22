@@ -2,7 +2,7 @@ import { ObjectId } from 'mongodb';
 import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
 import { LibraryPaymentMethod, LibrarySlotType } from '../constants/library.constants';
 
-export type BookingStatus = 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
+export type BookingStatus = 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
 
 @Entity('bookings')
 @Index('idx_bookings_student_created_at', ['studentId', 'createdAt'])

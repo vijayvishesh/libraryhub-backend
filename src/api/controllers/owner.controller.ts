@@ -15,14 +15,23 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { ActivityService } from '../services/activity.service';
+import { BookingService } from '../services/booking.service';
 import { MemberService } from '../services/member.service';
 import { OwnerService } from '../services/owner.service';
+import { MarkBookingPaidRequest, OwnerFeeCollectionQueryRequest } from './requests/booking.request';
 import {
   AddMemberRequest,
   ListMembersQueryRequest,
   UpdateMemberRequest,
 } from './requests/member.request';
 import { CurrentSessionData } from './responses/auth.response';
+import {
+  BookingMarkPaidApiResponse,
+  OwnerFeeCollectionApiResponse,
+  OwnerFeeCollectionItemData,
+  OwnerFeeCollectionPayloadData,
+  OwnerFeeCollectionSummaryData,
+} from './responses/booking.response';
 import { ErrorResponseModel } from './responses/common.reponse';
 import {
   MemberActionApiResponse,
@@ -47,9 +56,90 @@ import {
 export class OwnerController {
   constructor(
     private readonly ownerService: OwnerService,
+    private readonly bookingService: BookingService,
     private readonly memberService: MemberService,
     private readonly activityService: ActivityService,
   ) {}
+
+  @Get('/fee-collection')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(OwnerFeeCollectionApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getFeeCollection(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @QueryParams() query: OwnerFeeCollectionQueryRequest,
+  ): Promise<OwnerFeeCollectionApiResponse> {
+    try {
+      const result = await this.bookingService.getOwnerFeeCollection(session.user.id, query);
+
+      return new OwnerFeeCollectionApiResponse(
+        new OwnerFeeCollectionPayloadData({
+          summary: new OwnerFeeCollectionSummaryData(result.summary),
+          tab: result.tab,
+          items: result.items.map(item => new OwnerFeeCollectionItemData(item)),
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+        }),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GET_OWNER_FEE_COLLECTION_FAILED');
+    }
+  }
+
+  @Patch('/fee-collection/:bookingId/mark-paid')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(BookingMarkPaidApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async markBookingPaid(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('bookingId') bookingId: string,
+    @Body() payload: MarkBookingPaidRequest,
+  ): Promise<BookingMarkPaidApiResponse> {
+    try {
+      const paidItem = await this.bookingService.markOwnerBookingPaid(
+        session.user.id,
+        bookingId,
+        payload.paymentMethod,
+      );
+
+      await this.activityService.logActivity(
+        session.user.id,
+        'PAYMENT_RECEIVED',
+        `Payment received for seat ${paidItem.seatId}`,
+        {
+          memberName: paidItem.studentName,
+          seatId: paidItem.seatId,
+          amount: paidItem.amount,
+        },
+      );
+
+      return new BookingMarkPaidApiResponse(
+        'BOOKING_MARKED_AS_PAID',
+        new OwnerFeeCollectionItemData(paidItem),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('MARK_OWNER_BOOKING_PAID_FAILED');
+    }
+  }
 
   @Get('/dashboard')
   @Authorized('OWNER')
