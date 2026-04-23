@@ -3,7 +3,9 @@ import { Service } from 'typedi';
 import {
   CreateBookingRequest,
   ListMyBookingsQueryRequest,
+  OwnerFeeCollectionQueryRequest,
 } from '../controllers/requests/booking.request';
+import { LibraryPaymentMethod } from '../constants/library.constants';
 import {
   buildSeatMap,
   isSeatAllowedForStudent,
@@ -51,6 +53,38 @@ export type BookingResult = {
 
 export type ListMyBookingsResult = {
   bookings: BookingResult[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
+export type OwnerFeeCollectionSummaryResult = {
+  todayAmount: number;
+  todayPayments: number;
+  monthAmount: number;
+  monthPayments: number;
+  pendingCount: number;
+};
+
+export type OwnerFeeCollectionItemResult = {
+  bookingId: string;
+  studentId: string;
+  studentName: string;
+  studentPhone: string;
+  seatId: string;
+  slotName: string;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  dueDate: string;
+  paidAt: string | null;
+  overdueDays: number;
+};
+
+export type OwnerFeeCollectionResult = {
+  summary: OwnerFeeCollectionSummaryResult;
+  tab: 'pending' | 'received_today';
+  items: OwnerFeeCollectionItemResult[];
   page: number;
   limit: number;
   total: number;
@@ -279,6 +313,100 @@ export class BookingService {
     }
   }
 
+  public async getOwnerFeeCollection(
+    ownerId: string,
+    query: OwnerFeeCollectionQueryRequest,
+  ): Promise<OwnerFeeCollectionResult> {
+    try {
+      const ownerLibrary = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+      if (!ownerLibrary) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+
+      const tab = query.tab ?? 'pending';
+      const page = query.page ?? 1;
+      const limit = query.limit ?? 20;
+      const { fromDate, toDate } = this.resolveFeeCollectionDateRange(
+        query.fromDate,
+        query.toDate,
+      );
+
+      const [summary, bookingsResult] = await Promise.all([
+        this.bookingRepository.getFeeCollectionSummary(ownerLibrary.id),
+        this.bookingRepository.listLibraryFeeBookings({
+          libraryId: ownerLibrary.id,
+          tab,
+          fromDate,
+          toDate,
+          page,
+          limit,
+        }),
+      ]);
+
+      const uniqueStudentIds = Array.from(new Set(bookingsResult.bookings.map(b => b.studentId)));
+      const students = await Promise.all(
+        uniqueStudentIds.map(studentId => this.authRepository.findStudentById(studentId)),
+      );
+      const studentMap = new Map(
+        students.filter(item => item !== null).map(student => [student.id, student]),
+      );
+
+      return {
+        summary,
+        tab,
+        items: bookingsResult.bookings.map(booking => {
+          const student = studentMap.get(booking.studentId);
+          return this.mapOwnerFeeCollectionItem(booking, student?.name, student?.phone, tab);
+        }),
+        page,
+        limit,
+        total: bookingsResult.total,
+      };
+    } catch (error) {
+      this.rethrowBookingError(error, 'GET_OWNER_FEE_COLLECTION_FAILED');
+    }
+  }
+
+  public async markOwnerBookingPaid(
+    ownerId: string,
+    bookingId: string,
+    paymentMethod?: LibraryPaymentMethod,
+  ): Promise<OwnerFeeCollectionItemResult> {
+    try {
+      const ownerLibrary = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+      if (!ownerLibrary) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+
+      const booking = await this.bookingRepository.findLibraryBookingById(ownerLibrary.id, bookingId);
+      if (!booking) {
+        throw new NotFoundError('BOOKING_NOT_FOUND');
+      }
+
+      if (booking.status !== 'pending') {
+        throw new HttpError(409, 'BOOKING_ALREADY_PAID');
+      }
+
+      if (paymentMethod) {
+        const paymentMethods = this.resolveLibraryPaymentMethods(ownerLibrary);
+        const selectedPaymentMethod = paymentMethods.find(item => item.type === paymentMethod);
+        if (!selectedPaymentMethod || !selectedPaymentMethod.enabled) {
+          throw new HttpError(400, 'PAYMENT_METHOD_NOT_ALLOWED');
+        }
+      }
+
+      const updated = await this.bookingRepository.markBookingPaid(booking.id, paymentMethod);
+      if (!updated) {
+        throw new InternalServerError('MARK_BOOKING_PAID_FAILED');
+      }
+
+      const student = await this.authRepository.findStudentById(updated.studentId);
+      return this.mapOwnerFeeCollectionItem(updated, student?.name, student?.phone, 'received_today');
+    } catch (error) {
+      this.rethrowBookingError(error, 'MARK_BOOKING_PAID_FAILED');
+    }
+  }
+
   private resolveSeatSelection(
     seatMap: SeatMapItem[],
     requestedSeatId: string | undefined,
@@ -313,6 +441,78 @@ export class BookingService {
     }
 
     return selectedSeat;
+  }
+
+  private mapOwnerFeeCollectionItem(
+    booking: {
+      id: string;
+      studentId: string;
+      seatId: string;
+      slotName: string;
+      amount: number;
+      paymentMethod: string;
+      status: string;
+      validUntil: string;
+      updatedAt: Date;
+    },
+    studentName?: string,
+    studentPhone?: string,
+    tab?: 'pending' | 'received_today',
+  ): OwnerFeeCollectionItemResult {
+    const todayIsoDate = new Date().toISOString().slice(0, 10);
+    const overdueDays =
+      booking.status === 'pending'
+        ? this.calculateOverdueDays(booking.validUntil || todayIsoDate, todayIsoDate)
+        : 0;
+
+    return {
+      bookingId: booking.id,
+      studentId: booking.studentId,
+      studentName: studentName?.trim() || 'Unknown Student',
+      studentPhone: studentPhone?.trim() || '-',
+      seatId: booking.seatId,
+      slotName: booking.slotName,
+      amount: booking.amount,
+      paymentMethod: booking.paymentMethod,
+      status: booking.status,
+      dueDate: booking.validUntil,
+      paidAt:
+        tab === 'received_today' || booking.status !== 'pending' ? booking.updatedAt.toISOString() : null,
+      overdueDays,
+    };
+  }
+
+  private resolveFeeCollectionDateRange(
+    fromDate?: string,
+    toDate?: string,
+  ): { fromDate: string; toDate: string } {
+    const today = new Date().toISOString().slice(0, 10);
+    const resolvedFromDate = fromDate?.trim() || toDate?.trim() || today;
+    const resolvedToDate = toDate?.trim() || fromDate?.trim() || today;
+
+    if (resolvedFromDate > resolvedToDate) {
+      throw new HttpError(400, 'INVALID_DATE_RANGE');
+    }
+
+    return {
+      fromDate: resolvedFromDate,
+      toDate: resolvedToDate,
+    };
+  }
+
+  private calculateOverdueDays(dueDateIso: string, todayIsoDate: string): number {
+    const dueDate = new Date(`${dueDateIso}T00:00:00.000Z`);
+    const todayDate = new Date(`${todayIsoDate}T00:00:00.000Z`);
+    if (Number.isNaN(dueDate.getTime()) || Number.isNaN(todayDate.getTime())) {
+      return 0;
+    }
+
+    if (todayDate <= dueDate) {
+      return 0;
+    }
+
+    const diffMs = todayDate.getTime() - dueDate.getTime();
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
   }
 
   private resolveSectionIdForLibrary(
