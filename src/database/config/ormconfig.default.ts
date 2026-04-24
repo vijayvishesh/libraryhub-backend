@@ -14,6 +14,9 @@ import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
 import { AttendanceModel } from '../../api/models/attendance.model';
 import { StudySessionModel } from '../../api/models/studySession.model';
+import { AnnouncementModel } from '../../api/models/announcement.model';
+import { NotificationModel } from '../../api/models/notification.model';
+import { FcmTokenModel } from '../../api/models/fcmToken.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -51,7 +54,10 @@ const createDataSource = (): DataSource =>
       ActivityModel,
       StudyTimetableModel,
       AttendanceModel,
-      StudySessionModel
+      StudySessionModel,
+      AnnouncementModel,
+      NotificationModel,
+      FcmTokenModel,
     ],
     synchronize: true,
     logging: false,

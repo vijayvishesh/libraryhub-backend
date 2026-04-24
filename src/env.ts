@@ -87,7 +87,12 @@ export const env = {
     clientSecret: getOsEnv('CLIENT_SECRET'),
     tempPassword: getOsEnv('TEMP_PASSWORD'),
   },
-
+  
+  firebase: {
+  projectId: getOsEnv('FIREBASE_PROJECT_ID'),
+  clientEmail: getOsEnv('FIREBASE_CLIENT_EMAIL'),
+  privateKey: getOsEnv('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n'),
+},
   tokenSecret: getOsEnv('TOKEN_SECRET'),
   rsaPrivateKey: getOsEnv('RSA_PRIVATE_KEY'),
   rsaPublicKey: getOsEnv('RSA_PUBLIC_KEY'),
