@@ -1,4 +1,4 @@
-export type AuthUserRole = 'OWNER' | 'STUDENT';
+export type AuthUserRole = 'OWNER' | 'STUDENT' | 'SUPER_ADMIN';
 export type AuthTokenType = 'access' | 'refresh';
 export type AuthUserGender = 'male' | 'female' | 'other';
 
