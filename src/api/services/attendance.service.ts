@@ -30,15 +30,7 @@ export class AttendanceService {
     const today = new Date().toISOString().split('T')[0];
 
     // Check already checked in today
-    const existing = await this.attendanceRepository.findTodayByStudentAndLibrary(
-      studentId,
-      libraryId,
-      today,
-    );
 
-    if (existing) {
-      throw new BadRequestError('ALREADY_CHECKED_IN_TODAY');
-    }
 
     return this.attendanceRepository.create({
       studentId,
