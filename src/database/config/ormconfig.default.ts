@@ -15,6 +15,9 @@ import { env } from '../../env';
 import { AttendanceModel } from '../../api/models/attendance.model';
 import { StudySessionModel } from '../../api/models/studySession.model';
 import { SuperAdminModel } from '../../api/models/superAdmin.model';
+import { AnnouncementModel } from '../../api/models/announcement.model';
+import { NotificationModel } from '../../api/models/notification.model';
+import { FcmTokenModel } from '../../api/models/fcmToken.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -53,6 +56,9 @@ const createDataSource = (): DataSource =>
       StudyTimetableModel,
       AttendanceModel,
       StudySessionModel,
+      AnnouncementModel,
+      NotificationModel,
+      FcmTokenModel,,
       SuperAdminModel
     ],
     synchronize: true,
