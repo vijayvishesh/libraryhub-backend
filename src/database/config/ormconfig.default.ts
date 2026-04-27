@@ -14,6 +14,7 @@ import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
 import { AttendanceModel } from '../../api/models/attendance.model';
 import { StudySessionModel } from '../../api/models/studySession.model';
+import { SuperAdminModel } from '../../api/models/superAdmin.model';
 import { AnnouncementModel } from '../../api/models/announcement.model';
 import { NotificationModel } from '../../api/models/notification.model';
 import { FcmTokenModel } from '../../api/models/fcmToken.model';
@@ -57,7 +58,8 @@ const createDataSource = (): DataSource =>
       StudySessionModel,
       AnnouncementModel,
       NotificationModel,
-      FcmTokenModel,
+      FcmTokenModel,,
+      SuperAdminModel
     ],
     synchronize: true,
     logging: false,

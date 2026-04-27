@@ -12,7 +12,7 @@ import {
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
-import { BookingService } from '../services/booking.service';
+import { BookingService, BookingResult } from '../services/booking.service';
 import { CreateBookingRequest, ListMyBookingsQueryRequest } from './requests/booking.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
@@ -108,22 +108,7 @@ export class BookingController {
     }
   }
 
-  private mapBookingData(params: {
-    id: string;
-    libraryId: string;
-    libraryName: string;
-    seatId: string;
-    slotId: string;
-    slotName: string;
-    time: string;
-    sectionId: string | null;
-    paymentMethod: string;
-    amount: number;
-    date: string;
-    validUntil: string;
-    status: string;
-    invoiceNo: string;
-  }): BookingData {
+  private mapBookingData(params: BookingResult): BookingData {
     return new BookingData({
       id: params.id,
       libraryId: params.libraryId,
@@ -139,6 +124,12 @@ export class BookingController {
       validUntil: params.validUntil,
       status: params.status,
       invoiceNo: params.invoiceNo,
+      libraryAddress: params.libraryAddress,
+      libraryCity: params.libraryCity,
+      libraryState: params.libraryState,
+      libraryPincode: params.libraryPincode,
+      libraryLatitude: params.libraryLatitude,
+      libraryLongitude: params.libraryLongitude,
     });
   }
 }
