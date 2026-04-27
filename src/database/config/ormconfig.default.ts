@@ -14,6 +14,7 @@ import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
 import { AttendanceModel } from '../../api/models/attendance.model';
 import { StudySessionModel } from '../../api/models/studySession.model';
+import { SuperAdminModel } from '../../api/models/superAdmin.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -51,7 +52,8 @@ const createDataSource = (): DataSource =>
       ActivityModel,
       StudyTimetableModel,
       AttendanceModel,
-      StudySessionModel
+      StudySessionModel,
+      SuperAdminModel
     ],
     synchronize: true,
     logging: false,

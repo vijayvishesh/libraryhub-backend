@@ -247,6 +247,27 @@ export class BookingData {
   @IsString()
   invoiceNo!: string;
 
+  @IsString()
+  libraryAddress!: string;
+
+  @IsOptional()
+  @IsString()
+  libraryCity?: string;
+
+  @IsOptional()
+  @IsString()
+  libraryState?: string;
+
+  @IsOptional()
+  @IsString()
+  libraryPincode?: string;
+
+  @IsOptional()
+  latitude?: number;
+
+  @IsOptional()
+  longitude?: number;
+
   constructor(params?: {
     id: string;
     libraryId: string;
@@ -262,6 +283,12 @@ export class BookingData {
     validUntil: string;
     status: string;
     invoiceNo: string;
+    libraryAddress: string;
+    libraryCity: string;
+    libraryState: string;
+    libraryPincode: string;
+    libraryLatitude: number | null;
+    libraryLongitude: number | null;
   }) {
     if (!params) {
       return;
@@ -283,6 +310,12 @@ export class BookingData {
     this.validUntil = params.validUntil;
     this.status = params.status;
     this.invoiceNo = params.invoiceNo;
+    this.libraryAddress = params.libraryAddress;
+    this.libraryCity = params.libraryCity;
+    this.libraryState = params.libraryState;
+    this.libraryPincode = params.libraryPincode;
+    this.latitude = params.libraryLatitude ?? undefined;
+    this.longitude = params.libraryLongitude ?? undefined;
   }
 }
 

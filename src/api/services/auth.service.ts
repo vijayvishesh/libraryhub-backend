@@ -271,6 +271,26 @@ export class AuthService {
         return new SessionTokenData(tokens.accessToken, tokens.refreshToken);
       }
 
+      if (tokenPayload.role === 'SUPER_ADMIN') {
+        const tokens = this.generateTokens({
+          sub: tokenPayload.sub,
+          tid: '',
+          sid: session.id,
+          name: tokenPayload.name,
+          phone: '',
+          gender: 'other',
+          role: 'SUPER_ADMIN' as any,
+        });
+
+        await this.authRepository.rotateAuthSessionRefreshToken({
+          sessionId: session.id,
+          refreshTokenHash: this.hashToken(tokens.refreshToken),
+          expiresAt: this.getRefreshTokenExpiryDate(),
+        });
+
+        return new SessionTokenData(tokens.accessToken, tokens.refreshToken);
+      }
+
       const student = await this.authRepository.findStudentById(tokenPayload.sub);
       if (!student) {
         throw new UnauthorizedError('USER_NOT_FOUND');
@@ -320,6 +340,12 @@ export class AuthService {
       const accessToken = this.extractBearerToken(authorizationHeader);
       const payload = this.verifyToken(accessToken, 'access');
       await this.getValidSession(payload);
+
+      if (payload.role === 'SUPER_ADMIN') {
+        return new CurrentSessionData(
+          new AuthUserData(payload.sub, payload.name, '', 'other', 'SUPER_ADMIN' as any, {}),
+        );
+      }
 
       if (payload.role === 'OWNER') {
         const owner = await this.authRepository.findOwnerById(payload.sub);
@@ -514,7 +540,7 @@ export class AuthService {
       typeof payload.name === 'string' &&
       typeof payload.phone === 'string' &&
       (gender === 'male' || gender === 'female' || gender === 'other') &&
-      (role === 'OWNER' || role === 'STUDENT') &&
+      (role === 'OWNER' || role === 'STUDENT' || role === 'SUPER_ADMIN') && // ← changed
       (tokenType === 'access' || tokenType === 'refresh') &&
       tokenType === expectedType
     );

@@ -49,6 +49,12 @@ export type BookingResult = {
   validUntil: string;
   status: string;
   invoiceNo: string;
+  libraryAddress: string;
+  libraryCity: string;
+  libraryState: string;
+  libraryPincode: string;
+  libraryLatitude: number | null;
+  libraryLongitude: number | null;
 };
 
 export type ListMyBookingsResult = {
@@ -223,7 +229,7 @@ export class BookingService {
         validUntil,
       );
 
-      return this.mapBookingResult(booking);
+      return this.mapBookingResult(booking, library); //  pass library here
     } catch (error) {
       this.rethrowBookingError(error, 'CREATE_BOOKING_FAILED');
     }
@@ -286,8 +292,16 @@ export class BookingService {
         limit,
       });
 
+      //  only change: fetch library for each booking
+      const bookings = await Promise.all(
+        result.bookings.map(async item => {
+          const library = await this.libraryRepository.findLibraryById(item.libraryId);
+          return this.mapBookingResult(item, library);
+        }),
+      );
+
       return {
-        bookings: result.bookings.map(item => this.mapBookingResult(item)),
+        bookings,
         page,
         limit,
         total: result.total,
@@ -307,7 +321,9 @@ export class BookingService {
         throw new NotFoundError('BOOKING_NOT_FOUND');
       }
 
-      return this.mapBookingResult(booking);
+      // only change: fetch library and pass to mapBookingResult
+      const library = await this.libraryRepository.findLibraryById(booking.libraryId);
+      return this.mapBookingResult(booking, library);
     } catch (error) {
       this.rethrowBookingError(error, 'GET_MY_BOOKING_FAILED');
     }
@@ -620,7 +636,8 @@ export class BookingService {
     validUntil: string;
     status: string;
     invoiceNo: string;
-  }): BookingResult {
+    libraryAddress: string;
+  }, library?: LibraryRecord | null): BookingResult {
     return {
       id: booking.id,
       libraryId: booking.libraryId,
@@ -636,6 +653,12 @@ export class BookingService {
       validUntil: booking.validUntil,
       status: booking.status,
       invoiceNo: booking.invoiceNo,
+      libraryAddress: library?.address ?? booking.libraryAddress,
+      libraryCity: library?.city ?? '',
+      libraryState: library?.state ?? '',
+      libraryPincode: library?.pincode ?? '',
+      libraryLatitude: library?.location?.coordinates?.[1] ?? null,
+      libraryLongitude: library?.location?.coordinates?.[0] ?? null,
     };
   }
 
