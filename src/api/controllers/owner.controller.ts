@@ -1,3 +1,5 @@
+import { Response } from 'express';
+import * as multer from 'multer';
 import {
   Authorized,
   Body,
@@ -11,9 +13,12 @@ import {
   Patch,
   Post,
   QueryParams,
+  Res,
+  UploadedFile,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
+import { sendXlsxDownload } from '../helpers/excel.helper';
 import { ActivityService } from '../services/activity.service';
 import { BookingService } from '../services/booking.service';
 import { MemberService } from '../services/member.service';
@@ -21,7 +26,9 @@ import { OwnerService } from '../services/owner.service';
 import { MarkBookingPaidRequest, OwnerFeeCollectionQueryRequest } from './requests/booking.request';
 import {
   AddMemberRequest,
+  GenerateMemberInviteLinkRequest,
   ListMembersQueryRequest,
+  ListMemberUploadsQueryRequest,
   UpdateMemberRequest,
 } from './requests/member.request';
 import { CurrentSessionData } from './responses/auth.response';
@@ -38,8 +45,13 @@ import {
   MemberCreateApiResponse,
   MemberData,
   MemberDetailApiResponse,
+  MemberInviteLinkApiResponse,
+  MemberInviteLinkData,
   MemberListApiResponse,
   MemberListPayloadData,
+  MemberUploadData,
+  MemberUploadListApiResponse,
+  MemberUploadListPayloadData,
 } from './responses/member.response';
 import {
   OwnerDashboardAlertsData,
@@ -229,6 +241,148 @@ export class OwnerController {
     }
   }
 
+  @Get('/members/upload-template')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async downloadMemberUploadTemplate(@Res() res: Response): Promise<Response> {
+    try {
+      const result = await this.memberService.downloadMemberTemplate();
+      return sendXlsxDownload(res, result.filename, result.buffer);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('DOWNLOAD_MEMBER_UPLOAD_TEMPLATE_FAILED');
+    }
+  }
+
+  @Post('/members/upload')
+  @Authorized('OWNER')
+  @OpenAPI({
+    security: [{ bearerAuth: [] }],
+    requestBody: {
+      required: true,
+      content: {
+        ['multipart/form-data']: {
+          schema: {
+            type: 'object',
+            required: ['file'],
+            properties: {
+              file: {
+                type: 'string',
+                format: 'binary',
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ResponseSchema(MemberActionApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async uploadMembersExcel(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @UploadedFile('file', {
+      required: true,
+      options: {
+        storage: multer.memoryStorage(),
+        limits: {
+          fileSize: 5 * 1024 * 1024,
+        },
+      },
+    })
+    file: { originalname: string; buffer: Buffer },
+  ): Promise<MemberActionApiResponse> {
+    try {
+      const upload = await this.memberService.uploadMembersExcel(session.user.id, file);
+      if (upload.failedCount > 0) {
+        const firstFailedRow = upload.rows.find(row => row.uploadStatus === 'failed');
+        const errorMessage = firstFailedRow?.errorMessage || 'MEMBER_UPLOAD_FAILED';
+        const formattedErrorMessage = firstFailedRow
+          ? `Row ${firstFailedRow.rowNumber}: ${errorMessage}`
+          : errorMessage;
+
+        if (upload.successCount > 0) {
+          throw new HttpError(
+            400,
+            `Uploaded ${upload.successCount} rows successfully, ${upload.failedCount} failed. ${formattedErrorMessage}`,
+          );
+        }
+
+        throw new HttpError(400, formattedErrorMessage);
+      }
+
+      return new MemberActionApiResponse('MEMBER_UPLOAD_PROCESSED', 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('UPLOAD_OWNER_MEMBERS_FAILED');
+    }
+  }
+
+  @Get('/members/uploads')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(MemberUploadListApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async listMemberUploads(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @QueryParams() query: ListMemberUploadsQueryRequest,
+  ): Promise<MemberUploadListApiResponse> {
+    try {
+      const result = await this.memberService.listMemberUploads(session.user.id, query);
+      return new MemberUploadListApiResponse(
+        new MemberUploadListPayloadData(
+          result.uploads.map(item => new MemberUploadData(item)),
+          result.page,
+          result.limit,
+          result.total,
+        ),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('LIST_MEMBER_UPLOADS_FAILED');
+    }
+  }
+
+  @Get('/members/uploads/:uploadId/report')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async downloadMemberUploadReport(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('uploadId') uploadId: string,
+    @Res() res: Response,
+  ): Promise<Response> {
+    try {
+      const result = await this.memberService.downloadMemberUploadReport(session.user.id, uploadId);
+      return sendXlsxDownload(res, result.filename, result.buffer);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('DOWNLOAD_MEMBER_UPLOAD_REPORT_FAILED');
+    }
+  }
+
   @Post('/members')
   @Authorized('OWNER')
   @OpenAPI({ security: [{ bearerAuth: [] }] })
@@ -362,6 +516,37 @@ export class OwnerController {
       }
 
       throw new InternalServerError('DELETE_OWNER_MEMBER_FAILED');
+    }
+  }
+
+  @Post('/members/invite-link')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(MemberInviteLinkApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async generateMemberInviteLink(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Body() payload: GenerateMemberInviteLinkRequest,
+  ): Promise<MemberInviteLinkApiResponse> {
+    try {
+      const inviteLink = await this.memberService.generateMemberInviteLink(
+        session.user.id,
+        payload.siteLibraryId,
+      );
+      return new MemberInviteLinkApiResponse(
+        'MEMBER_INVITE_LINK_GENERATED',
+        new MemberInviteLinkData(inviteLink),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GENERATE_MEMBER_INVITE_LINK_FAILED');
     }
   }
 }

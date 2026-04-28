@@ -1,16 +1,39 @@
 import { HttpError, InternalServerError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
+import { v4 as uuidv4 } from 'uuid';
 import {
   AddMemberRequest,
   ListMembersQueryRequest,
+  ListMemberUploadsQueryRequest,
   UpdateMemberRequest,
 } from '../controllers/requests/member.request';
+import {
+  buildMemberUploadReport,
+  buildMemberUploadTemplate,
+  buildValidatedUploadPayload,
+  getMemberUploadErrorMessage,
+  MemberUploadFile,
+  parseMemberUploadFile,
+  resolveMemberBulkUploadStatus,
+} from '../helpers/memberUpload.helper';
 import { LibraryRepository } from '../repositories/library.repository';
+import { LibrarySeatRepository } from '../repositories/librarySeat.repository';
+import { MemberInviteLinkRepository } from '../repositories/memberInviteLink.repository';
 import { MemberRepository } from '../repositories/member.repository';
+import { MemberBulkUploadRepository } from '../repositories/memberBulkUpload.repository';
+import { MemberInviteLinkRecord } from '../repositories/types/memberInviteLink.repository.types';
 import { MemberMsgResponse, MemberRecord } from '../repositories/types/member.repository.types';
+import { MemberBulkUploadRecord } from '../repositories/types/memberBulkUpload.repository.types';
 
 export type ListMembersResult = {
   members: MemberRecord[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
+export type ListMemberUploadsResult = {
+  uploads: MemberBulkUploadRecord[];
   page: number;
   limit: number;
   total: number;
@@ -21,66 +44,15 @@ export class MemberService {
   constructor(
     private readonly libraryRepository: LibraryRepository,
     private readonly memberRepository: MemberRepository,
+    private readonly memberBulkUploadRepository: MemberBulkUploadRepository,
+    private readonly memberInviteLinkRepository: MemberInviteLinkRepository,
+    private readonly librarySeatRepository: LibrarySeatRepository,
   ) {}
 
   public async addMember(ownerId: string, payload: AddMemberRequest): Promise<MemberMsgResponse> {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
-      const fullName = payload.fullName.trim();
-      const mobileNo = payload.mobileNo.trim();
-      const aadharId = payload.aadharId?.trim() ?? null;
-      const email = payload.email?.trim() ?? null;
-      const seatId = payload.seatId?.trim() ?? null;
-      const slotId = payload.slotId?.trim() ?? null;
-      const status = payload.status || 'active';
-      const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
-      this.assertValidIsoDate(startDate);
-      const endDate = payload.endDate || this.addMonthsIsoDate(startDate, payload.duration);
-      this.assertValidIsoDate(endDate);
-      const notes = payload.notes?.trim() ?? null;
-      const planAmount = typeof payload.planAmount === 'number' ? Number(payload.planAmount) : null;
-
-      const existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
-        library.id,
-        mobileNo,
-        aadharId || undefined,
-      );
-
-      if (existingMember) {
-        throw new HttpError(409, 'MEMBER_ALREADY_EXISTS');
-      }
-
-      if (seatId) {
-        const seatConflict = await this.memberRepository.findActiveMemberBySeat(
-          library.id,
-          seatId,
-          slotId || undefined,
-        );
-        if (seatConflict) {
-          throw new HttpError(409, 'SEAT_ALREADY_ASSIGNED');
-        }
-      }
-
-      const member = await this.memberRepository.createMember({
-        fullName,
-        mobileNo,
-        aadharId,
-        studentId: null,
-        email,
-        duration: payload.duration,
-        libraryId: library.id,
-        seatId,
-        slotId,
-        status,
-        planAmount,
-        startDate,
-        endDate,
-        notes,
-      });
-
-      if (!member) {
-        throw new InternalServerError('MEMBER_CREATION_FAILED');
-      }
+      await this.createMemberForLibrary(library.id, payload);
 
       return {
         msg: 'Member added successfully',
@@ -177,9 +149,14 @@ export class MemberService {
         }
       }
 
-      const newSeatId = payload.seatId === undefined ? existingMember.seatId : payload.seatId?.trim() || null;
-      const newSlotId = payload.slotId === undefined ? existingMember.slotId : payload.slotId?.trim() || null;
-      if (newSeatId && (newSeatId !== existingMember.seatId || newSlotId !== existingMember.slotId)) {
+      const newSeatId =
+        payload.seatId === undefined ? existingMember.seatId : payload.seatId?.trim() || null;
+      const newSlotId =
+        payload.slotId === undefined ? existingMember.slotId : payload.slotId?.trim() || null;
+      if (
+        newSeatId &&
+        (newSeatId !== existingMember.seatId || newSlotId !== existingMember.slotId)
+      ) {
         const seatConflict = await this.memberRepository.findActiveMemberBySeat(
           library.id,
           newSeatId,
@@ -262,6 +239,285 @@ export class MemberService {
 
       throw new InternalServerError('DELETE_MEMBER_FAILED');
     }
+  }
+
+  public async downloadMemberTemplate(): Promise<{ filename: string; buffer: Buffer }> {
+    const buffer = await buildMemberUploadTemplate();
+
+    return {
+      filename: 'members-upload-template.xlsx',
+      buffer,
+    };
+  }
+
+  public async uploadMembersExcel(
+    ownerId: string,
+    file: MemberUploadFile,
+  ): Promise<MemberBulkUploadRecord> {
+    try {
+      if (!file?.buffer?.length) {
+        throw new HttpError(400, 'UPLOAD_FILE_REQUIRED');
+      }
+
+      const isCSV = file.originalname.toLowerCase().endsWith('.csv');
+      const isXLSX = file.originalname.toLowerCase().endsWith('.xlsx');
+
+      if (!isCSV && !isXLSX) {
+        throw new HttpError(400, 'UPLOAD_FILE_MUST_BE_CSV_OR_XLSX');
+      }
+
+      const library = await this.getOwnerLibraryOrThrow(ownerId);
+      const parsedRows = await parseMemberUploadFile(file);
+      const results = [];
+      let successCount = 0;
+
+      for (const row of parsedRows) {
+        try {
+          const payload = await buildValidatedUploadPayload(row);
+          const member = await this.createMemberForLibrary(library.id, payload);
+          successCount += 1;
+          results.push({
+            rowNumber: row.rowNumber,
+            fullName: row.fullName,
+            mobileNo: row.mobileNo,
+            aadharId: row.aadharId,
+            email: row.email,
+            duration: row.duration,
+            seatId: row.seatId,
+            slotId: row.slotId,
+            statusValue: row.status,
+            planAmount: row.planAmount,
+            startDate: row.startDate,
+            endDate: row.endDate,
+            notes: row.notes,
+            uploadStatus: 'success' as const,
+            errorMessage: null,
+            memberId: member.id,
+          });
+        } catch (error) {
+          results.push({
+            rowNumber: row.rowNumber,
+            fullName: row.fullName,
+            mobileNo: row.mobileNo,
+            aadharId: row.aadharId,
+            email: row.email,
+            duration: row.duration,
+            seatId: row.seatId,
+            slotId: row.slotId,
+            statusValue: row.status,
+            planAmount: row.planAmount,
+            startDate: row.startDate,
+            endDate: row.endDate,
+            notes: row.notes,
+            uploadStatus: 'failed' as const,
+            errorMessage: getMemberUploadErrorMessage(error),
+            memberId: null,
+          });
+        }
+      }
+
+      const failedCount = results.length - successCount;
+      const status = resolveMemberBulkUploadStatus(successCount, failedCount);
+
+      return await this.memberBulkUploadRepository.createUpload({
+        ownerId,
+        libraryId: library.id,
+        fileName: file.originalname,
+        status,
+        totalRows: results.length,
+        successCount,
+        failedCount,
+        rows: results,
+      });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('MEMBER_BULK_UPLOAD_FAILED');
+    }
+  }
+
+  public async listMemberUploads(
+    ownerId: string,
+    query: ListMemberUploadsQueryRequest,
+  ): Promise<ListMemberUploadsResult> {
+    try {
+      const library = await this.getOwnerLibraryOrThrow(ownerId);
+      const page = query.page ?? 1;
+      const limit = query.limit ?? 20;
+      const result = await this.memberBulkUploadRepository.listUploadsByLibrary({
+        libraryId: library.id,
+        page,
+        limit,
+        status: query.status,
+      });
+
+      return {
+        uploads: result.uploads,
+        page,
+        limit,
+        total: result.total,
+      };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('LIST_MEMBER_UPLOADS_FAILED');
+    }
+  }
+
+  public async downloadMemberUploadReport(
+    ownerId: string,
+    uploadId: string,
+  ): Promise<{ filename: string; buffer: Buffer }> {
+    try {
+      const library = await this.getOwnerLibraryOrThrow(ownerId);
+      const upload = await this.memberBulkUploadRepository.findUploadByIdAndLibrary(
+        uploadId.trim(),
+        library.id,
+      );
+      if (!upload) {
+        throw new NotFoundError('MEMBER_UPLOAD_NOT_FOUND');
+      }
+
+      const buffer = await buildMemberUploadReport(upload.rows);
+      return {
+        filename: `members-upload-report-${upload.id}.xlsx`,
+        buffer,
+      };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('DOWNLOAD_MEMBER_UPLOAD_REPORT_FAILED');
+    }
+  }
+
+  public async generateMemberInviteLink(
+    ownerId: string,
+    siteLibraryId: string,
+  ): Promise<MemberInviteLinkRecord> {
+    try {
+      const library = await this.getOwnerLibraryOrThrow(ownerId);
+      const token = uuidv4();
+
+      return await this.memberInviteLinkRepository.createInviteLink({
+        ownerId,
+        libraryId: library.id,
+        siteLibraryId,
+        token,
+      });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GENERATE_MEMBER_INVITE_LINK_FAILED');
+    }
+  }
+
+  public async getInviteLinkDetails(token: string): Promise<MemberInviteLinkRecord | null> {
+    try {
+      return await this.memberInviteLinkRepository.findValidLinkByToken(token);
+    } catch (error) {
+      throw new InternalServerError('GET_INVITE_LINK_DETAILS_FAILED');
+    }
+  }
+
+  public async submitMemberViaInviteLink(
+    token: string,
+    payload: AddMemberRequest,
+  ): Promise<MemberRecord> {
+    try {
+      const inviteLink = await this.memberInviteLinkRepository.findValidLinkByToken(token);
+      if (!inviteLink) {
+        throw new HttpError(404, 'INVITE_LINK_INVALID_OR_EXPIRED');
+      }
+
+      const member = await this.createMemberForLibrary(inviteLink.libraryId, payload);
+
+      await this.memberInviteLinkRepository.markLinkAsUsed(token, member.id);
+
+      return member;
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('SUBMIT_MEMBER_VIA_INVITE_LINK_FAILED');
+    }
+  }
+
+  private async createMemberForLibrary(
+    libraryId: string,
+    payload: AddMemberRequest,
+  ): Promise<MemberRecord> {
+    const fullName = payload.fullName.trim();
+    const mobileNo = payload.mobileNo.trim();
+    const aadharId = payload.aadharId?.trim() ?? null;
+    const email = payload.email?.trim() ?? null;
+    const seatId = payload.seatId?.trim() ?? null;
+    const slotId = payload.slotId?.trim() ?? null;
+    const status = payload.status || 'active';
+    const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
+    this.assertValidIsoDate(startDate);
+    const endDate = payload.endDate || this.addMonthsIsoDate(startDate, payload.duration);
+    this.assertValidIsoDate(endDate);
+    const notes = payload.notes?.trim() ?? null;
+    const planAmount = typeof payload.planAmount === 'number' ? Number(payload.planAmount) : null;
+
+    const existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
+      libraryId,
+      mobileNo,
+      aadharId || undefined,
+    );
+    if (existingMember) {
+      throw new HttpError(409, 'MEMBER_ALREADY_EXISTS');
+    }
+
+    if (seatId) {
+      const validSeat = await this.librarySeatRepository.findSeatByLibraryAndSeatId(
+        libraryId,
+        seatId,
+      );
+      if (!validSeat) {
+        throw new HttpError(400, 'SEAT_NOT_FOUND');
+      }
+
+      const seatConflict = await this.memberRepository.findActiveMemberBySeat(
+        libraryId,
+        seatId,
+        slotId || undefined,
+      );
+      if (seatConflict) {
+        throw new HttpError(409, 'SEAT_ALREADY_ASSIGNED');
+      }
+    }
+
+    const member = await this.memberRepository.createMember({
+      fullName,
+      mobileNo,
+      aadharId,
+      studentId: null,
+      email,
+      duration: payload.duration,
+      libraryId,
+      seatId,
+      slotId,
+      status,
+      planAmount,
+      startDate,
+      endDate,
+      notes,
+    });
+    if (!member) {
+      throw new InternalServerError('MEMBER_CREATION_FAILED');
+    }
+
+    return member;
   }
 
   private async getOwnerLibraryOrThrow(ownerId: string) {
