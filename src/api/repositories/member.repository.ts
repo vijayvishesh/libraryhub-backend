@@ -288,7 +288,12 @@ export class MemberRepository {
     );
     await this.createIndexSafely(
       { libraryId: 1, aadharId: 1 },
-      { unique: true, sparse: true, name: 'idx_members_library_aadhar_unique' },
+      {
+        unique: true,
+        sparse: false,
+        name: 'idx_members_library_aadhar_unique',
+        partialFilterExpression: { aadharId: { $type: 'string' } },
+      },
     );
     await this.createIndexSafely(
       { libraryId: 1, studentId: 1 },
@@ -304,7 +309,12 @@ export class MemberRepository {
 
   private async createIndexSafely(
     keys: Record<string, 1 | -1>,
-    options: { name: string; unique?: boolean; sparse?: boolean },
+    options: {
+      name: string;
+      unique?: boolean;
+      sparse?: boolean;
+      partialFilterExpression?: Record<string, unknown>;
+    },
   ): Promise<void> {
     try {
       await this.getMemberRepository().createCollectionIndex(keys, options);
