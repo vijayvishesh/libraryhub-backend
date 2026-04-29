@@ -20,6 +20,8 @@ import {
   PendingStudentSignupRecord,
   RotateAuthSessionRefreshTokenInput,
   StudentRecord,
+  UpdateOwnerProfileInput,
+  UpdateStudentProfileInput,
   UpsertPendingOwnerSignupInput,
   UpsertPendingStudentSignupInput,
 } from './types/auth.repository.types';
@@ -305,6 +307,55 @@ export class AuthRepository {
 
     student.hasJoinedLibrary = hasJoinedLibrary;
     await studentRepository.save(student);
+  }
+
+  public async updateOwnerProfile(
+    ownerId: string,
+    input: UpdateOwnerProfileInput,
+  ): Promise<AuthOwnerRecord | null> {
+    const objectId = this.tryParseObjectId(ownerId);
+    if (!objectId) {
+      return null;
+    }
+
+    const ownerRepository = this.getOwnerRepository();
+    const owner = await ownerRepository.findOneById(objectId);
+    if (!owner) {
+      return null;
+    }
+
+    if (input.name !== undefined) {
+      owner.name = input.name;
+    }
+
+    const savedOwner = await ownerRepository.save(owner);
+    return this.mapOwner(savedOwner);
+  }
+
+  public async updateStudentProfile(
+    studentId: string,
+    input: UpdateStudentProfileInput,
+  ): Promise<StudentRecord | null> {
+    const objectId = this.tryParseObjectId(studentId);
+    if (!objectId) {
+      return null;
+    }
+
+    const studentRepository = this.getStudentRepository();
+    const student = await studentRepository.findOneById(objectId);
+    if (!student) {
+      return null;
+    }
+
+    if (input.name !== undefined) {
+      student.name = input.name;
+    }
+    if (input.gender !== undefined) {
+      student.gender = input.gender;
+    }
+
+    const savedStudent = await studentRepository.save(student);
+    return this.mapStudent(savedStudent);
   }
 
   public async createAuthSession(input: CreateAuthSessionInput): Promise<AuthSessionRecord> {

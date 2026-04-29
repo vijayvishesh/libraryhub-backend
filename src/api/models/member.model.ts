@@ -47,6 +47,12 @@ export class MemberModel {
   endDate!: string | null;
 
   @Column()
+  bookingId!: string | null;
+
+  @Column()
+  paidAt!: Date | null;
+
+  @Column()
   notes!: string | null;
 
   @Column()

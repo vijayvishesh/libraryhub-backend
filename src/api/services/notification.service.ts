@@ -1,9 +1,9 @@
 import { NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
-import { NotificationRepository } from '../repositories/notification.repository';
-import { FcmTokenRepository } from '../repositories/fcmToken.repository';
-import { NotificationRecord } from '../repositories/types/notification.repository.types';
 import { RegisterFcmTokenRequest } from '../controllers/requests/fcmToken.request';
+import { FcmTokenRepository } from '../repositories/fcmToken.repository';
+import { NotificationRepository } from '../repositories/notification.repository';
+import { NotificationRecord } from '../repositories/types/notification.repository.types';
 
 @Service()
 export class NotificationService {
@@ -41,10 +41,7 @@ export class NotificationService {
     return this.notificationRepository.countUnread(studentId);
   }
 
-  public async registerFcmToken(
-    studentId: string,
-    input: RegisterFcmTokenRequest,
-  ): Promise<void> {
+  public async registerFcmToken(studentId: string, input: RegisterFcmTokenRequest): Promise<void> {
     await this.fcmTokenRepository.upsert({
       studentId,
       token: input.token,

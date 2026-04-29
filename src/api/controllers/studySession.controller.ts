@@ -16,10 +16,14 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { StudySessionService } from '../services/studySession.service';
-import { CreateStudySessionRequest, UpdateStudySessionRequest } from './requests/studySession.request';
-import { CurrentSessionData } from './responses/auth.response';
 import {
-//   SessionLibraryData,
+  CreateStudySessionRequest,
+  UpdateStudySessionRequest,
+} from './requests/studySession.request';
+import { CurrentSessionData } from './responses/auth.response';
+import { ErrorResponseModel } from './responses/common.reponse';
+import {
+  //   SessionLibraryData,
   StudySessionApiResponse,
   StudySessionData,
   StudySessionListApiResponse,
@@ -27,7 +31,6 @@ import {
   StudySessionStatsApiResponse,
   StudySessionStatsData,
 } from './responses/studySession.response';
-import { ErrorResponseModel } from './responses/common.reponse';
 // import { StudySessionRecord } from '../repositories/types/studySession.repository.types';
 
 @Service()
@@ -52,7 +55,9 @@ export class StudySessionController {
       const library = await this.studySessionService.getLibraryDataForSession(record);
       return new StudySessionApiResponse(new StudySessionData(record, library), 201);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('CREATE_SESSION_FAILED');
     }
   }
@@ -79,14 +84,19 @@ export class StudySessionController {
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('LIST_SESSIONS_FAILED');
     }
   }
 
   @Get('/stats')
   @Authorized('STUDENT')
-  @OpenAPI({ summary: 'Get study stats — total time, sessions, day streak', security: [{ bearerAuth: [] }] })
+  @OpenAPI({
+    summary: 'Get study stats — total time, sessions, day streak',
+    security: [{ bearerAuth: [] }],
+  })
   @ResponseSchema(StudySessionStatsApiResponse, { statusCode: 200 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
@@ -97,7 +107,9 @@ export class StudySessionController {
       const stats = await this.studySessionService.getStats(session.user.id);
       return new StudySessionStatsApiResponse(new StudySessionStatsData(stats), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_STATS_FAILED');
     }
   }
@@ -118,7 +130,9 @@ export class StudySessionController {
       const library = await this.studySessionService.getLibraryDataForSession(record);
       return new StudySessionApiResponse(new StudySessionData(record, library), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_SESSION_FAILED');
     }
   }
@@ -141,7 +155,9 @@ export class StudySessionController {
       const library = await this.studySessionService.getLibraryDataForSession(record);
       return new StudySessionApiResponse(new StudySessionData(record, library), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('UPDATE_SESSION_FAILED');
     }
   }
@@ -160,7 +176,9 @@ export class StudySessionController {
     try {
       await this.studySessionService.deleteSession(id, session.user.id);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('DELETE_SESSION_FAILED');
     }
   }

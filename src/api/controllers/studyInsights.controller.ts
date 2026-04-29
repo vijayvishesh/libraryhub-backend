@@ -20,7 +20,10 @@ export class StudyInsightsController {
 
   @Get('/')
   @Authorized('STUDENT')
-  @OpenAPI({ summary: 'Get study insights — today hours, streak, week hours, graph, recent sessions', security: [{ bearerAuth: [] }] })
+  @OpenAPI({
+    summary: 'Get study insights — today hours, streak, week hours, graph, recent sessions',
+    security: [{ bearerAuth: [] }],
+  })
   @ResponseSchema(StudyInsightsApiResponse, { statusCode: 200 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
@@ -31,7 +34,7 @@ export class StudyInsightsController {
       const insights = await this.studyInsightsService.getInsights(session.user.id);
       return new StudyInsightsApiResponse(new StudyInsightsData(insights), 200);
     } catch (error) {
-        console.error('GET_INSIGHTS_ERROR:', error);
+      console.error('GET_INSIGHTS_ERROR:', error);
       if (error instanceof HttpError) throw error;
       throw new InternalServerError('GET_INSIGHTS_FAILED');
     }

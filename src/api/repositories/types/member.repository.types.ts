@@ -12,6 +12,8 @@ export type CreateMemberInput = {
   planAmount: number | null;
   startDate: string | null;
   endDate: string | null;
+  bookingId: string | null;
+  paidAt: Date | null;
   notes: string | null;
 };
 
