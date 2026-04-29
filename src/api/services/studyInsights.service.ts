@@ -5,9 +5,7 @@ const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 @Service()
 export class StudyInsightsService {
-  constructor(
-    private readonly studySessionRepository: StudySessionRepository,
-  ) {}
+  constructor(private readonly studySessionRepository: StudySessionRepository) {}
 
   public async getInsights(studentId: string): Promise<{
     todayMinutes: number;
@@ -85,9 +83,7 @@ export class StudyInsightsService {
 
   private calculateDayStreak(sessions: any[]): number {
     if (sessions.length === 0) return 0;
-    const studyDays = new Set(
-      sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0]),
-    );
+    const studyDays = new Set(sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0]));
     let streak = 0;
     const today = new Date();
     for (let i = 0; i < 365; i++) {

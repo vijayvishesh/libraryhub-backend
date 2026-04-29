@@ -7,12 +7,9 @@ import {
   CreateLibrarySeatInput,
   LibrarySeatRecord,
 } from '../repositories/types/librarySeat.repository.types';
+import { SeatBackfillResult } from './types/librarySeat.service.types';
 
-export type SeatBackfillResult = {
-  totalLibraries: number;
-  backfilledLibraries: number;
-  skippedLibraries: number;
-};
+export type { SeatBackfillResult };
 
 @Service()
 export class LibrarySeatService {
@@ -75,7 +72,7 @@ export class LibrarySeatService {
       (library.seating?.sections || []).map(section => [String(section.id), section.name]),
     );
 
-    const generatedSeatMap = buildSeatMap(library.seating, library.totalSeats, new Set());
+    const generatedSeatMap = buildSeatMap(library.seating, library.totalSeats, new Map());
     return generatedSeatMap.map((seat, index) =>
       this.mapSeatToInventoryRecord(library.id, seat, index + 1, sectionsById),
     );

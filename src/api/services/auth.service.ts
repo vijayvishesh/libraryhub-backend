@@ -1,7 +1,7 @@
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 import * as jwt from 'jsonwebtoken';
-import { HttpError, InternalServerError, UnauthorizedError } from 'routing-controllers';
+import { HttpError, InternalServerError, NotFoundError, UnauthorizedError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { AuthJwtPayload, AuthTokenType, AuthUserGender } from '../../types/jwtToken.types';
 import {
@@ -12,6 +12,7 @@ import {
   RefreshSessionRequest,
   RegisterRequest,
   SendOtpRequest,
+  UpdateProfileRequest,
   VerifyOtpWithRoleRequest,
 } from '../controllers/requests/auth.request';
 import {
@@ -382,6 +383,56 @@ export class AuthService {
       );
     } catch (error) {
       this.rethrowAuthError(error, 'GET_CURRENT_SESSION_FAILED');
+    }
+  }
+
+  public async updateProfile(
+    session: CurrentSessionData,
+    payload: UpdateProfileRequest,
+  ): Promise<CurrentSessionData> {
+    try {
+      const role = session.user.role;
+
+      if (role === 'OWNER') {
+        const updated = await this.authRepository.updateOwnerProfile(session.user.id, {
+          name: payload.name,
+        });
+        if (!updated) {
+          throw new NotFoundError('USER_NOT_FOUND');
+        }
+
+        const tenant = session.tenant
+          ? new AuthTenantData(
+              session.tenant.id,
+              session.tenant.name,
+              session.tenant.city,
+              session.tenant.isSetupCompleted,
+            )
+          : undefined;
+
+        return new CurrentSessionData(
+          new AuthUserData(updated.id, updated.name, updated.phone, DEFAULT_OWNER_GENDER, updated.role, {
+            hasCreatedLibrary: updated.hasCreatedLibrary,
+          }),
+          tenant,
+        );
+      }
+
+      const updated = await this.authRepository.updateStudentProfile(session.user.id, {
+        name: payload.name,
+        gender: payload.gender ? this.normalizeRequestGender(payload.gender) : undefined,
+      });
+      if (!updated) {
+        throw new NotFoundError('USER_NOT_FOUND');
+      }
+
+      return new CurrentSessionData(
+        new AuthUserData(updated.id, updated.name, updated.phone, updated.gender, updated.role, {
+          hasJoinedLibrary: updated.hasJoinedLibrary,
+        }),
+      );
+    } catch (error) {
+      this.rethrowAuthError(error, 'UPDATE_PROFILE_FAILED');
     }
   }
 

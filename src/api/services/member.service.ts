@@ -5,22 +5,21 @@ import {
   ListMembersQueryRequest,
   UpdateMemberRequest,
 } from '../controllers/requests/member.request';
+import { LibraryPaymentMethod } from '../constants/library.constants';
+import { BookingRepository } from '../repositories/booking.repository';
 import { LibraryRepository } from '../repositories/library.repository';
 import { MemberRepository } from '../repositories/member.repository';
 import { MemberMsgResponse, MemberRecord } from '../repositories/types/member.repository.types';
+import { ListMembersResult } from './types/member.service.types';
 
-export type ListMembersResult = {
-  members: MemberRecord[];
-  page: number;
-  limit: number;
-  total: number;
-};
+export type { ListMembersResult };
 
 @Service()
 export class MemberService {
   constructor(
     private readonly libraryRepository: LibraryRepository,
     private readonly memberRepository: MemberRepository,
+    private readonly bookingRepository: BookingRepository,
   ) {}
 
   public async addMember(ownerId: string, payload: AddMemberRequest): Promise<MemberMsgResponse> {
@@ -32,7 +31,7 @@ export class MemberService {
       const email = payload.email?.trim() ?? null;
       const seatId = payload.seatId?.trim() ?? null;
       const slotId = payload.slotId?.trim() ?? null;
-      const status = payload.status || 'active';
+      const status = payload.status || 'pending';
       const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
       this.assertValidIsoDate(startDate);
       const endDate = payload.endDate || this.addMonthsIsoDate(startDate, payload.duration);
@@ -75,6 +74,8 @@ export class MemberService {
         planAmount,
         startDate,
         endDate,
+        bookingId: null,
+        paidAt: null,
         notes,
       });
 
@@ -261,6 +262,56 @@ export class MemberService {
       }
 
       throw new InternalServerError('DELETE_MEMBER_FAILED');
+    }
+  }
+
+  public async markMemberPaid(
+    ownerId: string,
+    memberId: string,
+    paymentMethod?: string,
+  ): Promise<MemberRecord> {
+    try {
+      const library = await this.getOwnerLibraryOrThrow(ownerId);
+      const member = await this.memberRepository.findMemberByIdAndLibrary(
+        memberId.trim(),
+        library.id,
+      );
+      if (!member) {
+        throw new NotFoundError('MEMBER_NOT_FOUND');
+      }
+
+      if (member.status !== 'pending') {
+        throw new HttpError(409, 'MEMBER_NOT_PENDING');
+      }
+
+      const updated = await this.memberRepository.updateMemberByIdAndLibrary(
+        member.id,
+        library.id,
+        {
+          status: 'active',
+          paidAt: new Date(),
+          updatedAt: new Date(),
+        },
+      );
+
+      if (!updated) {
+        throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
+      }
+
+      if (member.bookingId) {
+        await this.bookingRepository.markBookingPaid(
+          member.bookingId,
+          paymentMethod as LibraryPaymentMethod | undefined,
+        );
+      }
+
+      return updated;
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
     }
   }
 

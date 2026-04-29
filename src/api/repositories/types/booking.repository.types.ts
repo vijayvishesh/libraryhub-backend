@@ -14,6 +14,7 @@ export type CreateBookingInput = {
   sectionId: string | null;
   paymentMethod: LibraryPaymentMethod;
   amount: number;
+  duration: number;
   startDate: string;
   validUntil: string;
   status: BookingStatus;

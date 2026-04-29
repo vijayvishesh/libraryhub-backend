@@ -94,6 +94,8 @@ export type CreateLibraryInput = {
   deletedAt: Date | null;
 };
 
+export type UpdateLibraryInput = Partial<Omit<CreateLibraryInput, 'ownerId'>>;
+
 export type LibraryRecord = CreateLibraryInput & {
   id: string;
   createdAt: Date;

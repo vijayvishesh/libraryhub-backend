@@ -9,6 +9,8 @@ export const ACTIVITY_ACTION_TYPES = [
   'LIBRARY_UPDATED',
   'USER_LOGGED_IN',
   'USER_LOGGED_OUT',
+  'BOOKING_APPROVED',
+  'BOOKING_REJECTED',
 ] as const;
 
 export type ActivityActionType = (typeof ACTIVITY_ACTION_TYPES)[number];
