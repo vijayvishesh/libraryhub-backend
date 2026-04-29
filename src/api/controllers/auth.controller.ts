@@ -6,6 +6,7 @@ import {
   HttpError,
   InternalServerError,
   JsonController,
+  Patch,
   Post,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
@@ -18,6 +19,7 @@ import {
   RefreshSessionRequest,
   RegisterRequest,
   SendOtpRequest,
+  UpdateProfileRequest,
   VerifyOtpWithRoleRequest,
 } from './requests/auth.request';
 import {
@@ -130,6 +132,30 @@ export class AuthController {
     @CurrentUser({ required: true }) session: CurrentSessionData,
   ): Promise<CurrentSessionApiResponse> {
     return new CurrentSessionApiResponse(session, 200);
+  }
+
+  @Patch('/me')
+  @Authorized()
+  @OpenAPI({ summary: 'Update current user profile', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(CurrentSessionApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async updateProfile(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Body() payload: UpdateProfileRequest,
+  ): Promise<CurrentSessionApiResponse> {
+    try {
+      const updated = await this.authService.updateProfile(session, payload);
+      return new CurrentSessionApiResponse(updated, 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('UPDATE_PROFILE_FAILED');
+    }
   }
 
   @Post('/refresh')

@@ -2,11 +2,13 @@ import {
   Authorized,
   Body,
   CurrentUser,
+  Delete,
   Get,
   HttpError,
   InternalServerError,
   JsonController,
   Param,
+  Patch,
   Post,
   QueryParams,
 } from 'routing-controllers';
@@ -16,7 +18,11 @@ import { ActivityService } from '../services/activity.service';
 import { BookingService } from '../services/booking.service';
 import { LibraryService } from '../services/library.service';
 import { LibrarySeatMapQueryRequest } from './requests/booking.request';
-import { LibraryListQueryRequest, LibrarySetupRequest } from './requests/library.request';
+import {
+  LibraryListQueryRequest,
+  LibrarySetupRequest,
+  UpdateLibraryRequest,
+} from './requests/library.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
   LibraryPaymentOptionData,
@@ -85,7 +91,8 @@ export class LibraryController {
         query.sectionId,
       );
       const mappedSeats = seatMap.seats.map(item => new SeatMapSeatData(item));
-      const occupiedSeats = seatMap.seats.filter(item => item.occupied).length;
+      const occupiedSeats = seatMap.seats.filter(item => item.seatStatus === 'occupied').length;
+      const pendingSeats = seatMap.seats.filter(item => item.seatStatus === 'pending').length;
       const totalSeats = seatMap.seats.length;
 
       return new OwnerSeatOverviewApiResponse(
@@ -95,7 +102,8 @@ export class LibraryController {
           sectionId: seatMap.sectionId,
           totalSeats,
           occupiedSeats,
-          availableSeats: totalSeats - occupiedSeats,
+          pendingSeats,
+          availableSeats: totalSeats - occupiedSeats - pendingSeats,
           seats: mappedSeats,
         }),
         200,
@@ -250,6 +258,60 @@ export class LibraryController {
       }
 
       throw new InternalServerError('CREATE_LIBRARY_FAILED');
+    }
+  }
+
+  @Patch('/my')
+  @Authorized('OWNER')
+  @OpenAPI({ summary: 'Update library details', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(LibrarySetupApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async updateLibrary(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Body() payload: UpdateLibraryRequest,
+  ): Promise<LibrarySetupApiResponse> {
+    try {
+      const data = await this.libraryService.updateLibrary(session.user.id, payload);
+
+      await this.activityService.logActivity(
+        session.user.id,
+        'LIBRARY_UPDATED',
+        `User updated library: ${data.name}`,
+        { libraryId: data.id, libraryName: data.name },
+      );
+
+      return new LibrarySetupApiResponse(data, 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('UPDATE_LIBRARY_FAILED');
+    }
+  }
+
+  @Delete('/my')
+  @Authorized('OWNER')
+  @OpenAPI({ summary: 'Delete library (soft delete)', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async deleteLibrary(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+  ): Promise<{ responseCode: number; message: string }> {
+    try {
+      await this.libraryService.deleteLibrary(session.user.id);
+
+      return { responseCode: 200, message: 'Library deleted successfully' };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('DELETE_LIBRARY_FAILED');
     }
   }
 }

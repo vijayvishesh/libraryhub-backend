@@ -21,6 +21,9 @@ export class SeatMapSeatData {
   @IsBoolean()
   occupied!: boolean;
 
+  @IsString()
+  seatStatus!: string;
+
   @IsOptional()
   @IsString()
   sectionId?: string;
@@ -30,6 +33,7 @@ export class SeatMapSeatData {
     label: string;
     gender: string;
     occupied: boolean;
+    seatStatus: string;
     sectionId: string | null;
   }) {
     if (!params) {
@@ -40,6 +44,7 @@ export class SeatMapSeatData {
     this.label = params.label;
     this.gender = params.gender;
     this.occupied = params.occupied;
+    this.seatStatus = params.seatStatus;
     if (params.sectionId) {
       this.sectionId = params.sectionId;
     }
@@ -115,6 +120,9 @@ export class OwnerSeatOverviewData {
   occupiedSeats!: number;
 
   @IsNumber()
+  pendingSeats!: number;
+
+  @IsNumber()
   availableSeats!: number;
 
   @IsArray()
@@ -128,6 +136,7 @@ export class OwnerSeatOverviewData {
     sectionId?: string;
     totalSeats: number;
     occupiedSeats: number;
+    pendingSeats: number;
     availableSeats: number;
     seats: SeatMapSeatData[];
   }) {
@@ -140,6 +149,7 @@ export class OwnerSeatOverviewData {
     this.sectionId = params.sectionId;
     this.totalSeats = params.totalSeats;
     this.occupiedSeats = params.occupiedSeats;
+    this.pendingSeats = params.pendingSeats;
     this.availableSeats = params.availableSeats;
     this.seats = params.seats;
   }
@@ -446,10 +456,11 @@ export class OwnerFeeCollectionSummaryData {
 
 export class OwnerFeeCollectionItemData {
   @IsString()
-  bookingId!: string;
+  memberId!: string;
 
+  @IsOptional()
   @IsString()
-  studentId!: string;
+  bookingId?: string;
 
   @IsString()
   studentName!: string;
@@ -467,9 +478,6 @@ export class OwnerFeeCollectionItemData {
   amount!: number;
 
   @IsString()
-  paymentMethod!: string;
-
-  @IsString()
   status!: string;
 
   @IsString()
@@ -483,14 +491,13 @@ export class OwnerFeeCollectionItemData {
   overdueDays!: number;
 
   constructor(params?: {
-    bookingId: string;
-    studentId: string;
+    memberId: string;
+    bookingId: string | null;
     studentName: string;
     studentPhone: string;
     seatId: string;
     slotName: string;
     amount: number;
-    paymentMethod: string;
     status: string;
     dueDate: string;
     paidAt: string | null;
@@ -500,14 +507,13 @@ export class OwnerFeeCollectionItemData {
       return;
     }
 
-    this.bookingId = params.bookingId;
-    this.studentId = params.studentId;
+    this.memberId = params.memberId;
+    this.bookingId = params.bookingId || undefined;
     this.studentName = params.studentName;
     this.studentPhone = params.studentPhone;
     this.seatId = params.seatId;
     this.slotName = params.slotName;
     this.amount = params.amount;
-    this.paymentMethod = params.paymentMethod;
     this.status = params.status;
     this.dueDate = params.dueDate;
     this.paidAt = params.paidAt || undefined;

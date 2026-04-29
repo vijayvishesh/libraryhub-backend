@@ -12,7 +12,7 @@ import {
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
-import { BookingService, BookingResult } from '../services/booking.service';
+import { BookingResult, BookingService } from '../services/booking.service';
 import { CreateBookingRequest, ListMyBookingsQueryRequest } from './requests/booking.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {

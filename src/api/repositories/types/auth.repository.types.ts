@@ -99,6 +99,15 @@ export type UpsertPendingStudentSignupInput = {
   expiresAt: Date;
 };
 
+export type UpdateOwnerProfileInput = {
+  name?: string;
+};
+
+export type UpdateStudentProfileInput = {
+  name?: string;
+  gender?: 'male' | 'female' | 'other';
+};
+
 export type AuthSessionRecord = {
   id: string;
   ownerId: string;

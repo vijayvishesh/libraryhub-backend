@@ -3,7 +3,7 @@ import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { LibraryPaymentMethod } from '../constants/library.constants';
-import { BookingModel } from '../models/booking.model';
+import { BookingModel, BookingStatus } from '../models/booking.model';
 import {
   BookingRecord,
   CreateBookingInput,
@@ -18,7 +18,12 @@ type WithObjectId = {
   id: ObjectId;
 };
 
-const ACTIVE_BOOKING_STATUSES = ['confirmed', 'checked_in'] as const;
+const ACTIVE_BOOKING_STATUSES = [
+  'confirmed',
+  'checked_in',
+  'pending_approval',
+  'pending_payment',
+] as const;
 const PAID_BOOKING_STATUSES = ['confirmed', 'checked_in', 'checked_out'] as const;
 
 @Service()
@@ -38,6 +43,30 @@ export class BookingRepository {
 
     const savedBooking = await bookingRepository.save(booking);
     return this.mapBooking(savedBooking);
+  }
+
+  public async findActiveStudentBookingInLibrary(
+    studentId: string,
+    libraryId: string,
+  ): Promise<BookingRecord | null> {
+    const todayIsoDate = new Date().toISOString().slice(0, 10);
+    const bookings = await this.getBookingRepository().find({
+      where: {
+        studentId,
+        libraryId,
+        status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+        validUntil: { $gte: todayIsoDate },
+      },
+      order: { createdAt: 'DESC' },
+      take: 1,
+    });
+
+    const booking = bookings[0];
+    if (!booking) {
+      return null;
+    }
+
+    return this.mapBooking(booking);
   }
 
   public async findActiveSeatBooking(
@@ -66,11 +95,11 @@ export class BookingRepository {
     return this.mapBooking(booking);
   }
 
-  public async findActiveSeatIdsByLibraryAndSlot(
+  public async findActiveSeatStatusByLibraryAndSlot(
     libraryId: string,
     slotType?: string,
     sectionId?: string,
-  ): Promise<string[]> {
+  ): Promise<Map<string, 'pending' | 'occupied'>> {
     const todayIsoDate = new Date().toISOString().slice(0, 10);
     const whereFilter: Record<string, unknown> = {
       libraryId,
@@ -90,7 +119,22 @@ export class BookingRepository {
       where: whereFilter,
     });
 
-    return bookings.map(item => item.seatId);
+    const statusMap = new Map<string, 'pending' | 'occupied'>();
+    for (const booking of bookings) {
+      const isPending =
+        booking.status === 'pending_approval' || booking.status === 'pending_payment';
+      statusMap.set(booking.seatId, isPending ? 'pending' : 'occupied');
+    }
+
+    return statusMap;
+  }
+
+  public async findActiveSeatIdsByLibraryAndSlot(
+    libraryId: string,
+    slotType?: string,
+  ): Promise<string[]> {
+    const statusMap = await this.findActiveSeatStatusByLibraryAndSlot(libraryId, slotType);
+    return [...statusMap.keys()];
   }
 
   public async listStudentBookings(
@@ -179,6 +223,7 @@ export class BookingRepository {
           },
           {
             $group: {
+              // eslint-disable-next-line @typescript-eslint/naming-convention
               _id: null,
               amount: { $sum: '$amount' },
               count: { $sum: 1 },
@@ -197,6 +242,7 @@ export class BookingRepository {
           },
           {
             $group: {
+              // eslint-disable-next-line @typescript-eslint/naming-convention
               _id: null,
               amount: { $sum: '$amount' },
               count: { $sum: 1 },
@@ -269,19 +315,62 @@ export class BookingRepository {
     }
 
     const bookingRepository = this.getBookingRepository();
-    const booking = await bookingRepository.findOneById(objectId);
+    const setFields: Record<string, unknown> = {
+      status: 'confirmed',
+      updatedAt: new Date(),
+    };
+    if (paymentMethod) {
+      setFields.paymentMethod = paymentMethod;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    await bookingRepository.updateOne({ _id: objectId }, { $set: setFields });
+
+    const updated = await bookingRepository.findOneById(objectId);
+    if (!updated) {
+      return null;
+    }
+
+    return this.mapBooking(updated);
+  }
+
+  public async updateBookingStatus(
+    bookingId: string,
+    status: BookingStatus,
+  ): Promise<BookingRecord | null> {
+    const objectId = this.tryParseObjectId(bookingId);
+    if (!objectId) {
+      return null;
+    }
+
+    const bookingRepository = this.getBookingRepository();
+    /* eslint-disable @typescript-eslint/naming-convention */
+    await bookingRepository.updateOne(
+      { _id: objectId },
+      { $set: { status, updatedAt: new Date() } },
+    );
+    /* eslint-enable @typescript-eslint/naming-convention */
+
+    const updated = await bookingRepository.findOneById(objectId);
+    if (!updated) {
+      return null;
+    }
+
+    return this.mapBooking(updated);
+  }
+
+  public async findBookingById(bookingId: string): Promise<BookingRecord | null> {
+    const objectId = this.tryParseObjectId(bookingId);
+    if (!objectId) {
+      return null;
+    }
+
+    const booking = await this.getBookingRepository().findOneById(objectId);
     if (!booking) {
       return null;
     }
 
-    booking.status = 'confirmed';
-    if (paymentMethod) {
-      booking.paymentMethod = paymentMethod;
-    }
-    booking.updatedAt = new Date();
-
-    const saved = await bookingRepository.save(booking);
-    return this.mapBooking(saved);
+    return this.mapBooking(booking);
   }
 
   private async ensureIndexes(): Promise<void> {
@@ -358,6 +447,7 @@ export class BookingRepository {
       sectionId: booking.sectionId,
       paymentMethod: booking.paymentMethod,
       amount: booking.amount,
+      duration: booking.duration,
       startDate: booking.startDate,
       validUntil: booking.validUntil,
       status: booking.status,

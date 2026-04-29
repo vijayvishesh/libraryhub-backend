@@ -44,6 +44,13 @@ export class CreateBookingRequest {
   autoAllocate?: boolean;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  duration?: number;
+
+  @IsOptional()
   @IsString()
   @IsDateString(
     { strict: true, strictSeparator: true },
