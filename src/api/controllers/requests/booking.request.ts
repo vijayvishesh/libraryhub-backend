@@ -50,6 +50,11 @@ export class CreateBookingRequest {
     { message: 'startDate must be a valid ISO date (YYYY-MM-DD)' },
   )
   startDate?: string;
+
+@IsOptional()
+@IsInt()
+@Min(1)
+duration?: number; // e.g. 1, 7, 15, 1, 2, 3, 6, 12
 }
 
 export class ListMyBookingsQueryRequest {

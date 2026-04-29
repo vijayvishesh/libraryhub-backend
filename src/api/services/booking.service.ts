@@ -55,6 +55,7 @@ export type BookingResult = {
   libraryPincode: string;
   libraryLatitude: number | null;
   libraryLongitude: number | null;
+  duration: number;
 };
 
 export type ListMyBookingsResult = {
@@ -215,6 +216,7 @@ export class BookingService {
         checkedInAt: null,
         checkedOutAt: null,
         invoiceNo: this.buildInvoiceNo(),
+        duration: payload.duration ?? 1,
       };
 
       const booking = await this.bookingRepository.createBooking(bookingToCreate);
@@ -637,6 +639,7 @@ export class BookingService {
     status: string;
     invoiceNo: string;
     libraryAddress: string;
+    duration: number;
   }, library?: LibraryRecord | null): BookingResult {
     return {
       id: booking.id,
@@ -659,6 +662,7 @@ export class BookingService {
       libraryPincode: library?.pincode ?? '',
       libraryLatitude: library?.location?.coordinates?.[1] ?? null,
       libraryLongitude: library?.location?.coordinates?.[0] ?? null,
+      duration: booking.duration,
     };
   }
 
