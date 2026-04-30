@@ -308,8 +308,20 @@ export class MemberRepository {
       { libraryId: 1, mobileNo: 1 },
       { unique: true, name: 'idx_members_library_mobile_unique' },
     );
+<<<<<<< task/excel/28-04-2026
+    await this.createIndexSafely(
+      { libraryId: 1, aadharId: 1 },
+      {
+        unique: true,
+        sparse: false,
+        name: 'idx_members_library_aadhar_unique',
+        partialFilterExpression: { aadharId: { $type: 'string' } },
+      },
+    );
+=======
     await this.dropIndexSafely('idx_members_library_aadhar_unique');
     await this.dropIndexSafely('idx_members_library_aadhar_unique_v2');
+>>>>>>> main
     await this.createIndexSafely(
       { libraryId: 1, studentId: 1 },
       { sparse: true, name: 'idx_members_library_student' },
@@ -324,7 +336,16 @@ export class MemberRepository {
 
   private async createIndexSafely(
     keys: Record<string, 1 | -1>,
+<<<<<<< task/excel/28-04-2026
+    options: {
+      name: string;
+      unique?: boolean;
+      sparse?: boolean;
+      partialFilterExpression?: Record<string, unknown>;
+    },
+=======
     options: { name: string; unique?: boolean; sparse?: boolean; partialFilterExpression?: Record<string, unknown> },
+>>>>>>> main
   ): Promise<void> {
     try {
       await this.getMemberRepository().createCollectionIndex(keys, options);

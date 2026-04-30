@@ -18,6 +18,8 @@ import { SuperAdminModel } from '../../api/models/superAdmin.model';
 import { AnnouncementModel } from '../../api/models/announcement.model';
 import { NotificationModel } from '../../api/models/notification.model';
 import { FcmTokenModel } from '../../api/models/fcmToken.model';
+import { MemberBulkUploadModel } from '../../api/models/memberBulkUpload.model';
+import { MemberInviteLinkModel } from '../../api/models/memberInviteLink.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -58,8 +60,10 @@ const createDataSource = (): DataSource =>
       StudySessionModel,
       AnnouncementModel,
       NotificationModel,
-      FcmTokenModel,,
-      SuperAdminModel
+      FcmTokenModel,
+      MemberBulkUploadModel,
+      MemberInviteLinkModel,
+      SuperAdminModel,
     ],
     synchronize: true,
     logging: false,
