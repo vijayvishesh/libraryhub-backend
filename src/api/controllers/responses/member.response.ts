@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsEmail, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { env } from '../../../env';
 
 export class MemberData {
   @IsString()
@@ -212,5 +213,178 @@ export class MemberActionApiResponse {
 
     this.responseCode = responseCode;
     this.message = message;
+  }
+}
+
+export class MemberUploadData {
+  @IsString()
+  id!: string;
+
+  @IsString()
+  fileName!: string;
+
+  @IsString()
+  status!: string;
+
+  @IsNumber()
+  totalRows!: number;
+
+  @IsNumber()
+  successCount!: number;
+
+  @IsNumber()
+  failedCount!: number;
+
+  @IsString()
+  createdAt!: string;
+
+  @IsString()
+  updatedAt!: string;
+
+  constructor(data?: {
+    id: string;
+    fileName: string;
+    status: string;
+    totalRows: number;
+    successCount: number;
+    failedCount: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    if (!data) {
+      return;
+    }
+
+    this.id = data.id;
+    this.fileName = data.fileName;
+    this.status = data.status;
+    this.totalRows = data.totalRows;
+    this.successCount = data.successCount;
+    this.failedCount = data.failedCount;
+    this.createdAt = data.createdAt.toISOString();
+    this.updatedAt = data.updatedAt.toISOString();
+  }
+}
+
+export class MemberUploadApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @IsString()
+  message!: string;
+
+  @ValidateNested()
+  @Type(() => MemberUploadData)
+  data!: MemberUploadData;
+
+  constructor(message?: string, data?: MemberUploadData, responseCode = 200) {
+    if (!message || !data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.message = message;
+    this.data = data;
+  }
+}
+
+export class MemberUploadListPayloadData {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MemberUploadData)
+  uploads!: MemberUploadData[];
+
+  @IsNumber()
+  page!: number;
+
+  @IsNumber()
+  limit!: number;
+
+  @IsNumber()
+  total!: number;
+
+  constructor(uploads?: MemberUploadData[], page?: number, limit?: number, total?: number) {
+    if (
+      !uploads ||
+      typeof page !== 'number' ||
+      typeof limit !== 'number' ||
+      typeof total !== 'number'
+    ) {
+      return;
+    }
+
+    this.uploads = uploads;
+    this.page = page;
+    this.limit = limit;
+    this.total = total;
+  }
+}
+
+export class MemberUploadListApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => MemberUploadListPayloadData)
+  data!: MemberUploadListPayloadData;
+
+  constructor(data?: MemberUploadListPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}
+
+export class MemberInviteLinkData {
+  @IsString()
+  id!: string;
+
+  @IsString()
+  token!: string;
+
+  @IsString()
+  siteLibraryId!: string;
+
+  @IsNumber()
+  expiresIn!: number;
+
+  @IsString()
+  shareUrl!: string;
+
+  constructor(data?: { id: string; token: string; siteLibraryId: string; expiresAt: Date }) {
+    if (!data) {
+      return;
+    }
+
+    this.id = data.id;
+    this.token = data.token;
+    this.siteLibraryId = data.siteLibraryId;
+    this.expiresIn = Math.max(0, Math.floor((data.expiresAt.getTime() - Date.now()) / 1000));
+    this.shareUrl = `${env.app.baseUrl}/public/members/invite/${data.token}`;
+  }
+}
+
+export class MemberInviteLinkApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @IsString()
+  message!: string;
+
+  @ValidateNested()
+  @Type(() => MemberInviteLinkData)
+  data!: MemberInviteLinkData;
+
+  constructor(message?: string, data?: MemberInviteLinkData, responseCode = 200) {
+    if (!message || !data || typeof responseCode !== 'number') {
+      return;
+    }
+
+    this.responseCode = responseCode;
+    this.message = message;
+    this.data = data;
   }
 }
