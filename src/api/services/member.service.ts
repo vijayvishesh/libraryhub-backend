@@ -37,6 +37,13 @@ export type ListMemberUploadsResult = {
   total: number;
 };
 
+export type ListMemberUploadsResult = {
+  uploads: MemberBulkUploadRecord[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
 @Service()
 export class MemberService {
   constructor(
@@ -534,7 +541,9 @@ export class MemberService {
       if (member.bookingId) {
         await this.bookingRepository.markBookingPaid(
           member.bookingId,
-          paymentMethod as LibraryPaymentMethod | undefined,
+          paymentMethod as 
+          
+          | undefined,
         );
       }
 
