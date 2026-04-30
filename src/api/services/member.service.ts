@@ -26,12 +26,9 @@ import { MemberBulkUploadRepository } from '../repositories/memberBulkUpload.rep
 import { MemberInviteLinkRecord } from '../repositories/types/memberInviteLink.repository.types';
 import { MemberMsgResponse, MemberRecord } from '../repositories/types/member.repository.types';
 import { MemberBulkUploadRecord } from '../repositories/types/memberBulkUpload.repository.types';
-import { ListMembersResult } from './types/member.service.types';
 
-export type { ListMembersResult };
-
-export type ListMemberUploadsResult = {
-  uploads: MemberBulkUploadRecord[];
+export type ListMembersResult = {
+  members: MemberRecord[];
   page: number;
   limit: number;
   total: number;
@@ -49,73 +46,16 @@ export class MemberService {
   constructor(
     private readonly libraryRepository: LibraryRepository,
     private readonly memberRepository: MemberRepository,
+    private readonly bookingRepository: BookingRepository,
     private readonly memberBulkUploadRepository: MemberBulkUploadRepository,
     private readonly memberInviteLinkRepository: MemberInviteLinkRepository,
     private readonly librarySeatRepository: LibrarySeatRepository,
-    private readonly bookingRepository: BookingRepository,
   ) {}
 
   public async addMember(ownerId: string, payload: AddMemberRequest): Promise<MemberMsgResponse> {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
       await this.createMemberForLibrary(library.id, payload);
-      const fullName = payload.fullName.trim();
-      const mobileNo = payload.mobileNo.trim();
-      const aadharId = payload.aadharId?.trim() ?? null;
-      const email = payload.email?.trim() ?? null;
-      const seatId = payload.seatId?.trim() ?? null;
-      const slotId = payload.slotId?.trim() ?? null;
-      const status = payload.status || 'pending';
-      const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
-      this.assertValidIsoDate(startDate);
-      const endDate = payload.endDate || this.addMonthsIsoDate(startDate, payload.duration);
-      this.assertValidIsoDate(endDate);
-      const notes = payload.notes?.trim() ?? null;
-      const planAmount = typeof payload.planAmount === 'number' ? Number(payload.planAmount) : null;
-
-      const existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
-        library.id,
-        mobileNo,
-        aadharId || undefined,
-      );
-
-      if (existingMember) {
-        throw new HttpError(409, 'MEMBER_ALREADY_EXISTS');
-      }
-
-      if (seatId) {
-        const seatConflict = await this.memberRepository.findActiveMemberBySeat(
-          library.id,
-          seatId,
-          slotId || undefined,
-        );
-        if (seatConflict) {
-          throw new HttpError(409, 'SEAT_ALREADY_ASSIGNED');
-        }
-      }
-
-      const member = await this.memberRepository.createMember({
-        fullName,
-        mobileNo,
-        aadharId,
-        studentId: null,
-        email,
-        duration: payload.duration,
-        libraryId: library.id,
-        seatId,
-        slotId,
-        status,
-        planAmount,
-        startDate,
-        endDate,
-        bookingId: null,
-        paidAt: null,
-        notes,
-      });
-
-      if (!member) {
-        throw new InternalServerError('MEMBER_CREATION_FAILED');
-      }
 
       return {
         msg: 'Member added successfully',
@@ -301,6 +241,56 @@ export class MemberService {
       }
 
       throw new InternalServerError('DELETE_MEMBER_FAILED');
+    }
+  }
+
+  public async markMemberPaid(
+    ownerId: string,
+    memberId: string,
+    paymentMethod?: string,
+  ): Promise<MemberRecord> {
+    try {
+      const library = await this.getOwnerLibraryOrThrow(ownerId);
+      const member = await this.memberRepository.findMemberByIdAndLibrary(
+        memberId.trim(),
+        library.id,
+      );
+      if (!member) {
+        throw new NotFoundError('MEMBER_NOT_FOUND');
+      }
+
+      if (member.status !== 'pending') {
+        throw new HttpError(409, 'MEMBER_NOT_PENDING');
+      }
+
+      const updated = await this.memberRepository.updateMemberByIdAndLibrary(
+        member.id,
+        library.id,
+        {
+          status: 'active',
+          paidAt: new Date(),
+          updatedAt: new Date(),
+        },
+      );
+
+      if (!updated) {
+        throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
+      }
+
+      if (member.bookingId) {
+        await this.bookingRepository.markBookingPaid(
+          member.bookingId,
+          paymentMethod as LibraryPaymentMethod | undefined,
+        );
+      }
+
+      return updated;
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
     }
   }
 
@@ -505,49 +495,6 @@ export class MemberService {
       await this.memberInviteLinkRepository.markLinkAsUsed(token, member.id);
 
       return member;
-  public async markMemberPaid(
-    ownerId: string,
-    memberId: string,
-    paymentMethod?: string,
-  ): Promise<MemberRecord> {
-    try {
-      const library = await this.getOwnerLibraryOrThrow(ownerId);
-      const member = await this.memberRepository.findMemberByIdAndLibrary(
-        memberId.trim(),
-        library.id,
-      );
-      if (!member) {
-        throw new NotFoundError('MEMBER_NOT_FOUND');
-      }
-
-      if (member.status !== 'pending') {
-        throw new HttpError(409, 'MEMBER_NOT_PENDING');
-      }
-
-      const updated = await this.memberRepository.updateMemberByIdAndLibrary(
-        member.id,
-        library.id,
-        {
-          status: 'active',
-          paidAt: new Date(),
-          updatedAt: new Date(),
-        },
-      );
-
-      if (!updated) {
-        throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
-      }
-
-      if (member.bookingId) {
-        await this.bookingRepository.markBookingPaid(
-          member.bookingId,
-          paymentMethod as 
-          
-          | undefined,
-        );
-      }
-
-      return updated;
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
@@ -567,7 +514,7 @@ export class MemberService {
     const email = payload.email?.trim() ?? null;
     const seatId = payload.seatId?.trim() ?? null;
     const slotId = payload.slotId?.trim() ?? null;
-    const status = payload.status || 'active';
+    const status = payload.status || 'pending';
     const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
     this.assertValidIsoDate(startDate);
     const endDate = payload.endDate || this.addMonthsIsoDate(startDate, payload.duration);
@@ -617,6 +564,8 @@ export class MemberService {
       planAmount,
       startDate,
       endDate,
+      bookingId: null,
+      paidAt: null,
       notes,
     });
     if (!member) {
@@ -624,8 +573,6 @@ export class MemberService {
     }
 
     return member;
-      throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
-    }
   }
 
   private async getOwnerLibraryOrThrow(ownerId: string) {
