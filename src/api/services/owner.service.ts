@@ -8,45 +8,14 @@ import { LibraryRepository } from '../repositories/library.repository';
 import { LibraryRecord } from '../repositories/types/library.repository.types';
 import { ActivityRecord, ActivityService } from './activity.service';
 import { BookingService } from './booking.service';
+import {
+  OwnerDashboardAlerts,
+  OwnerDashboardRecentActivity,
+  OwnerDashboardResult,
+  OwnerDashboardRevenue,
+} from './types/owner.service.types';
 
-type OwnerDashboardRevenue = {
-  today: number;
-  todayChange: number;
-  monthly: number;
-};
-
-type OwnerDashboardSeats = {
-  total: number;
-  occupied: number;
-  pending: number;
-  free: number;
-};
-
-type OwnerDashboardAlerts = {
-  overdue: number;
-  expiringSoon: number;
-};
-
-type OwnerDashboardRecentActivity = {
-  id: string;
-  name: string;
-  action: string;
-  detail: string;
-  time: string;
-  color: string;
-};
-
-export type OwnerDashboardResult = {
-  library: {
-    name: string;
-    location: string;
-    capacity: number;
-  };
-  revenue: OwnerDashboardRevenue;
-  seats: OwnerDashboardSeats;
-  alerts: OwnerDashboardAlerts;
-  recentActivity: OwnerDashboardRecentActivity[];
-};
+export type { OwnerDashboardResult };
 
 @Service()
 export class OwnerService {
@@ -60,8 +29,8 @@ export class OwnerService {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
       const seatMap = await this.bookingService.getLibrarySeatMap(library.id);
-      const pendingSeatCount = await this.getPendingSeatCount(library.id);
-      const occupiedSeatCount = seatMap.seats.filter(item => item.occupied).length;
+      const occupiedSeatCount = seatMap.seats.filter(s => s.seatStatus === 'occupied').length;
+      const pendingSeatCount = seatMap.seats.filter(s => s.seatStatus === 'pending').length;
       const totalSeatCount = seatMap.seats.length;
       const freeSeatCount = Math.max(0, totalSeatCount - occupiedSeatCount - pendingSeatCount);
 
@@ -114,12 +83,6 @@ export class OwnerService {
     startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
     const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-    const timeBucketGroup = this.buildTimeBucketGroup(
-      startOfToday,
-      startOfTomorrow,
-      startOfYesterday,
-    );
-
     const ds = getDataSource();
     const [bookingResults, memberResults] = await Promise.all([
       ds
@@ -129,10 +92,20 @@ export class OwnerService {
             $match: {
               libraryId,
               status: { $in: ['confirmed', 'checked_in', 'checked_out'] },
-              createdAt: { $gte: startOfYesterday, $lt: startOfNextMonth },
+              updatedAt: { $gte: startOfYesterday, $lt: startOfNextMonth },
             },
           },
-          { $group: { ...timeBucketGroup, revenue: { $sum: '$amount' } } },
+          {
+            $group: {
+              ...this.buildTimeBucketGroup(
+                startOfToday,
+                startOfTomorrow,
+                startOfYesterday,
+                '$updatedAt',
+              ),
+              revenue: { $sum: '$amount' },
+            },
+          },
         ])
         .toArray(),
       ds
@@ -141,12 +114,22 @@ export class OwnerService {
           {
             $match: {
               libraryId,
-              status: { $in: ['active', 'pending'] },
+              bookingId: null,
+              paidAt: { $ne: null, $gte: startOfYesterday, $lt: startOfNextMonth },
               planAmount: { $gt: 0 },
-              createdAt: { $gte: startOfYesterday, $lt: startOfNextMonth },
             },
           },
-          { $group: { ...timeBucketGroup, revenue: { $sum: '$planAmount' } } },
+          {
+            $group: {
+              ...this.buildTimeBucketGroup(
+                startOfToday,
+                startOfTomorrow,
+                startOfYesterday,
+                '$paidAt',
+              ),
+              revenue: { $sum: '$planAmount' },
+            },
+          },
         ])
         .toArray(),
     ]);
@@ -172,7 +155,12 @@ export class OwnerService {
     return { today: todayRevenue, todayChange, monthly: monthlyRevenue };
   }
 
-  private buildTimeBucketGroup(startOfToday: Date, startOfTomorrow: Date, startOfYesterday: Date) {
+  private buildTimeBucketGroup(
+    startOfToday: Date,
+    startOfTomorrow: Date,
+    startOfYesterday: Date,
+    dateField = '$createdAt',
+  ) {
     return {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       _id: {
@@ -180,19 +168,13 @@ export class OwnerService {
           branches: [
             {
               case: {
-                $and: [
-                  { $gte: ['$createdAt', startOfToday] },
-                  { $lt: ['$createdAt', startOfTomorrow] },
-                ],
+                $and: [{ $gte: [dateField, startOfToday] }, { $lt: [dateField, startOfTomorrow] }],
               },
               then: 'today',
             },
             {
               case: {
-                $and: [
-                  { $gte: ['$createdAt', startOfYesterday] },
-                  { $lt: ['$createdAt', startOfToday] },
-                ],
+                $and: [{ $gte: [dateField, startOfYesterday] }, { $lt: [dateField, startOfToday] }],
               },
               then: 'yesterday',
             },
@@ -201,19 +183,6 @@ export class OwnerService {
         },
       },
     };
-  }
-
-  private async getPendingSeatCount(libraryId: string): Promise<number> {
-    const bookingRepository = getDataSource().getMongoRepository(BookingModel);
-    const todayIsoDate = new Date().toISOString().slice(0, 10);
-
-    return bookingRepository.count({
-      where: {
-        libraryId,
-        status: 'pending',
-        validUntil: { $gte: todayIsoDate },
-      },
-    });
   }
 
   private async getAlertStats(libraryId: string): Promise<OwnerDashboardAlerts> {
@@ -320,6 +289,8 @@ export class OwnerService {
     MEMBER_REMOVED: { action: 'Member removed', color: 'gray' },
     LIBRARY_CREATED: { action: 'Library created', color: 'green' },
     LIBRARY_UPDATED: { action: 'Library updated', color: 'indigo' },
+    BOOKING_APPROVED: { action: 'Booking approved', color: 'green' },
+    BOOKING_REJECTED: { action: 'Booking rejected', color: 'red' },
   };
 
   private mapActivityAction(actionType: ActivityActionType): { action: string; color: string } {

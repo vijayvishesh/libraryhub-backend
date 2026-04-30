@@ -3,6 +3,7 @@ import { Service } from 'typedi';
 import {
   LibraryListQueryRequest,
   LibrarySetupRequest,
+  UpdateLibraryRequest,
 } from '../controllers/requests/library.request';
 import {
   LibraryLocationData,
@@ -18,15 +19,15 @@ import {
 import { AuthRepository } from '../repositories/auth.repositories';
 import { LibraryRepository } from '../repositories/library.repository';
 import { AuthOwnerRecord, AuthTenantRecord } from '../repositories/types/auth.repository.types';
-import { CreateLibraryInput, LibraryRecord } from '../repositories/types/library.repository.types';
+import {
+  CreateLibraryInput,
+  LibraryRecord,
+  UpdateLibraryInput,
+} from '../repositories/types/library.repository.types';
 import { LibrarySeatService } from './librarySeat.service';
+import { ListedLibrariesResult } from './types/library.service.types';
 
-export type ListedLibrariesResult = {
-  libraries: LibrarySetupData[];
-  page: number;
-  limit: number;
-  total: number;
-};
+export type { ListedLibrariesResult };
 
 @Service()
 export class LibraryService {
@@ -132,6 +133,52 @@ export class LibraryService {
     }
   }
 
+  public async updateLibrary(
+    ownerId: string,
+    payload: UpdateLibraryRequest,
+  ): Promise<LibrarySetupData> {
+    try {
+      const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+      if (!library || library.deletedAt) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+
+      const updateInput = this.buildUpdateLibraryInput(payload);
+      const updated = await this.libraryRepository.partialUpdateLibrary(library.id, updateInput);
+      if (!updated) {
+        throw new InternalServerError('LIBRARY_UPDATE_FAILED');
+      }
+
+      if (payload.totalSeats !== undefined || payload.seating !== undefined) {
+        try {
+          await this.librarySeatService.syncLibrarySeatsFromLibrary(updated);
+        } catch {
+          // Seat inventory sync should not block library update.
+        }
+      }
+
+      return this.mapLibrarySetupData(updated);
+    } catch (error) {
+      this.rethrowLibraryError(error, 'LIBRARY_UPDATE_FAILED');
+    }
+  }
+
+  public async deleteLibrary(ownerId: string): Promise<void> {
+    try {
+      const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+      if (!library || library.deletedAt) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+
+      const deleted = await this.libraryRepository.softDeleteLibrary(library.id);
+      if (!deleted) {
+        throw new InternalServerError('LIBRARY_DELETE_FAILED');
+      }
+    } catch (error) {
+      this.rethrowLibraryError(error, 'LIBRARY_DELETE_FAILED');
+    }
+  }
+
   private buildCreateLibraryInput(
     payload: LibrarySetupRequest,
     owner: AuthOwnerRecord,
@@ -215,6 +262,98 @@ export class LibraryService {
         this.getDefaultPaymentMethods(),
       deletedAt: base?.deletedAt ?? null,
     };
+  }
+
+  private buildUpdateLibraryInput(payload: UpdateLibraryRequest): UpdateLibraryInput {
+    const input: UpdateLibraryInput = {};
+
+    if (payload.name !== undefined) {
+      input.name = payload.name.trim();
+    }
+    if (payload.description !== undefined) {
+      input.description = payload.description.trim();
+    }
+    if (payload.contactPhone !== undefined) {
+      input.contactPhone = payload.contactPhone.trim();
+    }
+    if (payload.contactEmail !== undefined) {
+      input.contactEmail = payload.contactEmail.trim();
+    }
+    if (payload.address !== undefined) {
+      input.address = payload.address.trim();
+    }
+    if (payload.city !== undefined) {
+      input.city = payload.city.trim();
+    }
+    if (payload.state !== undefined) {
+      input.state = payload.state.trim();
+    }
+    if (payload.pincode !== undefined) {
+      input.pincode = payload.pincode.trim();
+    }
+    if (payload.totalSeats !== undefined) {
+      input.totalSeats = payload.totalSeats;
+    }
+    if (payload.facilities !== undefined) {
+      input.facilities = payload.facilities;
+    }
+    if (payload.isActive !== undefined) {
+      input.isActive = payload.isActive;
+    }
+    if (payload.isMarketplaceVisible !== undefined) {
+      input.isMarketplaceVisible = payload.isMarketplaceVisible;
+    }
+    if (payload.isOpen !== undefined) {
+      input.isOpen = payload.isOpen;
+    }
+    if (payload.openingHours !== undefined) {
+      input.openingHours = payload.openingHours.trim();
+    }
+    if (payload.seating !== undefined) {
+      input.seating = payload.seating;
+    }
+
+    if (payload.location) {
+      input.location = {
+        type: payload.location.type,
+        coordinates: [payload.location.coordinates[0], payload.location.coordinates[1]],
+      };
+    } else if (payload.coordinates) {
+      input.location = {
+        type: 'Point',
+        coordinates: [payload.coordinates.lng, payload.coordinates.lat],
+      };
+    }
+
+    if (payload.slots) {
+      input.slots = payload.slots.map(slot => ({
+        slotType: slot.slotType,
+        name: slot.name.trim(),
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        pricePerMonth: slot.pricePerMonth,
+        isActive: slot.isActive ?? true,
+      }));
+    }
+
+    if (payload.photos) {
+      input.photos = payload.photos.map((photo, index) => ({
+        url: photo.url.trim(),
+        publicId: photo.publicId?.trim() ?? null,
+        order: photo.order ?? index,
+        uploadedAt: new Date(),
+      }));
+    }
+
+    if (payload.paymentMethods) {
+      input.paymentMethods = payload.paymentMethods.map(method => ({
+        type: method.type,
+        enabled: method.enabled ?? true,
+        label: method.label?.trim() || this.getPaymentMethodDefaultLabel(method.type),
+      }));
+    }
+
+    return input;
   }
 
   private mapLibrarySetupData(library: LibraryRecord): LibrarySetupData {

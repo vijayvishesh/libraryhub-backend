@@ -177,3 +177,16 @@ export class LogoutRequest {
   @IsString()
   refreshToken!: string;
 }
+
+export class UpdateProfileRequest {
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsIn([...USER_GENDER_ENUM])
+  gender?: AuthRequestGender;
+}

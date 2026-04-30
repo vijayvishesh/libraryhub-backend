@@ -3,14 +3,13 @@ import { Service } from 'typedi';
 import {
   CreateBookingRequest,
   ListMyBookingsQueryRequest,
-  OwnerFeeCollectionQueryRequest,
 } from '../controllers/requests/booking.request';
-import { LibraryPaymentMethod } from '../constants/library.constants';
 import {
   buildSeatMap,
   isSeatAllowedForStudent,
   pickAutoSeat,
   SeatMapItem,
+  SeatStatus,
 } from '../helpers/seatMap.helper';
 import { AuthRepository } from '../repositories/auth.repositories';
 import { BookingRepository } from '../repositories/booking.repository';
@@ -20,81 +19,14 @@ import { CreateBookingInput } from '../repositories/types/booking.repository.typ
 import { LibraryRecord } from '../repositories/types/library.repository.types';
 import { LibrarySeatRecord } from '../repositories/types/librarySeat.repository.types';
 import { LibrarySeatService } from './librarySeat.service';
+import {
+  BookingResult,
+  ListMyBookingsResult,
+  PaymentMethodOption,
+  SeatMapResult,
+} from './types/booking.service.types';
 
-type PaymentMethodOption = {
-  type: string;
-  label: string;
-  enabled: boolean;
-};
-
-export type SeatMapResult = {
-  libraryId: string;
-  slotId: string;
-  sectionId?: string;
-  seats: SeatMapItem[];
-};
-
-export type BookingResult = {
-  id: string;
-  libraryId: string;
-  libraryName: string;
-  seatId: string;
-  slotId: string;
-  slotName: string;
-  time: string;
-  sectionId: string | null;
-  paymentMethod: string;
-  amount: number;
-  date: string;
-  validUntil: string;
-  status: string;
-  invoiceNo: string;
-  libraryAddress: string;
-  libraryCity: string;
-  libraryState: string;
-  libraryPincode: string;
-  libraryLatitude: number | null;
-  libraryLongitude: number | null;
-};
-
-export type ListMyBookingsResult = {
-  bookings: BookingResult[];
-  page: number;
-  limit: number;
-  total: number;
-};
-
-export type OwnerFeeCollectionSummaryResult = {
-  todayAmount: number;
-  todayPayments: number;
-  monthAmount: number;
-  monthPayments: number;
-  pendingCount: number;
-};
-
-export type OwnerFeeCollectionItemResult = {
-  bookingId: string;
-  studentId: string;
-  studentName: string;
-  studentPhone: string;
-  seatId: string;
-  slotName: string;
-  amount: number;
-  paymentMethod: string;
-  status: string;
-  dueDate: string;
-  paidAt: string | null;
-  overdueDays: number;
-};
-
-export type OwnerFeeCollectionResult = {
-  summary: OwnerFeeCollectionSummaryResult;
-  tab: 'pending' | 'received_today';
-  items: OwnerFeeCollectionItemResult[];
-  page: number;
-  limit: number;
-  total: number;
-};
+export type { BookingResult, ListMyBookingsResult, PaymentMethodOption, SeatMapResult };
 
 @Service()
 export class BookingService {
@@ -157,6 +89,15 @@ export class BookingService {
         throw new HttpError(409, 'LIBRARY_NOT_AVAILABLE');
       }
 
+      // Prevent duplicate active booking by same student in same library
+      const existingBooking = await this.bookingRepository.findActiveStudentBookingInLibrary(
+        student.id,
+        library.id,
+      );
+      if (existingBooking) {
+        throw new HttpError(409, 'ALREADY_BOOKED_IN_LIBRARY');
+      }
+
       const slot = this.getLibrarySlotOrThrow(library, payload.slotId);
       const resolvedSectionId = this.resolveSectionIdForLibrary(library, payload.sectionId);
       const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
@@ -195,7 +136,7 @@ export class BookingService {
         throw new HttpError(409, 'SEAT_TAKEN');
       }
 
-      const validUntil = this.addDaysIsoDate(startDate, 30);
+      const validUntil = this.addDaysIsoDate(startDate, (payload.duration || 1) * 30);
       const bookingToCreate: CreateBookingInput = {
         libraryId: library.id,
         studentId: student.id,
@@ -208,10 +149,11 @@ export class BookingService {
         seatId: selectedSeat.id,
         sectionId: selectedSeat.sectionId,
         paymentMethod: payload.paymentMethod,
-        amount: slot.pricePerMonth,
+        amount: slot.pricePerMonth * (payload.duration || 1),
+        duration: payload.duration || 1,
         startDate,
         validUntil,
-        status: 'confirmed',
+        status: 'pending_approval',
         checkedInAt: null,
         checkedOutAt: null,
         invoiceNo: this.buildInvoiceNo(),
@@ -219,12 +161,13 @@ export class BookingService {
 
       const booking = await this.bookingRepository.createBooking(bookingToCreate);
       await this.authRepository.updateStudentHasJoinedLibrary(student.id, true);
-      await this.syncMemberForBooking(
+      await this.onBookingCreated(
+        booking.id,
         student,
-        library.id,
-        selectedSeat.id,
-        slot.slotType,
-        slot.pricePerMonth,
+        library,
+        selectedSeat,
+        slot,
+        payload,
         startDate,
         validUntil,
       );
@@ -232,6 +175,38 @@ export class BookingService {
       return this.mapBookingResult(booking, library); //  pass library here
     } catch (error) {
       this.rethrowBookingError(error, 'CREATE_BOOKING_FAILED');
+    }
+  }
+
+  private async onBookingCreated(
+    bookingId: string,
+    student: { id: string; name: string; phone: string },
+    library: LibraryRecord,
+    selectedSeat: SeatMapItem,
+    slot: { slotType: string; pricePerMonth: number },
+    payload: CreateBookingRequest,
+    startDate: string,
+    validUntil: string,
+  ): Promise<void> {
+    try {
+      await this.syncMemberForBooking(
+        student,
+        library.id,
+        selectedSeat.id,
+        slot.slotType,
+        slot.pricePerMonth * (payload.duration || 1),
+        startDate,
+        validUntil,
+        'pending',
+        bookingId,
+      );
+    } catch (syncError) {
+      console.error('Failed to sync member for booking:', {
+        studentId: student.id,
+        libraryId: library.id,
+        phone: student.phone,
+        error: syncError instanceof Error ? syncError.message : syncError,
+      });
     }
   }
 
@@ -243,11 +218,20 @@ export class BookingService {
     planAmount: number,
     startDate: string,
     endDate: string,
+    memberStatus: 'active' | 'pending' = 'active',
+    bookingId: string | null = null,
   ): Promise<void> {
-    const existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
+    // Check by studentId first, then by mobileNo (owner may have added member manually)
+    let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
       student.id,
       libraryId,
     );
+    if (!existingMember) {
+      existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
+        libraryId,
+        student.phone,
+      );
+    }
     if (!existingMember) {
       await this.memberRepository.createMember({
         fullName: student.name,
@@ -259,17 +243,21 @@ export class BookingService {
         libraryId,
         seatId,
         slotId,
-        status: 'active',
+        status: memberStatus,
         planAmount,
         startDate,
         endDate,
+        bookingId,
+        paidAt: null,
         notes: null,
       });
     } else {
       await this.memberRepository.updateMemberByIdAndLibrary(existingMember.id, libraryId, {
+        studentId: student.id,
+        bookingId,
         seatId,
         slotId,
-        status: 'active',
+        status: memberStatus,
         planAmount,
         startDate,
         endDate,
@@ -329,100 +317,6 @@ export class BookingService {
     }
   }
 
-  public async getOwnerFeeCollection(
-    ownerId: string,
-    query: OwnerFeeCollectionQueryRequest,
-  ): Promise<OwnerFeeCollectionResult> {
-    try {
-      const ownerLibrary = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
-      if (!ownerLibrary) {
-        throw new NotFoundError('LIBRARY_NOT_FOUND');
-      }
-
-      const tab = query.tab ?? 'pending';
-      const page = query.page ?? 1;
-      const limit = query.limit ?? 20;
-      const { fromDate, toDate } = this.resolveFeeCollectionDateRange(
-        query.fromDate,
-        query.toDate,
-      );
-
-      const [summary, bookingsResult] = await Promise.all([
-        this.bookingRepository.getFeeCollectionSummary(ownerLibrary.id),
-        this.bookingRepository.listLibraryFeeBookings({
-          libraryId: ownerLibrary.id,
-          tab,
-          fromDate,
-          toDate,
-          page,
-          limit,
-        }),
-      ]);
-
-      const uniqueStudentIds = Array.from(new Set(bookingsResult.bookings.map(b => b.studentId)));
-      const students = await Promise.all(
-        uniqueStudentIds.map(studentId => this.authRepository.findStudentById(studentId)),
-      );
-      const studentMap = new Map(
-        students.filter(item => item !== null).map(student => [student.id, student]),
-      );
-
-      return {
-        summary,
-        tab,
-        items: bookingsResult.bookings.map(booking => {
-          const student = studentMap.get(booking.studentId);
-          return this.mapOwnerFeeCollectionItem(booking, student?.name, student?.phone, tab);
-        }),
-        page,
-        limit,
-        total: bookingsResult.total,
-      };
-    } catch (error) {
-      this.rethrowBookingError(error, 'GET_OWNER_FEE_COLLECTION_FAILED');
-    }
-  }
-
-  public async markOwnerBookingPaid(
-    ownerId: string,
-    bookingId: string,
-    paymentMethod?: LibraryPaymentMethod,
-  ): Promise<OwnerFeeCollectionItemResult> {
-    try {
-      const ownerLibrary = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
-      if (!ownerLibrary) {
-        throw new NotFoundError('LIBRARY_NOT_FOUND');
-      }
-
-      const booking = await this.bookingRepository.findLibraryBookingById(ownerLibrary.id, bookingId);
-      if (!booking) {
-        throw new NotFoundError('BOOKING_NOT_FOUND');
-      }
-
-      if (booking.status !== 'pending') {
-        throw new HttpError(409, 'BOOKING_ALREADY_PAID');
-      }
-
-      if (paymentMethod) {
-        const paymentMethods = this.resolveLibraryPaymentMethods(ownerLibrary);
-        const selectedPaymentMethod = paymentMethods.find(item => item.type === paymentMethod);
-        if (!selectedPaymentMethod || !selectedPaymentMethod.enabled) {
-          throw new HttpError(400, 'PAYMENT_METHOD_NOT_ALLOWED');
-        }
-      }
-
-      const updated = await this.bookingRepository.markBookingPaid(booking.id, paymentMethod);
-      if (!updated) {
-        throw new InternalServerError('MARK_BOOKING_PAID_FAILED');
-      }
-
-      const student = await this.authRepository.findStudentById(updated.studentId);
-      return this.mapOwnerFeeCollectionItem(updated, student?.name, student?.phone, 'received_today');
-    } catch (error) {
-      this.rethrowBookingError(error, 'MARK_BOOKING_PAID_FAILED');
-    }
-  }
-
   private resolveSeatSelection(
     seatMap: SeatMapItem[],
     requestedSeatId: string | undefined,
@@ -459,78 +353,6 @@ export class BookingService {
     return selectedSeat;
   }
 
-  private mapOwnerFeeCollectionItem(
-    booking: {
-      id: string;
-      studentId: string;
-      seatId: string;
-      slotName: string;
-      amount: number;
-      paymentMethod: string;
-      status: string;
-      validUntil: string;
-      updatedAt: Date;
-    },
-    studentName?: string,
-    studentPhone?: string,
-    tab?: 'pending' | 'received_today',
-  ): OwnerFeeCollectionItemResult {
-    const todayIsoDate = new Date().toISOString().slice(0, 10);
-    const overdueDays =
-      booking.status === 'pending'
-        ? this.calculateOverdueDays(booking.validUntil || todayIsoDate, todayIsoDate)
-        : 0;
-
-    return {
-      bookingId: booking.id,
-      studentId: booking.studentId,
-      studentName: studentName?.trim() || 'Unknown Student',
-      studentPhone: studentPhone?.trim() || '-',
-      seatId: booking.seatId,
-      slotName: booking.slotName,
-      amount: booking.amount,
-      paymentMethod: booking.paymentMethod,
-      status: booking.status,
-      dueDate: booking.validUntil,
-      paidAt:
-        tab === 'received_today' || booking.status !== 'pending' ? booking.updatedAt.toISOString() : null,
-      overdueDays,
-    };
-  }
-
-  private resolveFeeCollectionDateRange(
-    fromDate?: string,
-    toDate?: string,
-  ): { fromDate: string; toDate: string } {
-    const today = new Date().toISOString().slice(0, 10);
-    const resolvedFromDate = fromDate?.trim() || toDate?.trim() || today;
-    const resolvedToDate = toDate?.trim() || fromDate?.trim() || today;
-
-    if (resolvedFromDate > resolvedToDate) {
-      throw new HttpError(400, 'INVALID_DATE_RANGE');
-    }
-
-    return {
-      fromDate: resolvedFromDate,
-      toDate: resolvedToDate,
-    };
-  }
-
-  private calculateOverdueDays(dueDateIso: string, todayIsoDate: string): number {
-    const dueDate = new Date(`${dueDateIso}T00:00:00.000Z`);
-    const todayDate = new Date(`${todayIsoDate}T00:00:00.000Z`);
-    if (Number.isNaN(dueDate.getTime()) || Number.isNaN(todayDate.getTime())) {
-      return 0;
-    }
-
-    if (todayDate <= dueDate) {
-      return 0;
-    }
-
-    const diffMs = todayDate.getTime() - dueDate.getTime();
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  }
-
   private resolveSectionIdForLibrary(
     library: LibraryRecord,
     sectionId: string | undefined,
@@ -556,15 +378,19 @@ export class BookingService {
 
   private buildSeatMapFromInventory(
     seatInventory: LibrarySeatRecord[],
-    occupiedSeatIds: Set<string>,
+    seatStatusMap: Map<string, SeatStatus>,
   ): SeatMapItem[] {
-    return seatInventory.map(seat => ({
-      id: seat.seatId,
-      label: seat.label,
-      gender: seat.gender,
-      occupied: occupiedSeatIds.has(seat.seatId),
-      sectionId: seat.sectionId,
-    }));
+    return seatInventory.map(seat => {
+      const status = seatStatusMap.get(seat.seatId) || 'available';
+      return {
+        id: seat.seatId,
+        label: seat.label,
+        gender: seat.gender,
+        occupied: status !== 'available',
+        seatStatus: status,
+        sectionId: seat.sectionId,
+      };
+    });
   }
 
   private async resolveSeatMapWithFallback(
@@ -572,23 +398,30 @@ export class BookingService {
     slotType?: string,
     sectionId?: string,
   ): Promise<SeatMapItem[]> {
-    const [occupiedSeatIds, memberSeatIds] = await Promise.all([
-      this.bookingRepository.findActiveSeatIdsByLibraryAndSlot(library.id, slotType, sectionId),
-      this.memberRepository.findActiveMemberSeatIds(library.id, slotType, sectionId),
+    const [bookingSeatStatus, memberSeatStatus] = await Promise.all([
+      this.bookingRepository.findActiveSeatStatusByLibraryAndSlot(library.id, slotType, sectionId),
+      this.memberRepository.findActiveMemberSeatStatus(library.id, slotType, sectionId),
     ]);
-    const occupiedSet = new Set([...occupiedSeatIds, ...memberSeatIds]);
+
+    // Merge: booking status takes priority, then member status
+    const seatStatusMap = new Map<string, SeatStatus>(bookingSeatStatus);
+    for (const [seatId, status] of memberSeatStatus) {
+      if (!seatStatusMap.has(seatId)) {
+        seatStatusMap.set(seatId, status);
+      }
+    }
 
     try {
       await this.librarySeatService.ensureLibrarySeatInventory(library);
       const seatInventory = await this.librarySeatService.listLibrarySeats(library.id, sectionId);
       if (seatInventory.length > 0) {
-        return this.buildSeatMapFromInventory(seatInventory, occupiedSet);
+        return this.buildSeatMapFromInventory(seatInventory, seatStatusMap);
       }
     } catch {
       // fallback to computed seat map when inventory is not ready
     }
 
-    return buildSeatMap(library.seating, library.totalSeats, occupiedSet, sectionId);
+    return buildSeatMap(library.seating, library.totalSeats, seatStatusMap, sectionId);
   }
 
   private getLibrarySlotOrThrow(library: LibraryRecord, slotId: string) {
@@ -620,24 +453,27 @@ export class BookingService {
     return library;
   }
 
-  private mapBookingResult(booking: {
-    id: string;
-    libraryId: string;
-    libraryName: string;
-    seatId: string;
-    slotType: string;
-    slotName: string;
-    slotStartTime: string;
-    slotEndTime: string;
-    sectionId: string | null;
-    paymentMethod: string;
-    amount: number;
-    startDate: string;
-    validUntil: string;
-    status: string;
-    invoiceNo: string;
-    libraryAddress: string;
-  }, library?: LibraryRecord | null): BookingResult {
+  private mapBookingResult(
+    booking: {
+      id: string;
+      libraryId: string;
+      libraryName: string;
+      seatId: string;
+      slotType: string;
+      slotName: string;
+      slotStartTime: string;
+      slotEndTime: string;
+      sectionId: string | null;
+      paymentMethod: string;
+      amount: number;
+      startDate: string;
+      validUntil: string;
+      status: string;
+      invoiceNo: string;
+      libraryAddress: string;
+    },
+    library?: LibraryRecord | null,
+  ): BookingResult {
     return {
       id: booking.id,
       libraryId: booking.libraryId,

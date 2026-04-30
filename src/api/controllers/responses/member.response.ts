@@ -55,6 +55,14 @@ export class MemberData {
 
   @IsOptional()
   @IsString()
+  bookingId?: string;
+
+  @IsOptional()
+  @IsString()
+  paidAt?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 
   @IsString()
@@ -78,6 +86,8 @@ export class MemberData {
     planAmount: number | null;
     startDate: string | null;
     endDate: string | null;
+    bookingId: string | null;
+    paidAt: Date | null;
     notes: string | null;
     createdAt: Date;
     updatedAt: Date;
@@ -100,6 +110,8 @@ export class MemberData {
     this.planAmount = data.planAmount ?? undefined;
     this.startDate = data.startDate ?? undefined;
     this.endDate = data.endDate ?? undefined;
+    this.bookingId = data.bookingId ?? undefined;
+    this.paidAt = data.paidAt ? data.paidAt.toISOString() : undefined;
     this.notes = data.notes ?? undefined;
     this.createdAt = data.createdAt.toISOString();
     this.updatedAt = data.updatedAt.toISOString();

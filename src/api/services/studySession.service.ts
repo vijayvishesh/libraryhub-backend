@@ -2,10 +2,13 @@ import { NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { LibraryRepository } from '../repositories/library.repository';
 // import { BookingRepository } from '../repositories/booking.repository';
+import {
+  CreateStudySessionRequest,
+  UpdateStudySessionRequest,
+} from '../controllers/requests/studySession.request';
+import { SessionLibraryData } from '../controllers/responses/studySession.response';
 import { StudySessionRepository } from '../repositories/studySession.repository';
 import { StudySessionRecord } from '../repositories/types/studySession.repository.types';
-import { CreateStudySessionRequest, UpdateStudySessionRequest } from '../controllers/requests/studySession.request';
-import { SessionLibraryData } from '../controllers/responses/studySession.response';
 
 @Service()
 export class StudySessionService {
@@ -41,10 +44,7 @@ export class StudySessionService {
     return this.studySessionRepository.findByStudent(studentId);
   }
 
-  public async getSessionById(
-    id: string,
-    studentId: string,
-  ): Promise<StudySessionRecord> {
+  public async getSessionById(id: string, studentId: string): Promise<StudySessionRecord> {
     const record = await this.studySessionRepository.findById(id);
     if (!record || record.deletedAt) throw new NotFoundError('SESSION_NOT_FOUND');
     if (record.studentId !== studentId) throw new NotFoundError('SESSION_NOT_FOUND');
@@ -126,9 +126,7 @@ export class StudySessionService {
 
   private calculateDayStreak(sessions: StudySessionRecord[]): number {
     if (sessions.length === 0) return 0;
-    const studyDays = new Set(
-      sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0]),
-    );
+    const studyDays = new Set(sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0]));
     let streak = 0;
     const today = new Date();
     for (let i = 0; i < 365; i++) {

@@ -372,3 +372,101 @@ export class LibraryListQueryRequest {
   @IsIn([...LIBRARY_SEATING_GENDER_ENUM])
   gender?: string;
 }
+
+export class UpdateLibraryRequest {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9]{10}$/, { message: 'contactPhone must be a valid 10-digit number' })
+  contactPhone?: string;
+
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9]{6}$/, { message: 'pincode must be a valid 6-digit number' })
+  pincode?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LibraryGeoLocationRequest)
+  location?: LibraryGeoLocationRequest;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LibraryGeoCoordinatesRequest)
+  coordinates?: LibraryGeoCoordinatesRequest;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  totalSeats?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn([...LIBRARY_FACILITY_ENUM], { each: true })
+  facilities?: (typeof LIBRARY_FACILITY_ENUM)[number][];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(4)
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySlotRequest)
+  slots?: LibrarySlotRequest[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibraryPhotoRequest)
+  photos?: LibraryPhotoRequest[];
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isMarketplaceVisible?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isOpen?: boolean;
+
+  @IsOptional()
+  @IsString()
+  openingHours?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LibrarySeatingRequest)
+  seating?: LibrarySeatingRequest;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibraryPaymentMethodRequest)
+  paymentMethods?: LibraryPaymentMethodRequest[];
+}
