@@ -20,11 +20,17 @@ export class MemberRepository {
 
     const memberRepository = this.getMemberRepository();
     const now = new Date();
-    const member = memberRepository.create({
-      ...input,
+    const { aadharId, ...rest } = input;
+    const memberData: Record<string, unknown> = {
+      ...rest,
       createdAt: now,
       updatedAt: now,
-    });
+    };
+    // Only set aadharId if it has a value — null would conflict with the unique partial index
+    if (aadharId) {
+      memberData.aadharId = aadharId;
+    }
+    const member = memberRepository.create(memberData as Partial<MemberModel>);
 
     const savedMember = await memberRepository.save(member);
     return this.mapMember(savedMember);
@@ -158,6 +164,12 @@ export class MemberRepository {
     if (input.aadharId !== undefined) {
       member.aadharId = input.aadharId;
     }
+    if (input.studentId !== undefined) {
+      member.studentId = input.studentId;
+    }
+    if (input.bookingId !== undefined) {
+      member.bookingId = input.bookingId;
+    }
     if (input.email !== undefined) {
       member.email = input.email;
     }
@@ -184,6 +196,9 @@ export class MemberRepository {
     }
     if (input.notes !== undefined) {
       member.notes = input.notes;
+    }
+    if (input.paidAt !== undefined) {
+      member.paidAt = input.paidAt;
     }
 
     member.updatedAt = input.updatedAt || new Date();
@@ -223,11 +238,11 @@ export class MemberRepository {
     return this.mapMember(member);
   }
 
-  public async findActiveMemberSeatIds(
+  public async findActiveMemberSeatStatus(
     libraryId: string,
     slotId?: string,
     sectionId?: string,
-  ): Promise<string[]> {
+  ): Promise<Map<string, 'pending' | 'occupied'>> {
     const whereFilter: Record<string, unknown> = {
       libraryId,
       status: { $in: ['active', 'pending'] },
@@ -240,14 +255,21 @@ export class MemberRepository {
 
     const members = await this.getMemberRepository().find({ where: whereFilter });
 
-    let seatIds = members.map(m => m.seatId).filter((id): id is string => id !== null);
-
-    if (sectionId) {
-      const prefix = `SEC-${sectionId}-`;
-      seatIds = seatIds.filter(id => id.startsWith(prefix));
+    const statusMap = new Map<string, 'pending' | 'occupied'>();
+    for (const member of members) {
+      if (!member.seatId) {
+        continue;
+      }
+      if (sectionId) {
+        const prefix = `SEC-${sectionId}-`;
+        if (!member.seatId.startsWith(prefix)) {
+          continue;
+        }
+      }
+      statusMap.set(member.seatId, member.status === 'pending' ? 'pending' : 'occupied');
     }
 
-    return seatIds;
+    return statusMap;
   }
 
   public async findActiveMemberBySeat(
@@ -295,6 +317,8 @@ export class MemberRepository {
         partialFilterExpression: { aadharId: { $type: 'string' } },
       },
     );
+    await this.dropIndexSafely('idx_members_library_aadhar_unique');
+    await this.dropIndexSafely('idx_members_library_aadhar_unique_v2');
     await this.createIndexSafely(
       { libraryId: 1, studentId: 1 },
       { sparse: true, name: 'idx_members_library_student' },
@@ -309,12 +333,7 @@ export class MemberRepository {
 
   private async createIndexSafely(
     keys: Record<string, 1 | -1>,
-    options: {
-      name: string;
-      unique?: boolean;
-      sparse?: boolean;
-      partialFilterExpression?: Record<string, unknown>;
-    },
+    options: { name: string; unique?: boolean; sparse?: boolean; partialFilterExpression?: Record<string, unknown> },
   ): Promise<void> {
     try {
       await this.getMemberRepository().createCollectionIndex(keys, options);
@@ -324,6 +343,15 @@ export class MemberRepository {
       }
 
       throw error;
+    }
+  }
+
+  private async dropIndexSafely(indexName: string): Promise<void> {
+    try {
+      const collection = this.getMemberRepository().manager.getMongoRepository(MemberModel);
+      await collection.dropCollectionIndex(indexName);
+    } catch {
+      // Index may not exist, ignore
     }
   }
 
@@ -362,6 +390,8 @@ export class MemberRepository {
       planAmount: member.planAmount ?? null,
       startDate: member.startDate ?? null,
       endDate: member.endDate ?? null,
+      bookingId: member.bookingId ?? null,
+      paidAt: member.paidAt ?? null,
       notes: member.notes ?? null,
       createdAt: member.createdAt,
       updatedAt: member.updatedAt,

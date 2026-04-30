@@ -3,27 +3,28 @@ import { LibrarySeating } from '../models/library.model';
 export type SeatGender = 'any' | 'male' | 'female';
 export type StudentGender = 'male' | 'female' | 'other';
 
+export type SeatStatus = 'available' | 'pending' | 'occupied';
+
 export type SeatMapItem = {
   id: string;
   label: string;
   gender: SeatGender;
   occupied: boolean;
+  seatStatus: SeatStatus;
   sectionId: string | null;
 };
-
-const SEATS_PER_ROW = 50;
 
 export const buildSeatMap = (
   seating: LibrarySeating | undefined,
   totalSeats: number,
-  occupiedSeatIds: Set<string>,
+  seatStatusMap: Map<string, SeatStatus>,
   sectionId?: string,
 ): SeatMapItem[] => {
   if (seating?.mode === 'section' && seating.sections && seating.sections.length > 0) {
-    return buildSectionSeatMap(seating, occupiedSeatIds, sectionId);
+    return buildSectionSeatMap(seating, seatStatusMap, sectionId);
   }
 
-  return buildGeneralSeatMap(seating, totalSeats, occupiedSeatIds);
+  return buildGeneralSeatMap(seating, totalSeats, seatStatusMap);
 };
 
 export const isSeatAllowedForStudent = (
@@ -45,7 +46,7 @@ export const pickAutoSeat = (
 const buildGeneralSeatMap = (
   seating: LibrarySeating | undefined,
   totalSeats: number,
-  occupiedSeatIds: Set<string>,
+  seatStatusMap: Map<string, SeatStatus>,
 ): SeatMapItem[] => {
   const resolvedTotal = Math.max(
     1,
@@ -54,12 +55,14 @@ const buildGeneralSeatMap = (
 
   return Array.from({ length: resolvedTotal }).map((_, index) => {
     const seatNumber = index + 1;
-    const label = formatSeatLabel(seatNumber);
+    const label = String(seatNumber);
+    const status = seatStatusMap.get(label) || 'available';
     return {
       id: label,
       label,
       gender: resolveGeneralSeatGender(seatNumber, seating),
-      occupied: occupiedSeatIds.has(label),
+      occupied: status !== 'available',
+      seatStatus: status,
       sectionId: null,
     };
   });
@@ -67,7 +70,7 @@ const buildGeneralSeatMap = (
 
 const buildSectionSeatMap = (
   seating: LibrarySeating,
-  occupiedSeatIds: Set<string>,
+  seatStatusMap: Map<string, SeatStatus>,
   sectionId?: string,
 ): SeatMapItem[] => {
   const filteredSections = sectionId
@@ -83,11 +86,13 @@ const buildSectionSeatMap = (
     const capacity = Math.max(0, section.capacity || 0);
     for (let index = 1; index <= capacity; index += 1) {
       const label = `SEC-${section.id}-${String(index).padStart(2, '0')}`;
+      const status = seatStatusMap.get(label) || 'available';
       seatItems.push({
         id: label,
         label,
         gender: section.gender,
-        occupied: occupiedSeatIds.has(label),
+        occupied: status !== 'available',
+        seatStatus: status,
         sectionId: String(section.id),
       });
     }
@@ -125,25 +130,4 @@ const resolveGeneralSeatGender = (seatNumber: number, seating?: LibrarySeating):
     range => seatNumber >= range.from && seatNumber <= range.to,
   );
   return matchedRange?.gender || 'any';
-};
-
-const formatSeatLabel = (seatNumber: number): string => {
-  const zeroBased = seatNumber - 1;
-  const rowIndex = Math.floor(zeroBased / SEATS_PER_ROW);
-  const positionInRow = (zeroBased % SEATS_PER_ROW) + 1;
-
-  return `${toAlphabetLabel(rowIndex)}-${String(positionInRow).padStart(2, '0')}`;
-};
-
-const toAlphabetLabel = (index: number): string => {
-  let current = index + 1;
-  let label = '';
-
-  while (current > 0) {
-    const remainder = (current - 1) % 26;
-    label = String.fromCharCode(65 + remainder) + label;
-    current = Math.floor((current - 1) / 26);
-  }
-
-  return label;
 };

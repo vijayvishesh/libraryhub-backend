@@ -20,7 +20,8 @@ import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { sendXlsxDownload } from '../helpers/excel.helper';
 import { ActivityService } from '../services/activity.service';
-import { BookingService } from '../services/booking.service';
+import { BookingApprovalService } from '../services/bookingApproval.service';
+import { FeeCollectionService } from '../services/feeCollection.service';
 import { MemberService } from '../services/member.service';
 import { OwnerService } from '../services/owner.service';
 import { MarkBookingPaidRequest, OwnerFeeCollectionQueryRequest } from './requests/booking.request';
@@ -33,7 +34,6 @@ import {
 } from './requests/member.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
-  BookingMarkPaidApiResponse,
   OwnerFeeCollectionApiResponse,
   OwnerFeeCollectionItemData,
   OwnerFeeCollectionPayloadData,
@@ -68,9 +68,10 @@ import {
 export class OwnerController {
   constructor(
     private readonly ownerService: OwnerService,
-    private readonly bookingService: BookingService,
+    private readonly feeCollectionService: FeeCollectionService,
     private readonly memberService: MemberService,
     private readonly activityService: ActivityService,
+    private readonly bookingApprovalService: BookingApprovalService,
   ) {}
 
   @Get('/fee-collection')
@@ -85,7 +86,7 @@ export class OwnerController {
     @QueryParams() query: OwnerFeeCollectionQueryRequest,
   ): Promise<OwnerFeeCollectionApiResponse> {
     try {
-      const result = await this.bookingService.getOwnerFeeCollection(session.user.id, query);
+      const result = await this.feeCollectionService.getOwnerFeeCollection(session.user.id, query);
 
       return new OwnerFeeCollectionApiResponse(
         new OwnerFeeCollectionPayloadData({
@@ -107,49 +108,72 @@ export class OwnerController {
     }
   }
 
-  @Patch('/fee-collection/:bookingId/mark-paid')
+  @Patch('/bookings/:bookingId/approve')
   @Authorized('OWNER')
   @OpenAPI({ security: [{ bearerAuth: [] }] })
-  @ResponseSchema(BookingMarkPaidApiResponse, { statusCode: 200 })
-  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 409 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-  public async markBookingPaid(
+  public async approveBooking(
     @CurrentUser({ required: true }) session: CurrentSessionData,
     @Param('bookingId') bookingId: string,
-    @Body() payload: MarkBookingPaidRequest,
-  ): Promise<BookingMarkPaidApiResponse> {
+  ): Promise<{ responseCode: number; message: string }> {
     try {
-      const paidItem = await this.bookingService.markOwnerBookingPaid(
-        session.user.id,
-        bookingId,
-        payload.paymentMethod,
-      );
+      const result = await this.bookingApprovalService.approveBooking(session.user.id, bookingId);
 
       await this.activityService.logActivity(
         session.user.id,
-        'PAYMENT_RECEIVED',
-        `Payment received for seat ${paidItem.seatId}`,
+        'BOOKING_APPROVED',
+        `Booking approved for seat ${result.seatId}`,
         {
-          memberName: paidItem.studentName,
-          seatId: paidItem.seatId,
-          amount: paidItem.amount,
+          bookingId: result.id,
+          seatId: result.seatId,
+          amount: result.amount,
         },
       );
 
-      return new BookingMarkPaidApiResponse(
-        'BOOKING_MARKED_AS_PAID',
-        new OwnerFeeCollectionItemData(paidItem),
-        200,
-      );
+      return { responseCode: 200, message: 'BOOKING_APPROVED' };
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
       }
 
-      throw new InternalServerError('MARK_OWNER_BOOKING_PAID_FAILED');
+      throw new InternalServerError('APPROVE_BOOKING_FAILED');
+    }
+  }
+
+  @Patch('/bookings/:bookingId/reject')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async rejectBooking(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('bookingId') bookingId: string,
+  ): Promise<{ responseCode: number; message: string }> {
+    try {
+      const result = await this.bookingApprovalService.rejectBooking(session.user.id, bookingId);
+
+      await this.activityService.logActivity(
+        session.user.id,
+        'BOOKING_REJECTED',
+        `Booking rejected for seat ${result.seatId}`,
+        {
+          bookingId: result.id,
+          seatId: result.seatId,
+        },
+      );
+
+      return { responseCode: 200, message: 'BOOKING_REJECTED' };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('REJECT_BOOKING_FAILED');
     }
   }
 
@@ -481,6 +505,48 @@ export class OwnerController {
       }
 
       throw new InternalServerError('UPDATE_OWNER_MEMBER_FAILED');
+    }
+  }
+
+  @Patch('/members/:memberId/mark-paid')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(MemberDetailApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async markMemberPaid(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('memberId') memberId: string,
+    @Body() payload: MarkBookingPaidRequest,
+  ): Promise<MemberDetailApiResponse> {
+    try {
+      const member = await this.memberService.markMemberPaid(
+        session.user.id,
+        memberId,
+        payload.paymentMethod,
+      );
+
+      await this.activityService.logActivity(
+        session.user.id,
+        'PAYMENT_RECEIVED',
+        `Payment received from ${member.fullName}`,
+        {
+          memberName: member.fullName,
+          memberId: member.id,
+          amount: member.planAmount,
+          seatId: member.seatId,
+        },
+      );
+
+      return new MemberDetailApiResponse(new MemberData(member), 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
     }
   }
 

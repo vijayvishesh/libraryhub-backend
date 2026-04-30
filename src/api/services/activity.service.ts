@@ -2,17 +2,9 @@ import { Service } from 'typedi';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { ActivityActionType } from '../constants/activity.constants';
 import { ActivityMetadata, ActivityModel } from '../models/activity.model';
+import { ActivityRecord } from './types/activity.service.types';
 
-export type ActivityRecord = {
-  id: string;
-  userId: string;
-  actionType: ActivityActionType;
-  description: string;
-  metadata?: ActivityMetadata;
-  timestamp: Date;
-  createdAt: Date;
-  updatedAt: Date;
-};
+export type { ActivityRecord };
 
 @Service()
 export class ActivityService {

@@ -8,6 +8,7 @@ import {
   LibraryRecord,
   ListLibrariesQuery,
   ListLibrariesResult,
+  UpdateLibraryInput,
 } from './types/library.repository.types';
 
 type WithObjectId = {
@@ -140,6 +141,50 @@ export class LibraryRepository {
     existingLibrary.stats = input.stats;
     existingLibrary.deletedAt = input.deletedAt;
     existingLibrary.updatedAt = new Date();
+
+    const savedLibrary = await libraryRepository.save(existingLibrary);
+    return this.mapLibrary(savedLibrary);
+  }
+
+  public async partialUpdateLibrary(
+    libraryId: string,
+    input: UpdateLibraryInput,
+  ): Promise<LibraryRecord | null> {
+    const objectId = this.tryParseObjectId(libraryId);
+    if (!objectId) {
+      return null;
+    }
+
+    const libraryRepository = this.getLibraryRepository();
+    const existingLibrary = await libraryRepository.findOneById(objectId);
+    if (!existingLibrary) {
+      return null;
+    }
+
+    Object.assign(existingLibrary, input);
+    existingLibrary.updatedAt = new Date();
+
+    const savedLibrary = await libraryRepository.save(existingLibrary);
+    return this.mapLibrary(savedLibrary);
+  }
+
+  public async softDeleteLibrary(libraryId: string): Promise<LibraryRecord | null> {
+    const objectId = this.tryParseObjectId(libraryId);
+    if (!objectId) {
+      return null;
+    }
+
+    const libraryRepository = this.getLibraryRepository();
+    const existingLibrary = await libraryRepository.findOneById(objectId);
+    if (!existingLibrary || existingLibrary.deletedAt) {
+      return null;
+    }
+
+    const now = new Date();
+    existingLibrary.deletedAt = now;
+    existingLibrary.isActive = false;
+    existingLibrary.isMarketplaceVisible = false;
+    existingLibrary.updatedAt = now;
 
     const savedLibrary = await libraryRepository.save(existingLibrary);
     return this.mapLibrary(savedLibrary);
