@@ -122,4 +122,45 @@ export class AttendanceService {
     if (record.studentId !== studentId) throw new NotFoundError('ATTENDANCE_NOT_FOUND');
     return record;
   }
+
+  public async getStudentAttendanceHistory(
+  studentId: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<{ records: AttendanceRecord[]; total: number }> {
+  const records = await this.attendanceRepository.findByStudentWithFilters(
+    studentId,
+    fromDate,
+    toDate,
+  );
+  return { records, total: records.length };
+}
+
+public async getOwnerAttendanceHistory(
+  ownerId: string,
+  query: {
+    date?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  },
+): Promise<{ records: AttendanceRecord[]; total: number; page: number; limit: number }> {
+  const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
+  if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 20;
+
+  const result = await this.attendanceRepository.findByLibraryWithFilters(
+    library.id,
+    query.date,
+    query.status,
+    query.search,
+    page,
+    limit,
+  );
+
+  return { ...result, page, limit };
+}
 }

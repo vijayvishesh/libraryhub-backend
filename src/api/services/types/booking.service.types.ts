@@ -14,6 +14,7 @@ export type SeatMapResult = {
 };
 
 export type BookingResult = {
+  duration: number;
   id: string;
   libraryId: string;
   libraryName: string;

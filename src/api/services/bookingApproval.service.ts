@@ -267,6 +267,7 @@ export class BookingApprovalService {
       status: string;
       invoiceNo: string;
       libraryAddress: string;
+      duration: number;
     },
     library?: LibraryRecord | null,
   ): BookingResult {
@@ -291,6 +292,7 @@ export class BookingApprovalService {
       libraryPincode: library?.pincode ?? '',
       libraryLatitude: library?.location?.coordinates?.[1] ?? null,
       libraryLongitude: library?.location?.coordinates?.[0] ?? null,
+      duration: booking.duration,
     };
   }
 

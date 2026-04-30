@@ -21,7 +21,6 @@ export type CreateBookingInput = {
   checkedInAt: Date | null;
   checkedOutAt: Date | null;
   invoiceNo: string;
-  duration: number;
 };
 
 export type BookingRecord = CreateBookingInput & {

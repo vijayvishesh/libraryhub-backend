@@ -47,7 +47,7 @@ export class CreateBookingRequest {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(12)
+  @Max(365)
   duration?: number;
 
   @IsOptional()
@@ -58,10 +58,10 @@ export class CreateBookingRequest {
   )
   startDate?: string;
 
-@IsOptional()
-@IsInt()
-@Min(1)
-duration?: number; // e.g. 1, 7, 15, 1, 2, 3, 6, 12
+// @IsOptional()
+// @IsInt()
+// @Min(1)
+// duration?: number; // e.g. 1, 7, 15, 1, 2, 3, 6, 12
 }
 
 export class ListMyBookingsQueryRequest {

@@ -100,3 +100,63 @@ export class TodayAttendanceApiResponse {
     this.data = data;
   }
 }
+
+export class AttendanceHistoryListPayloadData {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttendanceData)
+  records!: AttendanceData[];
+
+  @IsNumber() total!: number;
+
+  constructor(records?: AttendanceData[], total?: number) {
+    if (!records || typeof total !== 'number') return;
+    this.records = records;
+    this.total = total;
+  }
+}
+
+export class AttendanceHistoryListApiResponse {
+  @IsNumber() responseCode!: number;
+  @ValidateNested()
+  @Type(() => AttendanceHistoryListPayloadData)
+  data!: AttendanceHistoryListPayloadData;
+
+  constructor(data?: AttendanceHistoryListPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}
+
+export class OwnerAttendanceHistoryPayloadData {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttendanceData)
+  records!: AttendanceData[];
+
+  @IsNumber() total!: number;
+  @IsNumber() page!: number;
+  @IsNumber() limit!: number;
+
+  constructor(records?: AttendanceData[], total?: number, page?: number, limit?: number) {
+    if (!records || typeof total !== 'number' || typeof page !== 'number' || typeof limit !== 'number') return;
+    this.records = records;
+    this.total = total;
+    this.page = page;
+    this.limit = limit;
+  }
+}
+
+export class OwnerAttendanceHistoryApiResponse {
+  @IsNumber() responseCode!: number;
+  @ValidateNested()
+  @Type(() => OwnerAttendanceHistoryPayloadData)
+  data!: OwnerAttendanceHistoryPayloadData;
+
+  constructor(data?: OwnerAttendanceHistoryPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}

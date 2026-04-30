@@ -456,7 +456,6 @@ export class BookingRepository {
       invoiceNo: booking.invoiceNo,
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
-      duration: booking.duration ?? 1,
     };
   }
 

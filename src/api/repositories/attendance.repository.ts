@@ -60,6 +60,58 @@ export class AttendanceRepository {
     return models.map(m => this.toRecord(m));
   }
 
+  public async findByStudentWithFilters(
+  studentId: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<AttendanceRecord[]> {
+  const where: Record<string, unknown> = { studentId };
+
+  if (fromDate || toDate) {
+    where.date = {};
+    if (fromDate) (where.date as any).$gte = fromDate;
+    if (toDate) (where.date as any).$lte = toDate;
+  }
+
+  const models = await this.getRepo().find({
+    where: where as any,
+    order: { createdAt: 'DESC' } as any,
+  });
+  return models.map(m => this.toRecord(m));
+}
+
+public async findByLibraryWithFilters(
+  libraryId: string,
+  date?: string,
+  status?: string,
+  search?: string,
+  page: number = 1,
+  limit: number = 20,
+): Promise<{ records: AttendanceRecord[]; total: number }> {
+  const where: Record<string, unknown> = { libraryId };
+
+  if (date) where.date = date;
+  if (status) where.status = status;
+  if (search) {
+    where.studentName = { $regex: search, $options: 'i' };
+  }
+
+  const [models, total] = await Promise.all([
+    this.getRepo().find({
+      where: where as any,
+      order: { checkInTime: 'DESC' } as any,
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    this.getRepo().count({ where: where as any }),
+  ]);
+
+  return {
+    records: models.map(m => this.toRecord(m)),
+    total,
+  };
+}
+
   public async create(input: CreateAttendanceInput): Promise<AttendanceRecord> {
     const now = new Date();
     const repo = this.getRepo();

@@ -82,7 +82,4 @@ export class BookingModel {
   @Column()
   updatedAt!: Date;
 
-  @Column()
-duration!: number;
-
 }

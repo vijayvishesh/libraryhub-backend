@@ -9,15 +9,19 @@ import {
   Patch,
   Post,
   HttpCode,
+  QueryParams,
+  Get,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { AttendanceService } from '../services/attendance.service';
-import { CheckInRequest } from './requests/attendance.request';
+import { CheckInRequest, StudentAttendanceHistoryQuery } from './requests/attendance.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
   AttendanceApiResponse,
   AttendanceData,
+  AttendanceHistoryListApiResponse,
+  AttendanceHistoryListPayloadData,
 //   AttendanceSummaryData,
 //   TodayAttendanceApiResponse,
 //   TodayAttendanceData,
@@ -113,4 +117,33 @@ export class AttendanceController {
       throw new InternalServerError('RESUME_FAILED');
     }
   }
+
+@Get('/history')
+@Authorized('STUDENT')
+@OpenAPI({ summary: 'Get student attendance history', security: [{ bearerAuth: [] }] })
+@ResponseSchema(AttendanceHistoryListApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async getMyAttendanceHistory(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @QueryParams() query: StudentAttendanceHistoryQuery,
+): Promise<AttendanceHistoryListApiResponse> {
+  try {
+    const result = await this.attendanceService.getStudentAttendanceHistory(
+      session.user.id,
+      query.fromDate,
+      query.toDate,
+    );
+    return new AttendanceHistoryListApiResponse(
+      new AttendanceHistoryListPayloadData(
+        result.records.map(r => new AttendanceData(r)),
+        result.total,
+      ),
+      200,
+    );
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('GET_ATTENDANCE_HISTORY_FAILED');
+  }
+}
 }

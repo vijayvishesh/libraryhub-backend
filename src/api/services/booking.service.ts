@@ -157,7 +157,6 @@ export class BookingService {
         checkedInAt: null,
         checkedOutAt: null,
         invoiceNo: this.buildInvoiceNo(),
-        duration: payload.duration ?? 1,
       };
 
       const booking = await this.bookingRepository.createBooking(bookingToCreate);
