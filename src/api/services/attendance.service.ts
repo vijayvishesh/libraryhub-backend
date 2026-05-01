@@ -27,7 +27,7 @@ export class AttendanceService {
       throw new BadRequestError('NO_ACTIVE_MEMBERSHIP');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    // const today = new Date().toISOString().split('T')[0];
 
     // Check already checked in today
 
@@ -38,7 +38,7 @@ export class AttendanceService {
       membershipId: member.id,
       seatId: member.seatId,
       studentName: member.fullName,
-      date: today,
+      // date: today,
       checkInTime: new Date(),
     });
   }
@@ -139,6 +139,8 @@ export class AttendanceService {
 public async getOwnerAttendanceHistory(
   ownerId: string,
   query: {
+    fromDate?: string;
+    toDate?: string;
     date?: string;
     status?: string;
     search?: string;
@@ -154,7 +156,9 @@ public async getOwnerAttendanceHistory(
 
   const result = await this.attendanceRepository.findByLibraryWithFilters(
     library.id,
-    query.date,
+    // query.date,
+    query.fromDate,
+    query.toDate,
     query.status,
     query.search,
     page,

@@ -21,6 +21,8 @@ export class AttendanceData {
   @IsOptional() @IsDate() checkOutTime?: Date | null;
   @IsString() status!: string;
   @IsDate() createdAt!: Date;
+  @IsDate() fromDate?: string;
+  @IsDate() toDate?: string;
 
   constructor(params?: AttendanceRecord) {
     if (!params) return;
@@ -30,7 +32,9 @@ export class AttendanceData {
     this.membershipId = params.membershipId;
     this.seatId = params.seatId;
     this.studentName = params.studentName;
-    this.date = params.date;
+    // this.date = params.date;
+    this.fromDate = params.fromDate;
+    this.toDate = params.toDate;
     this.checkInTime = params.checkInTime;
     this.checkOutTime = params.checkOutTime;
     this.status = params.status;

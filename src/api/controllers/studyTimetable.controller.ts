@@ -10,11 +10,12 @@ import {
   OnUndefined,
   Param,
   Put,
+  QueryParams,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { StudyTimetableService } from '../services/studyTimetable.service';
-import { UpdateStudyTimetableRequest } from './requests/studyTimetable.request';
+import { StudyTimetableHistoryQuery, UpdateStudyTimetableRequest } from './requests/studyTimetable.request';
 import { CurrentSessionData } from './responses/auth.response';
 import { Post, HttpCode } from 'routing-controllers';
 import { CreateStudyTimetableRequest } from './requests/studyTimetable.request';
@@ -52,6 +53,35 @@ export class StudyTimetableController {
       throw new InternalServerError('LIST_TIMETABLES_FAILED');
     }
   }
+
+@Get('/history')
+@Authorized('STUDENT')
+@OpenAPI({ summary: 'Get timetable history with date filter', security: [{ bearerAuth: [] }] })
+@ResponseSchema(StudyTimetableListApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async getTimetableHistory(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @QueryParams() query: StudyTimetableHistoryQuery,
+): Promise<StudyTimetableListApiResponse> {
+  try {
+    const records = await this.studyTimetableService.getTimetableHistory(
+      session.user.id,
+      query.fromDate,
+      query.toDate,
+    );
+    return new StudyTimetableListApiResponse(
+      new StudyTimetableListPayloadData(
+        records.map(r => new StudyTimetableData(r)),
+        records.length,
+      ),
+      200,
+    );
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('GET_TIMETABLE_HISTORY_FAILED');
+  }
+}
 
   @Get('/:id')
   @Authorized('STUDENT')
@@ -136,4 +166,5 @@ public async createTimetable(
   private mapTimetableData(record: StudyTimetableRecord): StudyTimetableData {
     return new StudyTimetableData(record);
   }
+
 }

@@ -20,6 +20,7 @@ import { NotificationModel } from '../../api/models/notification.model';
 import { FcmTokenModel } from '../../api/models/fcmToken.model';
 import { MemberBulkUploadModel } from '../../api/models/memberBulkUpload.model';
 import { MemberInviteLinkModel } from '../../api/models/memberInviteLink.model';
+import { BannerModel } from '../../api/models/banner.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -64,6 +65,7 @@ const createDataSource = (): DataSource =>
       MemberBulkUploadModel,
       MemberInviteLinkModel,
       SuperAdminModel,
+      BannerModel
     ],
     synchronize: true,
     logging: false,

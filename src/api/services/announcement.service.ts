@@ -9,7 +9,7 @@ import { LibraryRepository } from '../repositories/library.repository';
 import { BookingRepository } from '../repositories/booking.repository';
 import { AnnouncementRecord } from '../repositories/types/announcement.repository.types';
 import { AnnouncementTarget } from '../models/announcement.model';
-import { CreateAnnouncementRequest } from '../controllers/requests/announcement.request';
+import { CreateAnnouncementRequest, UpdateAnnouncementRequest } from '../controllers/requests/announcement.request';
 
 @Service()
 export class AnnouncementService {
@@ -165,4 +165,32 @@ export class AnnouncementService {
       console.error('FCM push notification failed:', error);
     }
   }
+
+  public async updateAnnouncement(
+  ownerId: string,
+  id: string,
+  input: UpdateAnnouncementRequest,
+): Promise<AnnouncementRecord> {
+  const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
+  if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+
+  const existing = await this.announcementRepository.findById(id);
+  if (!existing || existing.deletedAt) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+  if (existing.libraryId !== library.id) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+
+  const updated = await this.announcementRepository.update(id, input);
+  if (!updated) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+  return updated;
+}
+
+public async deleteAnnouncement(ownerId: string, id: string): Promise<void> {
+  const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
+  if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+
+  const existing = await this.announcementRepository.findById(id);
+  if (!existing || existing.deletedAt) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+  if (existing.libraryId !== library.id) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+
+  await this.announcementRepository.softDelete(id);
+}
 }

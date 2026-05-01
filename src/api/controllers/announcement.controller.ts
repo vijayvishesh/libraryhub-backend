@@ -2,17 +2,21 @@ import {
   Authorized,
   Body,
   CurrentUser,
+  Delete,
   Get,
   HttpCode,
   HttpError,
   InternalServerError,
   JsonController,
+  OnUndefined,
+  Param,
+  Patch,
   Post,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { AnnouncementService } from '../services/announcement.service';
-import { CreateAnnouncementRequest } from './requests/announcement.request';
+import { CreateAnnouncementRequest, UpdateAnnouncementRequest } from './requests/announcement.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
   AnnouncementApiResponse,
@@ -75,4 +79,48 @@ export class AnnouncementController {
       throw new InternalServerError('LIST_ANNOUNCEMENTS_FAILED');
     }
   }
+  @Patch('/:id')
+@Authorized('OWNER')
+@OpenAPI({ summary: 'Update an announcement', security: [{ bearerAuth: [] }] })
+@ResponseSchema(AnnouncementApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async updateAnnouncement(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @Param('id') id: string,
+  @Body() payload: UpdateAnnouncementRequest,
+): Promise<AnnouncementApiResponse> {
+  try {
+    const record = await this.announcementService.updateAnnouncement(
+      session.user.id,
+      id,
+      payload,
+    );
+    return new AnnouncementApiResponse(new AnnouncementData(record), 200);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('UPDATE_ANNOUNCEMENT_FAILED');
+  }
+}
+
+@Delete('/:id')
+@Authorized('OWNER')
+@OnUndefined(204)
+@OpenAPI({ summary: 'Delete an announcement', security: [{ bearerAuth: [] }] })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async deleteAnnouncement(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @Param('id') id: string,
+): Promise<void> {
+  try {
+    await this.announcementService.deleteAnnouncement(session.user.id, id);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('DELETE_ANNOUNCEMENT_FAILED');
+  }
+}
 }

@@ -12,12 +12,14 @@ import {
   Param,
   Post,
   Put,
+  QueryParams,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { StudySessionService } from '../services/studySession.service';
 import {
   CreateStudySessionRequest,
+  StudySessionHistoryQuery,
   UpdateStudySessionRequest,
 } from './requests/studySession.request';
 import { CurrentSessionData } from './responses/auth.response';
@@ -113,7 +115,38 @@ export class StudySessionController {
       throw new InternalServerError('GET_STATS_FAILED');
     }
   }
-
+ @Get('/history')
+@Authorized('STUDENT')
+@OpenAPI({ summary: 'Get study session history with date filter', security: [{ bearerAuth: [] }] })
+@ResponseSchema(StudySessionListApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async getSessionHistory(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @QueryParams() query: StudySessionHistoryQuery,
+): Promise<StudySessionListApiResponse> {
+  try {
+    const records = await this.studySessionService.getSessionHistory(
+      session.user.id,
+      query.fromDate,
+      query.toDate,
+    );
+    const sessions = await Promise.all(
+      records.map(async record => {
+        const library = await this.studySessionService.getLibraryDataForSession(record);
+        return new StudySessionData(record, library);
+      }),
+    );
+    return new StudySessionListApiResponse(
+      new StudySessionListPayloadData(sessions, sessions.length),
+      200,
+    );
+  } catch (error) {
+     console.log("❌ REAL ERROR:", error);
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('GET_SESSION_HISTORY_FAILED');
+  }
+}
   @Get('/:id')
   @Authorized('STUDENT')
   @OpenAPI({ summary: 'Get a specific study session by ID', security: [{ bearerAuth: [] }] })

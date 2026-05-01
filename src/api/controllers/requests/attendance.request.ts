@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 
 export class CheckInRequest {
   @IsString()
@@ -8,21 +8,23 @@ export class CheckInRequest {
 }
 
 export class StudentAttendanceHistoryQuery {
-  @IsOptional()
-  @IsString()
-  @IsDateString()
-  fromDate?: string;
+@IsOptional()
+@Matches(/^\d{4}-\d{2}-\d{2}$/)
+fromDate?: string;
 
-  @IsOptional()
-  @IsString()
-  @IsDateString()
-  toDate?: string;
+@IsOptional()
+@Matches(/^\d{4}-\d{2}-\d{2}$/)
+toDate?: string;
 }
 
 export class OwnerAttendanceHistoryQuery {
-  @IsOptional()
-  @IsString()
-  date?: string;
+@IsOptional()
+@Matches(/^\d{4}-\d{2}-\d{2}$/)
+fromDate?: string;
+
+@IsOptional()
+@Matches(/^\d{4}-\d{2}-\d{2}$/)
+toDate?: string;
 
   @IsOptional()
   @IsString()

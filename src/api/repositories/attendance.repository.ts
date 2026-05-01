@@ -23,7 +23,7 @@ export class AttendanceRepository {
       membershipId: model.membershipId,
       seatId: model.seatId,
       studentName: model.studentName,
-      date: model.date,
+      // date: model.date,
       checkInTime: model.checkInTime,
       checkOutTime: model.checkOutTime,
       status: model.status,
@@ -82,7 +82,8 @@ export class AttendanceRepository {
 
 public async findByLibraryWithFilters(
   libraryId: string,
-  date?: string,
+  fromDate?: string,
+  toDate?: string,
   status?: string,
   search?: string,
   page: number = 1,
@@ -90,7 +91,11 @@ public async findByLibraryWithFilters(
 ): Promise<{ records: AttendanceRecord[]; total: number }> {
   const where: Record<string, unknown> = { libraryId };
 
-  if (date) where.date = date;
+  if (fromDate || toDate) {
+    where.date = {};
+    if (fromDate) (where.date as any).$gte = fromDate;
+    if (toDate) (where.date as any).$lte = toDate;
+  }
   if (status) where.status = status;
   if (search) {
     where.studentName = { $regex: search, $options: 'i' };

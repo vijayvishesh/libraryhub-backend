@@ -17,7 +17,7 @@ export class StudySessionRepository {
 
   private toRecord(model: StudySessionModel): StudySessionRecord {
     return {
-      id: model.id.toHexString(),
+      id: (model.id || (model as any)._id).toHexString(),
       studentId: model.studentId,
       libraryId: model.libraryId,
       studyDuration: model.studyDuration,
@@ -82,5 +82,32 @@ export class StudySessionRepository {
     existing.updatedAt = new Date();
     await repo.save(existing);
     return true;
+  }
+
+  // ✅ FIXED METHOD
+  public async findByStudentWithDateFilter(
+    studentId: string,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<StudySessionRecord[]> {
+
+    const query: any = {
+      studentId,
+      deletedAt: null,
+    };
+
+    if (fromDate || toDate) {
+      query.createdAt = {};
+      if (fromDate) query.createdAt.$gte = new Date(`${fromDate}T00:00:00.000Z`);
+      if (toDate) query.createdAt.$lte = new Date(`${toDate}T23:59:59.999Z`);
+    }
+
+    // 🔥 IMPORTANT CHANGE: use Mongo cursor instead of find({ where })
+    const models = await this.getRepo()
+      .createCursor(query)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    return models.map(m => this.toRecord(m));
   }
 }
