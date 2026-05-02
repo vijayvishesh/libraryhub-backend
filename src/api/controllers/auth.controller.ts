@@ -14,6 +14,7 @@ import { Service } from 'typedi';
 import { ActivityService } from '../services/activity.service';
 import { AuthService } from '../services/auth.service';
 import {
+  ChangePasswordRequest,
   LoginRequest,
   LogoutRequest,
   RefreshSessionRequest,
@@ -193,4 +194,23 @@ export class AuthController {
       throw new InternalServerError('LOGOUT_FAILED');
     }
   }
+
+  @Patch('/change-password')
+@Authorized()
+@OpenAPI({ summary: 'Change current user password', security: [{ bearerAuth: [] }] })
+@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async changePassword(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @Body() payload: ChangePasswordRequest,
+): Promise<{ responseCode: number; message: string }> {
+  try {
+    await this.authService.changePassword(session, payload);
+    return { responseCode: 200, message: 'Password changed successfully' };
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('CHANGE_PASSWORD_FAILED');
+  }
+}
 }

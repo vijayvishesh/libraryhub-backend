@@ -14,6 +14,7 @@ export type AttendanceRecord = {
   status: AttendanceStatus;
   createdAt: Date;
   updatedAt: Date;
+  date: string;
 };
 
 export type CreateAttendanceInput = {
@@ -22,8 +23,9 @@ export type CreateAttendanceInput = {
   membershipId: string;
   seatId: string | null;
   studentName: string;
-  // fromDate?: string;
-  // toDate?: string;
+  fromDate?: string;
+  toDate?: string;
+  date: string;
   checkInTime: Date;
 };
 

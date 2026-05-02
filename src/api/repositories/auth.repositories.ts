@@ -353,6 +353,15 @@ export class AuthRepository {
     if (input.gender !== undefined) {
       student.gender = input.gender;
     }
+    if (input.email !== undefined) {
+      student.email = input.email;
+    }
+    if (input.city !== undefined) {
+      student.city = input.city;
+    }
+    if (input.bio !== undefined) {
+      student.bio = input.bio;
+    }
 
     const savedStudent = await studentRepository.save(student);
     return this.mapStudent(savedStudent);
@@ -466,6 +475,9 @@ export class AuthRepository {
       isPhoneVerified: student.isPhoneVerified,
       hasJoinedLibrary: student.hasJoinedLibrary ?? false,
       role: (student.role as StudentRecord['role']) || 'STUDENT',
+      email: student.email ?? null,
+      city: student.city ?? null,
+      bio: student.bio ?? null,
     };
   }
 
@@ -548,4 +560,27 @@ export class AuthRepository {
   private getAuthSessionRepository(): MongoRepository<AuthSessionModel> {
     return getDataSource().getMongoRepository(AuthSessionModel);
   }
+  public async updateOwnerPassword(ownerId: string, hashedPassword: string): Promise<void> {
+  const objectId = this.tryParseObjectId(ownerId);
+  if (!objectId) return;
+
+  const repo = this.getOwnerRepository();
+  const owner = await repo.findOneById(objectId);
+  if (!owner) return;
+
+  owner.password = hashedPassword;
+  await repo.save(owner);
+}
+
+public async updateStudentPassword(studentId: string, hashedPassword: string): Promise<void> {
+  const objectId = this.tryParseObjectId(studentId);
+  if (!objectId) return
+
+  const repo = this.getStudentRepository();
+  const student = await repo.findOneById(objectId);
+  if (!student) return;
+
+  student.password = hashedPassword;
+  await repo.save(student);
+}
 }

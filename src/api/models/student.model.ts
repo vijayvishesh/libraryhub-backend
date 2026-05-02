@@ -27,4 +27,12 @@ export class StudentModel {
 
   @Column()
   role!: string;
+  @Column()
+  email!: string | null;
+
+  @Column()
+  city!: string | null;
+
+  @Column()
+  bio!: string | null;
 }

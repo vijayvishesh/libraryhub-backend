@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -189,4 +189,35 @@ export class UpdateProfileRequest {
   @Transform(trimString)
   @IsIn([...USER_GENDER_ENUM])
   gender?: AuthRequestGender;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
+  city?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  bio?: string;
+}
+
+export class ChangePasswordRequest {
+  @IsNotEmpty()
+  @IsString()
+  oldPassword!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(6)
+  newPassword!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  confirmPassword!: string;
 }

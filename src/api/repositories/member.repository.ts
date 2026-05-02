@@ -409,4 +409,10 @@ export class MemberRepository {
   private getMemberRepository(): MongoRepository<MemberModel> {
     return getDataSource().getMongoRepository(MemberModel);
   }
+  public async findAllMembersByStudentId(studentId: string): Promise<MemberRecord[]> {
+  const members = await this.getMemberRepository().find({
+    where: { studentId } as any,
+  });
+  return members.map(item => this.mapMember(item));
+}
 }

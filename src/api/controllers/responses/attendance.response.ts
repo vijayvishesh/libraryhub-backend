@@ -32,7 +32,7 @@ export class AttendanceData {
     this.membershipId = params.membershipId;
     this.seatId = params.seatId;
     this.studentName = params.studentName;
-    // this.date = params.date;
+    this.date = params.date;
     this.fromDate = params.fromDate;
     this.toDate = params.toDate;
     this.checkInTime = params.checkInTime;

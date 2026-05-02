@@ -27,18 +27,15 @@ export class AttendanceService {
       throw new BadRequestError('NO_ACTIVE_MEMBERSHIP');
     }
 
-    // const today = new Date().toISOString().split('T')[0];
-
-    // Check already checked in today
-
-
+    const today = new Date().toISOString().split('T')[0];
+    
     return this.attendanceRepository.create({
       studentId,
       libraryId,
       membershipId: member.id,
       seatId: member.seatId,
       studentName: member.fullName,
-      // date: today,
+      date: today,
       checkInTime: new Date(),
     });
   }

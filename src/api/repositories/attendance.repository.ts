@@ -23,7 +23,7 @@ export class AttendanceRepository {
       membershipId: model.membershipId,
       seatId: model.seatId,
       studentName: model.studentName,
-      // date: model.date,
+      date: model.date,
       checkInTime: model.checkInTime,
       checkOutTime: model.checkOutTime,
       status: model.status,

@@ -7,6 +7,7 @@ import { AuthJwtPayload, AuthTokenType, AuthUserGender } from '../../types/jwtTo
 import {
   AuthRequestGender,
   AuthRequestRole,
+  ChangePasswordRequest,
   LoginRequest,
   LogoutRequest,
   RefreshSessionRequest,
@@ -31,6 +32,7 @@ import {
   AuthTenantRecord,
   StudentRecord,
 } from '../repositories/types/auth.repository.types';
+import { MemberRepository } from '../repositories/member.repository';
 
 const ACCESS_TOKEN_EXPIRY = '60m';
 const REFRESH_TOKEN_EXPIRY = '7d';
@@ -58,7 +60,10 @@ type AuthTokenIdentity = {
 
 @Service()
 export class AuthService {
-  constructor(private readonly authRepository: AuthRepository) {}
+  constructor(
+    private readonly authRepository: AuthRepository,
+     private readonly memberRepository: MemberRepository,
+  ) {}
 
   public async register(payload: RegisterRequest): Promise<AuthRegisterData> {
     try {
@@ -379,6 +384,9 @@ export class AuthService {
       return new CurrentSessionData(
         new AuthUserData(student.id, student.name, student.phone, student.gender, student.role, {
           hasJoinedLibrary: student.hasJoinedLibrary,
+          email: student.email,   
+          city: student.city,     
+          bio: student.bio,
         }),
       );
     } catch (error) {
@@ -421,11 +429,25 @@ export class AuthService {
       const updated = await this.authRepository.updateStudentProfile(session.user.id, {
         name: payload.name,
         gender: payload.gender ? this.normalizeRequestGender(payload.gender) : undefined,
+        email: payload.email,    
+        city: payload.city,      
+        bio: payload.bio, 
       });
       if (!updated) {
         throw new NotFoundError('USER_NOT_FOUND');
       }
+      if (payload.name) {
+  const members = await this.memberRepository.findAllMembersByStudentId(updated.id);
 
+  await Promise.all(
+    members.map(member =>
+      this.memberRepository.updateMemberByIdAndLibrary(member.id, member.libraryId, {
+        fullName: updated.name,
+        updatedAt: new Date(),
+      }),
+    ),
+  );
+}
       return new CurrentSessionData(
         new AuthUserData(updated.id, updated.name, updated.phone, updated.gender, updated.role, {
           hasJoinedLibrary: updated.hasJoinedLibrary,
@@ -504,6 +526,9 @@ export class AuthService {
       tokens.refreshToken,
       new AuthUserData(student.id, student.name, student.phone, student.gender, student.role, {
         hasJoinedLibrary: student.hasJoinedLibrary,
+        email: student.email, 
+        city: student.city,   
+        bio: student.bio, 
       }),
     );
   }
@@ -722,4 +747,40 @@ export class AuthService {
     const errorCode = (error as { code?: number }).code;
     return errorCode === 11000;
   }
+
+  public async changePassword(
+  session: CurrentSessionData,
+  payload: ChangePasswordRequest,
+): Promise<void> {
+  try {
+    if (payload.newPassword !== payload.confirmPassword) {
+      throw new HttpError(400, 'PASSWORDS_DO_NOT_MATCH');
+    }
+
+    const role = session.user.role;
+
+    if (role === 'OWNER') {
+      const owner = await this.authRepository.findOwnerById(session.user.id);
+      if (!owner) throw new NotFoundError('USER_NOT_FOUND');
+
+      const isValid = await bcrypt.compare(payload.oldPassword, owner.password);
+      if (!isValid) throw new HttpError(400, 'INVALID_OLD_PASSWORD');
+
+      const hashed = await bcrypt.hash(payload.newPassword, PASSWORD_SALT_ROUNDS);
+      await this.authRepository.updateOwnerPassword(session.user.id, hashed);
+      return;
+    }
+
+    const student = await this.authRepository.findStudentById(session.user.id);
+    if (!student) throw new NotFoundError('USER_NOT_FOUND');
+
+    const isValid = await bcrypt.compare(payload.oldPassword, student.password);
+    if (!isValid) throw new HttpError(400, 'INVALID_OLD_PASSWORD');
+
+    const hashed = await bcrypt.hash(payload.newPassword, PASSWORD_SALT_ROUNDS);
+    await this.authRepository.updateStudentPassword(session.user.id, hashed);
+  } catch (error) {
+    this.rethrowAuthError(error, 'CHANGE_PASSWORD_FAILED');
+  }
+}
 }
