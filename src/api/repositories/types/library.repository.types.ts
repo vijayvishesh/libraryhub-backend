@@ -15,6 +15,8 @@ export type CreateLibrarySlotInput = {
   endTime: string;
   pricePerMonth: number;
   isActive: boolean;
+  plans?: { duration: string; isActive: boolean; discountPercent: number }[];
+  trials?: { duration: string; isActive: boolean }[];
 };
 
 export type CreateLibraryPhotoInput = {

@@ -470,3 +470,66 @@ export class UpdateLibraryRequest {
   @Type(() => LibraryPaymentMethodRequest)
   paymentMethods?: LibraryPaymentMethodRequest[];
 }
+
+export class LibrarySlotPlanRequest {
+  @IsString()
+  @IsNotEmpty()
+  duration!: string;
+
+  @IsBoolean()
+  isActive!: boolean;
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  discountPercent!: number;
+}
+
+export class LibrarySlotTrialRequest {
+  @IsString()
+  @IsNotEmpty()
+  duration!: string;
+
+  @IsBoolean()
+  isActive!: boolean;
+}
+
+export class UpdateLibrarySlotRequest {
+  @IsString()
+  @IsIn([...LIBRARY_SLOT_TYPE_ENUM])
+  slotType!: (typeof LIBRARY_SLOT_TYPE_ENUM)[number];
+
+  @IsBoolean()
+  isActive!: boolean;
+
+  @IsString()
+  @Matches(TIME_FORMAT_REGEX, { message: 'startTime must be in HH:mm format' })
+  startTime!: string;
+
+  @IsString()
+  @Matches(TIME_FORMAT_REGEX, { message: 'endTime must be in HH:mm format' })
+  endTime!: string;
+
+  @IsNumber()
+  @Min(0)
+  pricePerMonth!: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySlotPlanRequest)
+  plans?: LibrarySlotPlanRequest[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySlotTrialRequest)
+  trials?: LibrarySlotTrialRequest[];
+}
+
+export class UpdateLibrarySlotsRequest {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateLibrarySlotRequest)
+  slots!: UpdateLibrarySlotRequest[];
+}

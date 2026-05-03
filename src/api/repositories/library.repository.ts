@@ -5,6 +5,7 @@ import { getDataSource } from '../../database/config/ormconfig.default';
 import { LibraryModel } from '../models/library.model';
 import {
   CreateLibraryInput,
+  CreateLibrarySlotInput,
   LibraryRecord,
   ListLibrariesQuery,
   ListLibrariesResult,
@@ -263,4 +264,21 @@ export class LibraryRepository {
   private getLibraryRepository(): MongoRepository<LibraryModel> {
     return getDataSource().getMongoRepository(LibraryModel);
   }
+
+  public async updateLibrarySlots(
+  libraryId: string,
+  slots: CreateLibrarySlotInput[],
+): Promise<LibraryRecord | null> {
+  const objectId = this.tryParseObjectId(libraryId);
+  if (!objectId) return null;
+
+  const repo = this.getLibraryRepository();
+  const library = await repo.findOneById(objectId);
+  if (!library) return null;
+
+  library.slots = slots as any;
+  library.updatedAt = new Date();
+  const saved = await repo.save(library);
+  return this.mapLibrary(saved);
+}
 }

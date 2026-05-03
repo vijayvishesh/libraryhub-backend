@@ -41,6 +41,19 @@ export class LibrarySlotData {
   @IsBoolean()
   isActive!: boolean;
 
+    @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySlotPlanData)
+  plans?: LibrarySlotPlanData[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySlotTrialData)
+  trials?: LibrarySlotTrialData[];
+
+
   constructor(
     slotType: string,
     name: string,
@@ -48,6 +61,8 @@ export class LibrarySlotData {
     endTime: string,
     pricePerMonth: number,
     isActive: boolean,
+    plans?: { duration: string; isActive: boolean; discountPercent: number }[],
+    trials?: { duration: string; isActive: boolean }[],
   ) {
     this.slotType = slotType;
     this.name = name;
@@ -55,6 +70,9 @@ export class LibrarySlotData {
     this.endTime = endTime;
     this.pricePerMonth = pricePerMonth;
     this.isActive = isActive;
+    this.plans = plans?.map(p => new LibrarySlotPlanData(p));
+    this.trials = trials?.map(t => new LibrarySlotTrialData(t));
+
   }
 }
 
@@ -475,5 +493,52 @@ export class ListedLibrariesApiResponse {
 
     this.responseCode = responseCode;
     this.data = new ListedLibrariesData(libraries, meta);
+  }
+}
+export class LibrarySlotPlanData {
+  @IsString() duration!: string;
+  @IsBoolean() isActive!: boolean;
+  @IsNumber() discountPercent!: number;
+
+  constructor(plan?: { duration: string; isActive: boolean; discountPercent: number }) {
+    if (!plan) return;
+    this.duration = plan.duration;
+    this.isActive = plan.isActive;
+    this.discountPercent = plan.discountPercent;
+  }
+}
+
+export class LibrarySlotTrialData {
+  @IsString() duration!: string;
+  @IsBoolean() isActive!: boolean;
+
+  constructor(trial?: { duration: string; isActive: boolean }) {
+    if (!trial) return;
+    this.duration = trial.duration;
+    this.isActive = trial.isActive;
+  }
+}
+export class LibrarySlotsPayloadData {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibrarySlotData)
+  slots!: LibrarySlotData[];
+
+  constructor(slots?: LibrarySlotData[]) {
+    if (!slots) return;
+    this.slots = slots;
+  }
+}
+
+export class LibrarySlotsApiResponse {
+  @IsNumber() responseCode!: number;
+  @ValidateNested()
+  @Type(() => LibrarySlotsPayloadData)
+  data!: LibrarySlotsPayloadData;
+
+  constructor(data?: LibrarySlotsPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
+    this.responseCode = responseCode;
+    this.data = data;
   }
 }

@@ -4,6 +4,7 @@ import {
   LibraryListQueryRequest,
   LibrarySetupRequest,
   UpdateLibraryRequest,
+  UpdateLibrarySlotsRequest,
 } from '../controllers/requests/library.request';
 import {
   LibraryLocationData,
@@ -407,6 +408,8 @@ export class LibraryService {
             slot.endTime,
             slot.pricePerMonth,
             slot.isActive,
+            slot.plans,
+            slot.trials,
           ),
       ),
       photos: library.photos.map(
@@ -468,4 +471,64 @@ export class LibraryService {
 
     throw new InternalServerError(defaultMessage);
   }
+  public async getLibrarySlots(ownerId: string): Promise<LibrarySlotData[]> {
+  try {
+    const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+
+    return library.slots.map(
+      slot => new LibrarySlotData(
+        slot.slotType,
+        slot.name,
+        slot.startTime,
+        slot.endTime,
+        slot.pricePerMonth,
+        slot.isActive,
+        slot.plans,
+        slot.trials,
+      ),
+    );
+  } catch (error) {
+    this.rethrowLibraryError(error, 'GET_LIBRARY_SLOTS_FAILED');
+  }
+}
+
+public async updateLibrarySlots(
+  ownerId: string,
+  payload: UpdateLibrarySlotsRequest,
+): Promise<LibrarySlotData[]> {
+  try {
+    const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+    if (!library || library.deletedAt) throw new NotFoundError('LIBRARY_NOT_FOUND');
+
+    const slots = payload.slots.map(slot => ({
+      slotType: slot.slotType,
+      name: slot.slotType, // use slotType as name
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      pricePerMonth: slot.pricePerMonth,
+      isActive: slot.isActive,
+      plans: slot.plans ?? [],
+      trials: slot.trials ?? [],
+    }));
+
+    const updated = await this.libraryRepository.updateLibrarySlots(library.id, slots);
+    if (!updated) throw new InternalServerError('UPDATE_LIBRARY_SLOTS_FAILED');
+
+    return updated.slots.map(
+      slot => new LibrarySlotData(
+        slot.slotType,
+        slot.name,
+        slot.startTime,
+        slot.endTime,
+        slot.pricePerMonth,
+        slot.isActive,
+        slot.plans,
+        slot.trials,
+      ),
+    );
+  } catch (error) {
+    this.rethrowLibraryError(error, 'UPDATE_LIBRARY_SLOTS_FAILED');
+  }
+}
 }
