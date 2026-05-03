@@ -64,6 +64,14 @@ export class LibrarySeatRepository {
     return seats.map(item => this.mapSeat(item));
   }
 
+  public async findAllSeatsByLibraryId(libraryId: string): Promise<LibrarySeatRecord[]> {
+    const seats = await this.getSeatRepository().find({
+      where: { libraryId },
+      order: { sequence: 'ASC' },
+    });
+    return seats.map(item => this.mapSeat(item));
+  }
+
   public async findSeatByLibraryAndSeatId(
     libraryId: string,
     seatId: string,

@@ -12,6 +12,7 @@ import {
   Param,
   Patch,
   Post,
+  QueryParam,
   QueryParams,
   Res,
   UploadedFile,
@@ -52,6 +53,8 @@ import {
   MemberUploadData,
   MemberUploadListApiResponse,
   MemberUploadListPayloadData,
+  RenewalRemindersApiResponse,
+  RenewalRemindersPayloadData,
 } from './responses/member.response';
 import {
   OwnerDashboardAlertsData,
@@ -234,10 +237,40 @@ export class OwnerController {
     }
   }
 
-  @Get('/members')
+  @Get('/members/renewal-reminders')
   @Authorized('OWNER')
   @OpenAPI({ security: [{ bearerAuth: [] }] })
-  @ResponseSchema(MemberListApiResponse, { statusCode: 200 })
+  @ResponseSchema(RenewalRemindersApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getRenewalReminders(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @QueryParam('tab') tab: string,
+  ): Promise<RenewalRemindersApiResponse> {
+    try {
+      const validTabs = ['today', '3days', '7days', 'month'] as const;
+      const selectedTab = (validTabs.includes(tab as (typeof validTabs)[number]) ? tab : 'today') as (typeof validTabs)[number];
+
+      const result = await this.memberService.getRenewalReminders(session.user.id, selectedTab);
+      return new RenewalRemindersApiResponse(
+        new RenewalRemindersPayloadData({
+          members: result.members.map(m => new MemberData(m)),
+          tabCounts: result.tabCounts,
+          totalAtRisk: result.totalAtRisk,
+        }),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GET_RENEWAL_REMINDERS_FAILED');
+    }
+  }
+
+  @Get('/members')
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })

@@ -122,6 +122,22 @@ export class MemberRepository {
     return members.map(item => this.mapMember(item));
   }
 
+  public async findMembersExpiringInRange(
+    libraryId: string,
+    fromDate: string,
+    toDate: string,
+  ): Promise<MemberRecord[]> {
+    const members = await this.getMemberRepository().find({
+      where: {
+        libraryId,
+        endDate: { $gte: fromDate, $lte: toDate } as unknown as string,
+      },
+      order: { endDate: 'ASC' },
+    });
+
+    return members.map(item => this.mapMember(item));
+  }
+
   public async findMemberByIdAndLibrary(
     memberId: string,
     libraryId: string,

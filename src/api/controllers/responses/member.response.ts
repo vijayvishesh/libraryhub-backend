@@ -388,3 +388,56 @@ export class MemberInviteLinkApiResponse {
     this.data = data;
   }
 }
+
+export class RenewalReminderTabCounts {
+  @IsNumber()
+  today!: number;
+
+  @IsNumber()
+  '3days'!: number;
+
+  @IsNumber()
+  '7days'!: number;
+
+  @IsNumber()
+  month!: number;
+}
+
+export class RenewalRemindersPayloadData {
+  @ValidateNested({ each: true })
+  @Type(() => MemberData)
+  members!: MemberData[];
+
+  @ValidateNested()
+  @Type(() => RenewalReminderTabCounts)
+  tabCounts!: RenewalReminderTabCounts;
+
+  @IsNumber()
+  totalAtRisk!: number;
+
+  constructor(data?: {
+    members: MemberData[];
+    tabCounts: { today: number; '3days': number; '7days': number; month: number };
+    totalAtRisk: number;
+  }) {
+    if (!data) return;
+    this.members = data.members;
+    this.tabCounts = Object.assign(new RenewalReminderTabCounts(), data.tabCounts);
+    this.totalAtRisk = data.totalAtRisk;
+  }
+}
+
+export class RenewalRemindersApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => RenewalRemindersPayloadData)
+  data!: RenewalRemindersPayloadData;
+
+  constructor(data?: RenewalRemindersPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}
