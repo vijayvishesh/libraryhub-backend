@@ -222,6 +222,31 @@
       border: 1px solid #c3e6cb;
     }
 
+    .radio-group {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: normal;
+      cursor: pointer;
+      color: #444;
+    }
+
+    .radio-label input[type='radio'] {
+      width: auto;
+      margin: 0;
+    }
+
+    select option.seat-inactive {
+      color: #999;
+    }
+
     @media (max-width: 600px) {
       .container {
         padding: 24px;
@@ -318,15 +343,29 @@
       </div>
 
       <div class="form-group">
-        <label for="seatId">Seat ID</label>
-        <input type="text" id="seatId" name="seatId" placeholder="Your assigned seat ID" />
-        <div class="error" id="seatIdError"></div>
+        <label for="slotId">Slot ID</label>
+        <select id="slotId" name="slotId">
+          <option value="">Select Slot</option>
+        </select>
+        <div class="error" id="slotIdError"></div>
       </div>
 
       <div class="form-group">
-        <label for="slotId">Slot ID</label>
-        <input type="text" id="slotId" name="slotId" placeholder="Your time slot" />
-        <div class="error" id="slotIdError"></div>
+        <label class="required">Gender</label>
+        <div class="radio-group">
+          <label class="radio-label"><input type="radio" name="gender" value="male" /> Male</label>
+          <label class="radio-label"><input type="radio" name="gender" value="female" /> Female</label>
+          <label class="radio-label"><input type="radio" name="gender" value="any" /> Any</label>
+        </div>
+        <div class="error" id="genderError"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="seatId">Seat ID</label>
+        <select id="seatId" name="seatId">
+          <option value="">Select gender first</option>
+        </select>
+        <div class="error" id="seatIdError"></div>
       </div>
 
       <div class="form-group">
@@ -390,6 +429,38 @@
       expiryTime.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
 
+    let allSeats = [];
+
+    function populateSeatsByGender(gender) {
+      const seatSelect = document.getElementById('seatId');
+      seatSelect.innerHTML = '<option value="">Select Seat</option>';
+      const filtered = gender ? allSeats.filter(s => s.gender === gender || s.gender === 'any') : allSeats;
+      filtered.forEach(seat => {
+        const today = new Date().toISOString().slice(0, 10);
+        const endDateVal = document.getElementById('endDate').value;
+        let status;
+        if (endDateVal) {
+          status = endDateVal >= today ? 'Active' : 'Inactive';
+        } else {
+          status = seat.isActive ? 'Active' : 'Inactive';
+        }
+        const opt = document.createElement('option');
+        opt.value = seat.seatId;
+        opt.textContent = `${seat.label || seat.seatId} (${status})`;
+        if (status === 'Inactive') opt.className = 'seat-inactive';
+        seatSelect.appendChild(opt);
+      });
+    }
+
+    document.querySelectorAll('input[name="gender"]').forEach(radio => {
+      radio.addEventListener('change', () => populateSeatsByGender(radio.value));
+    });
+
+    document.getElementById('endDate').addEventListener('change', () => {
+      const checked = document.querySelector('input[name="gender"]:checked');
+      populateSeatsByGender(checked ? checked.value : '');
+    });
+
     async function loadInviteDetails() {
       const response = await fetch(`${API_BASE}/api/public/members/invite/${TOKEN}/details`);
       if (!response.ok) {
@@ -398,6 +469,20 @@
 
       const payload = await response.json();
       remainingSeconds = payload?.data?.expiresIn ?? 0;
+
+      // Populate slots dropdown
+      const slotSelect = document.getElementById('slotId');
+      const slots = payload?.data?.slots ?? [];
+      slots.forEach(slot => {
+        if (!slot.isActive) return;
+        const opt = document.createElement('option');
+        opt.value = slot.slotType;
+        opt.textContent = `${slot.name} (${slot.startTime} - ${slot.endTime})`;
+        slotSelect.appendChild(opt);
+      });
+
+      // Store seats for gender-based filtering
+      allSeats = payload?.data?.seats ?? [];
       if (remainingSeconds <= 0) {
         submitBtn.disabled = true;
         showError('This invite link has expired. Please request a new one.');
@@ -443,6 +528,7 @@
         endDate: document.getElementById('endDate').value,
         seatId: document.getElementById('seatId').value.trim(),
         slotId: document.getElementById('slotId').value.trim(),
+        gender: document.querySelector('input[name="gender"]:checked')?.value || '',
         status: document.getElementById('status').value.trim(),
         notes: document.getElementById('notes').value.trim(),
       };

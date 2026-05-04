@@ -480,6 +480,105 @@ export class MemberService {
     }
   }
 
+  public async getInviteLinkFormData(token: string): Promise<{
+    inviteLink: MemberInviteLinkRecord;
+    slots: { slotType: string; name: string; startTime: string; endTime: string; isActive: boolean }[];
+    seats: { seatId: string; label: string; gender: string; isActive: boolean }[];
+  } | null> {
+    try {
+      const inviteLink = await this.memberInviteLinkRepository.findValidLinkByToken(token);
+      if (!inviteLink) return null;
+
+      const [library, seats] = await Promise.all([
+        this.libraryRepository.findLibraryById(inviteLink.libraryId),
+        this.librarySeatRepository.findAllSeatsByLibraryId(inviteLink.libraryId),
+      ]);
+
+      const slots = (library?.slots ?? []).map(s => ({
+        slotType: s.slotType,
+        name: s.name,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        isActive: s.isActive,
+      }));
+
+      return {
+        inviteLink,
+        slots,
+        seats: seats.map(s => ({
+          seatId: s.seatId,
+          label: s.label,
+          gender: s.gender,
+          isActive: s.isActive,
+        })),
+      };
+    } catch (error) {
+      throw new InternalServerError('GET_INVITE_LINK_DETAILS_FAILED');
+    }
+  }
+
+  public async getRenewalReminders(
+    ownerId: string,
+    tab: 'today' | '3days' | '7days' | 'month',
+  ): Promise<{
+    members: MemberRecord[];
+    tabCounts: { today: number; '3days': number; '7days': number; month: number };
+    totalAtRisk: number;
+  }> {
+    try {
+      const library = await this.getOwnerLibraryOrThrow(ownerId);
+      const today = new Date().toISOString().slice(0, 10);
+      const d3 = new Date(); d3.setDate(d3.getDate() + 3);
+      const d7 = new Date(); d7.setDate(d7.getDate() + 7);
+      const d30 = new Date(); d30.setDate(d30.getDate() + 30);
+      const date3 = d3.toISOString().slice(0, 10);
+      const date7 = d7.toISOString().slice(0, 10);
+      const date30 = d30.toISOString().slice(0, 10);
+
+      const ranges: Record<string, { from: string; to: string }> = {
+        today: { from: '1970-01-01', to: today },
+        '3days': { from: today, to: date3 },
+        '7days': { from: today, to: date7 },
+        month: { from: today, to: date30 },
+      };
+
+      const [todayMembers, d3Members, d7Members, d30Members] = await Promise.all([
+        this.memberRepository.findMembersExpiringInRange(library.id, ranges.today.from, ranges.today.to),
+        this.memberRepository.findMembersExpiringInRange(library.id, ranges['3days'].from, ranges['3days'].to),
+        this.memberRepository.findMembersExpiringInRange(library.id, ranges['7days'].from, ranges['7days'].to),
+        this.memberRepository.findMembersExpiringInRange(library.id, ranges.month.from, ranges.month.to),
+      ]);
+
+      const tabMap = {
+        today: todayMembers,
+        '3days': d3Members,
+        '7days': d7Members,
+        month: d30Members,
+      };
+
+      const members = tabMap[tab];
+      const allRiskMembers = d30Members;
+      const totalAtRisk = allRiskMembers.reduce((sum, m) => sum + (m.planAmount ?? 0), 0);
+
+      return {
+        members,
+        tabCounts: {
+          today: todayMembers.length,
+          '3days': d3Members.length,
+          '7days': d7Members.length,
+          month: d30Members.length,
+        },
+        totalAtRisk,
+      };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new InternalServerError('GET_RENEWAL_REMINDERS_FAILED');
+    }
+  }
+
   public async submitMemberViaInviteLink(
     token: string,
     payload: AddMemberRequest,
