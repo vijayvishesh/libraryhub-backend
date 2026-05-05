@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -11,6 +12,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { LIBRARY_PAYMENT_METHOD_ENUM } from '../../constants/library.constants';
 
 const MEMBER_STATUS_ENUM = ['active', 'inactive', 'expired', 'pending'] as const;
 
@@ -37,40 +39,35 @@ export class AddMemberRequest {
   @Min(1)
   duration!: number;
 
-  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  seatId?: string;
+  seatId!: string;
 
-  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  slotId?: string;
+  slotId!: string;
 
-  @IsOptional()
-  @IsString()
-  @IsIn([...MEMBER_STATUS_ENUM])
-  status?: (typeof MEMBER_STATUS_ENUM)[number];
-
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  planAmount?: number;
+  planAmount!: number;
 
-  @IsOptional()
   @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'startDate must be YYYY-MM-DD' })
-  startDate?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'endDate must be YYYY-MM-DD' })
-  endDate?: string;
+  startDate!: string;
 
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  markPaid?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...LIBRARY_PAYMENT_METHOD_ENUM])
+  paymentMethod?: (typeof LIBRARY_PAYMENT_METHOD_ENUM)[number];
 }
 
 export class UpdateMemberRequest {

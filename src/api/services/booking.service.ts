@@ -199,6 +199,7 @@ export class BookingService {
         validUntil,
         'pending',
         bookingId,
+        payload.duration || 1,
       );
     } catch (syncError) {
       console.error('Failed to sync member for booking:', {
@@ -220,6 +221,7 @@ export class BookingService {
     endDate: string,
     memberStatus: 'active' | 'pending' = 'active',
     bookingId: string | null = null,
+    duration = 1,
   ): Promise<void> {
     // Check by studentId first, then by mobileNo (owner may have added member manually)
     let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
@@ -239,7 +241,7 @@ export class BookingService {
         aadharId: null,
         studentId: student.id,
         email: null,
-        duration: 1,
+        duration,
         libraryId,
         seatId,
         slotId,

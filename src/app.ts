@@ -24,6 +24,7 @@ const start = async (): Promise<void> => {
   const { socketLoader } = await import('./loaders/socketLoader');
   const { swaggerLoader } = await import('./loaders/swaggerLoader');
   const { winstonLoader } = await import('./loaders/winstonLoader');
+  const { cronLoader } = await import('./loaders/cronLoader');
 
   const log = new Logger(__filename);
   const { initializeFirebase } = await import('./lib/firebase/firebase');
@@ -42,6 +43,7 @@ const start = async (): Promise<void> => {
       swaggerLoader,
       homeLoader,
       redisLoader,
+      cronLoader,
     ],
   });
 
