@@ -22,7 +22,12 @@ export class BookingApprovalService {
     private readonly fcmTokenRepository: FcmTokenRepository,
   ) {}
 
-  public async approveBooking(ownerId: string, bookingId: string): Promise<BookingResult> {
+  public async approveBooking(
+    ownerId: string,
+    bookingId: string,
+    markPaid = false,
+    paymentMethod?: string,
+  ): Promise<BookingResult> {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
       const booking = await this.bookingRepository.findLibraryBookingById(library.id, bookingId);
@@ -34,10 +39,15 @@ export class BookingApprovalService {
         throw new HttpError(409, 'BOOKING_NOT_PENDING_APPROVAL');
       }
 
-      const updated = await this.bookingRepository.updateBookingStatus(
-        bookingId,
-        'pending_payment',
-      );
+      const targetStatus = markPaid ? 'confirmed' : 'pending_payment';
+      const memberStatus = markPaid ? 'active' : 'pending';
+
+      const updated = markPaid
+        ? await this.bookingRepository.markBookingPaid(
+            bookingId,
+            paymentMethod as LibraryPaymentMethod | undefined,
+          )
+        : await this.bookingRepository.updateBookingStatus(bookingId, targetStatus);
       if (!updated) {
         throw new InternalServerError('APPROVE_BOOKING_FAILED');
       }
@@ -52,15 +62,20 @@ export class BookingApprovalService {
           booking.amount,
           booking.startDate,
           booking.validUntil,
-          'pending',
+          memberStatus,
           bookingId,
+          booking.duration,
         );
       }
+
+      const notifMessage = markPaid
+        ? `Booking approved & paid for seat ${booking.seatId}`
+        : `Confirmed! Pay ₹${booking.amount} at counter for seat ${booking.seatId}`;
 
       await this.createAndPushNotification(
         booking.studentId,
         'Booking Approved',
-        `Confirmed! Pay ₹${booking.amount} at counter for seat ${booking.seatId}`,
+        notifMessage,
         bookingId,
       );
 
@@ -144,6 +159,7 @@ export class BookingApprovalService {
           booking.validUntil,
           'active',
           bookingId,
+          booking.duration,
         );
       }
 
@@ -163,6 +179,7 @@ export class BookingApprovalService {
     endDate: string,
     memberStatus: 'active' | 'pending',
     bookingId: string | null = null,
+    duration = 1,
   ): Promise<void> {
     let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
       student.id,
@@ -181,7 +198,7 @@ export class BookingApprovalService {
         aadharId: null,
         studentId: student.id,
         email: null,
-        duration: 1,
+        duration,
         libraryId,
         seatId,
         slotId,

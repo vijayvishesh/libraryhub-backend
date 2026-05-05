@@ -12,7 +12,6 @@ import {
   Param,
   Patch,
   Post,
-  QueryParam,
   QueryParams,
   Res,
   UploadedFile,
@@ -20,6 +19,7 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { sendXlsxDownload } from '../helpers/excel.helper';
+import { runMemberExpiryJob } from '../../loaders/cronLoader';
 import { ActivityService } from '../services/activity.service';
 import { BookingApprovalService } from '../services/bookingApproval.service';
 import { FeeCollectionService } from '../services/feeCollection.service';
@@ -40,7 +40,7 @@ import {
   OwnerFeeCollectionPayloadData,
   OwnerFeeCollectionSummaryData,
 } from './responses/booking.response';
-import { ErrorResponseModel } from './responses/common.reponse';
+import { CommonResponse, ErrorResponseModel } from './responses/common.reponse';
 import {
   MemberActionApiResponse,
   MemberCreateApiResponse,
@@ -53,8 +53,6 @@ import {
   MemberUploadData,
   MemberUploadListApiResponse,
   MemberUploadListPayloadData,
-  RenewalRemindersApiResponse,
-  RenewalRemindersPayloadData,
 } from './responses/member.response';
 import {
   OwnerDashboardAlertsData,
@@ -121,9 +119,15 @@ export class OwnerController {
   public async approveBooking(
     @CurrentUser({ required: true }) session: CurrentSessionData,
     @Param('bookingId') bookingId: string,
+    @Body() payload: MarkBookingPaidRequest,
   ): Promise<{ responseCode: number; message: string }> {
     try {
-      const result = await this.bookingApprovalService.approveBooking(session.user.id, bookingId);
+      const result = await this.bookingApprovalService.approveBooking(
+        session.user.id,
+        bookingId,
+        payload.markPaid ?? false,
+        payload.paymentMethod,
+      );
 
       await this.activityService.logActivity(
         session.user.id,
@@ -237,40 +241,9 @@ export class OwnerController {
     }
   }
 
-  @Get('/members/renewal-reminders')
+  @Get('/members')
   @Authorized('OWNER')
   @OpenAPI({ security: [{ bearerAuth: [] }] })
-  @ResponseSchema(RenewalRemindersApiResponse, { statusCode: 200 })
-  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-  public async getRenewalReminders(
-    @CurrentUser({ required: true }) session: CurrentSessionData,
-    @QueryParam('tab') tab: string,
-  ): Promise<RenewalRemindersApiResponse> {
-    try {
-      const validTabs = ['today', '3days', '7days', 'month'] as const;
-      const selectedTab = (validTabs.includes(tab as (typeof validTabs)[number]) ? tab : 'today') as (typeof validTabs)[number];
-
-      const result = await this.memberService.getRenewalReminders(session.user.id, selectedTab);
-      return new RenewalRemindersApiResponse(
-        new RenewalRemindersPayloadData({
-          members: result.members.map(m => new MemberData(m)),
-          tabCounts: result.tabCounts,
-          totalAtRisk: result.totalAtRisk,
-        }),
-        200,
-      );
-    } catch (error) {
-      if (error instanceof HttpError) {
-        throw error;
-      }
-
-      throw new InternalServerError('GET_RENEWAL_REMINDERS_FAILED');
-    }
-  }
-
-  @Get('/members')
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
@@ -559,6 +532,8 @@ export class OwnerController {
         session.user.id,
         memberId,
         payload.paymentMethod,
+        payload.duration,
+        payload.amount,
       );
 
       await this.activityService.logActivity(
@@ -646,6 +621,25 @@ export class OwnerController {
       }
 
       throw new InternalServerError('GENERATE_MEMBER_INVITE_LINK_FAILED');
+    }
+  }
+
+  @Post('/sync-expired-members')
+  @Authorized('OWNER')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async syncExpiredMembers(
+    @CurrentUser({ required: true }) _session: CurrentSessionData,
+  ): Promise<CommonResponse<{ expiredCount: number }>> {
+    try {
+      const count = await runMemberExpiryJob();
+      return new CommonResponse(200, { expiredCount: count });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('SYNC_EXPIRED_MEMBERS_FAILED');
     }
   }
 }

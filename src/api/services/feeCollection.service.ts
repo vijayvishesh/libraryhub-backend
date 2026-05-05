@@ -4,10 +4,10 @@ import { getDataSource } from '../../database/config/ormconfig.default';
 import { OwnerFeeCollectionQueryRequest } from '../controllers/requests/booking.request';
 import { MemberModel } from '../models/member.model';
 import { LibraryRepository } from '../repositories/library.repository';
-import { MemberRepository } from '../repositories/member.repository';
 import { LibraryRecord } from '../repositories/types/library.repository.types';
 import { MemberRecord } from '../repositories/types/member.repository.types';
 import {
+  FeeCollectionTab,
   OwnerFeeCollectionItemResult,
   OwnerFeeCollectionResult,
   OwnerFeeCollectionSummaryResult,
@@ -23,7 +23,6 @@ export type {
 export class FeeCollectionService {
   constructor(
     private readonly libraryRepository: LibraryRepository,
-    private readonly memberRepository: MemberRepository,
   ) {}
 
   public async getOwnerFeeCollection(
@@ -33,15 +32,13 @@ export class FeeCollectionService {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
 
-      const tab = query.tab ?? 'pending';
+      const tab: FeeCollectionTab = query.tab ?? 'pending';
       const page = query.page ?? 1;
       const limit = query.limit ?? 20;
 
       const [summary, listResult] = await Promise.all([
         this.getFeeCollectionSummary(library.id),
-        tab === 'pending'
-          ? this.listPendingMembers(library.id, page, limit)
-          : this.listPaidTodayMembers(library.id, page, limit),
+        this.listMembersByTab(library.id, tab, page, limit, query),
       ]);
 
       return {
@@ -57,99 +54,79 @@ export class FeeCollectionService {
     }
   }
 
-  private async getFeeCollectionSummary(
+  private async listMembersByTab(
     libraryId: string,
-  ): Promise<OwnerFeeCollectionSummaryResult> {
-    const now = new Date();
-    const startOfToday = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
-    const startOfTomorrow = new Date(startOfToday);
-    startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
-    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    tab: FeeCollectionTab,
+    page: number,
+    limit: number,
+    query: OwnerFeeCollectionQueryRequest,
+  ): Promise<{ members: MemberRecord[]; total: number }> {
+    if (tab === 'pending') {
+      const memberRepo = getDataSource().getMongoRepository(MemberModel);
+      const filter = { libraryId, status: { $in: ['pending', 'expired'] } };
+      const [members, total] = await Promise.all([
+        memberRepo.find({
+          where: filter,
+          order: { createdAt: 'DESC' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        memberRepo.count({ where: filter }),
+      ]);
+      return { members: members.map(m => this.mapMemberModel(m)), total };
+    }
 
-    const memberRepo = getDataSource().getMongoRepository(MemberModel);
+    if (tab === 'expiring') {
+      return this.listExpiringMembers(libraryId, query.expiringRange ?? 'today', page, limit);
+    }
 
-    const [todayRows, monthRows, pendingCount] = await Promise.all([
-      memberRepo
-        .aggregate([
-          {
-            $match: {
-              libraryId,
-              paidAt: { $gte: startOfToday, $lt: startOfTomorrow },
-              planAmount: { $gt: 0 },
-            },
-          },
-          {
-            $group: {
-              // eslint-disable-next-line @typescript-eslint/naming-convention
-              _id: null,
-              amount: { $sum: '$planAmount' },
-              count: { $sum: 1 },
-            },
-          },
-        ])
-        .toArray(),
-      memberRepo
-        .aggregate([
-          {
-            $match: {
-              libraryId,
-              paidAt: { $gte: startOfMonth, $lt: startOfTomorrow },
-              planAmount: { $gt: 0 },
-            },
-          },
-          {
-            $group: {
-              // eslint-disable-next-line @typescript-eslint/naming-convention
-              _id: null,
-              amount: { $sum: '$planAmount' },
-              count: { $sum: 1 },
-            },
-          },
-        ])
-        .toArray(),
-      memberRepo.count({ where: { libraryId, status: 'pending' } }),
-    ]);
-
-    return {
-      todayAmount: todayRows[0]?.amount || 0,
-      todayPayments: todayRows[0]?.count || 0,
-      monthAmount: monthRows[0]?.amount || 0,
-      monthPayments: monthRows[0]?.count || 0,
-      pendingCount,
-    };
+    return this.listCollectedMembers(libraryId, query.collectedRange ?? 'today', page, limit);
   }
 
-  private async listPendingMembers(
+  private async listExpiringMembers(
     libraryId: string,
+    range: 'today' | '3days' | '7days' | 'month',
     page: number,
     limit: number,
   ): Promise<{ members: MemberRecord[]; total: number }> {
-    return this.memberRepository.listMembersByLibrary({
-      libraryId,
-      page,
-      limit,
-      status: 'pending',
-    });
-  }
-
-  private async listPaidTodayMembers(
-    libraryId: string,
-    page: number,
-    limit: number,
-  ): Promise<{ members: MemberRecord[]; total: number }> {
-    const now = new Date();
-    const startOfToday = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
-    const startOfTomorrow = new Date(startOfToday);
-    startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+    const today = new Date().toISOString().slice(0, 10);
+    const rangeEnd = this.getExpiringRangeEnd(range);
 
     const memberRepo = getDataSource().getMongoRepository(MemberModel);
     const whereFilter = {
       libraryId,
-      paidAt: { $gte: startOfToday, $lt: startOfTomorrow },
+      status: 'active',
+      endDate: { $gte: today, $lte: rangeEnd },
+    };
+
+    const [members, total] = await Promise.all([
+      memberRepo.find({
+        where: whereFilter,
+        order: { endDate: 'ASC' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      memberRepo.count({ where: whereFilter }),
+    ]);
+
+    return {
+      members: members.map(m => this.mapMemberModel(m)),
+      total,
+    };
+  }
+
+  private async listCollectedMembers(
+    libraryId: string,
+    range: 'today' | 'week' | 'month' | 'lastMonth',
+    page: number,
+    limit: number,
+  ): Promise<{ members: MemberRecord[]; total: number }> {
+    const { start, end } = this.getCollectedDateRange(range);
+
+    const memberRepo = getDataSource().getMongoRepository(MemberModel);
+    const whereFilter = {
+      libraryId,
+      paidAt: { $gte: start, $lt: end },
     };
 
     const [members, total] = await Promise.all([
@@ -163,29 +140,105 @@ export class FeeCollectionService {
     ]);
 
     return {
-      members: members.map(m => ({
-        id: m.id.toHexString(),
-        fullName: m.fullName,
-        mobileNo: m.mobileNo,
-        aadharId: m.aadharId ?? null,
-        studentId: m.studentId ?? null,
-        email: m.email,
-        duration: m.duration,
-        libraryId: m.libraryId,
-        seatId: m.seatId ?? null,
-        slotId: m.slotId ?? null,
-        status: m.status,
-        planAmount: m.planAmount ?? null,
-        startDate: m.startDate ?? null,
-        endDate: m.endDate ?? null,
-        bookingId: m.bookingId ?? null,
-        paidAt: m.paidAt ?? null,
-        notes: m.notes ?? null,
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-      })),
+      members: members.map(m => this.mapMemberModel(m)),
       total,
     };
+  }
+
+  private async getFeeCollectionSummary(
+    libraryId: string,
+  ): Promise<OwnerFeeCollectionSummaryResult> {
+    const now = new Date();
+    const startOfToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+    const today = now.toISOString().slice(0, 10);
+    const d7 = new Date();
+    d7.setDate(d7.getDate() + 7);
+    const date7 = d7.toISOString().slice(0, 10);
+
+    const memberRepo = getDataSource().getMongoRepository(MemberModel);
+
+    const results = await memberRepo
+      .aggregate([
+        { $match: { libraryId } },
+        {
+          $facet: {
+            today: [
+              { $match: { paidAt: { $gte: startOfToday, $lt: startOfTomorrow }, planAmount: { $gt: 0 } } },
+              // eslint-disable-next-line @typescript-eslint/naming-convention
+              { $group: { _id: null, amount: { $sum: '$planAmount' }, count: { $sum: 1 } } },
+            ],
+            month: [
+              { $match: { paidAt: { $gte: startOfMonth, $lt: startOfTomorrow }, planAmount: { $gt: 0 } } },
+              // eslint-disable-next-line @typescript-eslint/naming-convention
+              { $group: { _id: null, amount: { $sum: '$planAmount' }, count: { $sum: 1 } } },
+            ],
+            pending: [
+              { $match: { status: { $in: ['pending', 'expired'] } } },
+              { $count: 'count' },
+            ],
+            expiring: [
+              { $match: { status: 'active', endDate: { $gte: today, $lte: date7 }, planAmount: { $gt: 0 } } },
+              // eslint-disable-next-line @typescript-eslint/naming-convention
+              { $group: { _id: null, amount: { $sum: '$planAmount' }, count: { $sum: 1 } } },
+            ],
+          },
+        },
+      ])
+      .toArray();
+
+    const facet = results[0] || {};
+    return {
+      todayAmount: facet.today?.[0]?.amount || 0,
+      todayPayments: facet.today?.[0]?.count || 0,
+      monthAmount: facet.month?.[0]?.amount || 0,
+      monthPayments: facet.month?.[0]?.count || 0,
+      pendingCount: facet.pending?.[0]?.count || 0,
+      expiringCount: facet.expiring?.[0]?.count || 0,
+      expiringAmount: facet.expiring?.[0]?.amount || 0,
+    };
+  }
+
+  private getExpiringRangeEnd(range: 'today' | '3days' | '7days' | 'month'): string {
+    const d = new Date();
+    const daysMap = { today: 0, '3days': 3, '7days': 7, month: 30 };
+    d.setDate(d.getDate() + daysMap[range]);
+    return d.toISOString().slice(0, 10);
+  }
+
+  private getCollectedDateRange(
+    range: 'today' | 'week' | 'month' | 'lastMonth',
+  ): { start: Date; end: Date } {
+    const now = new Date();
+    const startOfToday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+
+    if (range === 'today') {
+      return { start: startOfToday, end: startOfTomorrow };
+    }
+
+    if (range === 'week') {
+      const startOfWeek = new Date(startOfToday);
+      startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay());
+      return { start: startOfWeek, end: startOfTomorrow };
+    }
+
+    if (range === 'month') {
+      const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      return { start: startOfMonth, end: startOfTomorrow };
+    }
+
+    const startOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const endOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    return { start: startOfLastMonth, end: endOfLastMonth };
   }
 
   private mapFeeCollectionItem(member: MemberRecord): OwnerFeeCollectionItemResult {
@@ -207,6 +260,30 @@ export class FeeCollectionService {
       dueDate: member.endDate || '-',
       paidAt: member.paidAt ? member.paidAt.toISOString() : null,
       overdueDays,
+    };
+  }
+
+  private mapMemberModel(m: MemberModel): MemberRecord {
+    return {
+      id: m.id.toHexString(),
+      fullName: m.fullName,
+      mobileNo: m.mobileNo,
+      aadharId: m.aadharId ?? null,
+      studentId: m.studentId ?? null,
+      email: m.email,
+      duration: m.duration,
+      libraryId: m.libraryId,
+      seatId: m.seatId ?? null,
+      slotId: m.slotId ?? null,
+      status: m.status,
+      planAmount: m.planAmount ?? null,
+      startDate: m.startDate ?? null,
+      endDate: m.endDate ?? null,
+      bookingId: m.bookingId ?? null,
+      paidAt: m.paidAt ?? null,
+      notes: m.notes ?? null,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
     };
   }
 

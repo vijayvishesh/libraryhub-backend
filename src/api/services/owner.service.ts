@@ -2,7 +2,6 @@ import { HttpError, InternalServerError, NotFoundError } from 'routing-controlle
 import { Service } from 'typedi';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { ActivityActionType } from '../constants/activity.constants';
-import { BookingModel } from '../models/booking.model';
 import { MemberModel } from '../models/member.model';
 import { LibraryRepository } from '../repositories/library.repository';
 import { LibraryRecord } from '../repositories/types/library.repository.types';
@@ -81,61 +80,36 @@ export class OwnerService {
     startOfYesterday.setUTCDate(startOfYesterday.getUTCDate() - 1);
     const startOfTomorrow = new Date(startOfToday);
     startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
     const ds = getDataSource();
-    const [bookingResults, memberResults] = await Promise.all([
-      ds
-        .getMongoRepository(BookingModel)
-        .aggregate([
-          {
-            $match: {
-              libraryId,
-              status: { $in: ['confirmed', 'checked_in', 'checked_out'] },
-              updatedAt: { $gte: startOfYesterday, $lt: startOfNextMonth },
-            },
+    const results = await ds
+      .getMongoRepository(MemberModel)
+      .aggregate([
+        {
+          $match: {
+            libraryId,
+            paidAt: { $ne: null, $gte: startOfMonth, $lt: startOfNextMonth },
+            planAmount: { $gt: 0 },
           },
-          {
-            $group: {
-              ...this.buildTimeBucketGroup(
-                startOfToday,
-                startOfTomorrow,
-                startOfYesterday,
-                '$updatedAt',
-              ),
-              revenue: { $sum: '$amount' },
-            },
+        },
+        {
+          $group: {
+            ...this.buildTimeBucketGroup(
+              startOfToday,
+              startOfTomorrow,
+              startOfYesterday,
+              '$paidAt',
+            ),
+            revenue: { $sum: '$planAmount' },
           },
-        ])
-        .toArray(),
-      ds
-        .getMongoRepository(MemberModel)
-        .aggregate([
-          {
-            $match: {
-              libraryId,
-              bookingId: null,
-              paidAt: { $ne: null, $gte: startOfYesterday, $lt: startOfNextMonth },
-              planAmount: { $gt: 0 },
-            },
-          },
-          {
-            $group: {
-              ...this.buildTimeBucketGroup(
-                startOfToday,
-                startOfTomorrow,
-                startOfYesterday,
-                '$paidAt',
-              ),
-              revenue: { $sum: '$planAmount' },
-            },
-          },
-        ])
-        .toArray(),
-    ]);
+        },
+      ])
+      .toArray();
 
     const revenueMap: Record<string, number> = {};
-    for (const row of [...bookingResults, ...memberResults]) {
+    for (const row of results) {
       const key = row['_id'] as string;
       revenueMap[key] = (revenueMap[key] || 0) + (row.revenue || 0);
     }
@@ -192,35 +166,23 @@ export class OwnerService {
     expiringWindow.setUTCDate(expiringWindow.getUTCDate() + 7);
     const expiringIso = expiringWindow.toISOString().slice(0, 10);
 
-    const pipeline = [
-      { $match: { libraryId, endDate: { $ne: null } } },
-      {
-        $group: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          _id: null,
-          overdue: { $sum: { $cond: [{ $lt: ['$endDate', nowIso] }, 1, 0] } },
-          expiringSoon: {
-            $sum: {
-              $cond: [
-                { $and: [{ $gte: ['$endDate', nowIso] }, { $lte: ['$endDate', expiringIso] }] },
-                1,
-                0,
-              ],
-            },
-          },
-        },
-      },
-    ];
+    const memberRepo = getDataSource().getMongoRepository(MemberModel);
+    const [overdueCount, expiringSoonCount] = await Promise.all([
+      memberRepo.count({
+        where: { libraryId, status: { $in: ['expired'] } as any },
+      }),
+      memberRepo.count({
+        where: {
+          libraryId,
+          status: 'active',
+          endDate: { $gte: nowIso, $lte: expiringIso },
+        } as any,
+      }),
+    ]);
 
-    const results = await getDataSource()
-      .getMongoRepository(MemberModel)
-      .aggregate(pipeline)
-      .toArray();
-
-    const row = results[0];
     return {
-      overdue: row?.overdue || 0,
-      expiringSoon: row?.expiringSoon || 0,
+      overdue: overdueCount,
+      expiringSoon: expiringSoonCount,
     };
   }
 
