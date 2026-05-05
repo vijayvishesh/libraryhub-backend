@@ -5,6 +5,7 @@ import {
   AddMemberRequest,
   ListMembersQueryRequest,
   ListMemberUploadsQueryRequest,
+  SubmitMemberViaInviteLinkRequest,
   UpdateMemberRequest,
 } from '../controllers/requests/member.request';
 import {
@@ -248,6 +249,8 @@ export class MemberService {
     ownerId: string,
     memberId: string,
     paymentMethod?: string,
+    overrideDuration?: number,
+    overrideAmount?: number,
   ): Promise<MemberRecord> {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
@@ -259,9 +262,22 @@ export class MemberService {
         throw new NotFoundError('MEMBER_NOT_FOUND');
       }
 
-      if (member.status !== 'pending') {
-        throw new HttpError(409, 'MEMBER_NOT_PENDING');
+      if (member.status !== 'pending' && member.status !== 'active' && member.status !== 'expired') {
+        throw new HttpError(409, 'MEMBER_NOT_ELIGIBLE_FOR_PAYMENT');
       }
+
+      const isFirstPayment = member.status === 'pending';
+      const isRenewal = member.status === 'active' || member.status === 'expired';
+      const duration = overrideDuration || (isFirstPayment ? (member.duration || 1) : 1);
+      const newStartDate = isRenewal && member.endDate
+        ? member.endDate
+        : new Date().toISOString().slice(0, 10);
+      const newEndDate = this.calculateEndDate(newStartDate, duration);
+
+      const monthlyRate = (member.duration && member.duration > 0)
+        ? member.planAmount / member.duration
+        : member.planAmount;
+      const newAmount = overrideAmount ?? monthlyRate * duration;
 
       const updated = await this.memberRepository.updateMemberByIdAndLibrary(
         member.id,
@@ -269,6 +285,10 @@ export class MemberService {
         {
           status: 'active',
           paidAt: new Date(),
+          startDate: newStartDate,
+          endDate: newEndDate,
+          duration,
+          planAmount: newAmount,
           updatedAt: new Date(),
         },
       );
@@ -292,6 +312,12 @@ export class MemberService {
 
       throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
     }
+  }
+
+  private calculateEndDate(startDateIso: string, durationMonths: number): string {
+    const date = new Date(`${startDateIso}T00:00:00.000Z`);
+    date.setUTCMonth(date.getUTCMonth() + durationMonths);
+    return date.toISOString().slice(0, 10);
   }
 
   public async downloadMemberTemplate(): Promise<{ filename: string; buffer: Buffer }> {
@@ -581,7 +607,7 @@ export class MemberService {
 
   public async submitMemberViaInviteLink(
     token: string,
-    payload: AddMemberRequest,
+    payload: SubmitMemberViaInviteLinkRequest,
   ): Promise<MemberRecord> {
     try {
       const inviteLink = await this.memberInviteLinkRepository.findValidLinkByToken(token);
@@ -605,7 +631,7 @@ export class MemberService {
 
   private async createMemberForLibrary(
     libraryId: string,
-    payload: AddMemberRequest,
+    payload: AddMemberRequest | SubmitMemberViaInviteLinkRequest,
   ): Promise<MemberRecord> {
     const fullName = payload.fullName.trim();
     const mobileNo = payload.mobileNo.trim();
@@ -613,13 +639,13 @@ export class MemberService {
     const email = payload.email?.trim() ?? null;
     const seatId = payload.seatId?.trim() ?? null;
     const slotId = payload.slotId?.trim() ?? null;
-    const status = payload.status || 'pending';
+    const markPaid = 'markPaid' in payload && payload.markPaid === true;
+    const status = markPaid ? 'active' : 'pending';
     const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
     this.assertValidIsoDate(startDate);
-    const endDate = payload.endDate || this.addMonthsIsoDate(startDate, payload.duration);
-    this.assertValidIsoDate(endDate);
+    const endDate = this.addMonthsIsoDate(startDate, payload.duration);
     const notes = payload.notes?.trim() ?? null;
-    const planAmount = typeof payload.planAmount === 'number' ? Number(payload.planAmount) : null;
+    const planAmount = typeof payload.planAmount === 'number' ? payload.planAmount : null;
 
     const existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
       libraryId,
@@ -664,7 +690,7 @@ export class MemberService {
       startDate,
       endDate,
       bookingId: null,
-      paidAt: null,
+      paidAt: status === 'active' ? new Date() : null,
       notes,
     });
     if (!member) {

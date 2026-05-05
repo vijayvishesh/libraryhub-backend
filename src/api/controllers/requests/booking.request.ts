@@ -90,24 +90,18 @@ export class LibrarySeatMapQueryRequest {
 export class OwnerFeeCollectionQueryRequest {
   @IsOptional()
   @IsString()
-  @IsIn(['pending', 'received_today'])
-  tab?: 'pending' | 'received_today';
+  @IsIn(['pending', 'expiring', 'collected'])
+  tab?: 'pending' | 'expiring' | 'collected';
 
   @IsOptional()
   @IsString()
-  @IsDateString(
-    { strict: true, strictSeparator: true },
-    { message: 'fromDate must be a valid ISO date (YYYY-MM-DD)' },
-  )
-  fromDate?: string;
+  @IsIn(['today', '3days', '7days', 'month'])
+  expiringRange?: 'today' | '3days' | '7days' | 'month';
 
   @IsOptional()
   @IsString()
-  @IsDateString(
-    { strict: true, strictSeparator: true },
-    { message: 'toDate must be a valid ISO date (YYYY-MM-DD)' },
-  )
-  toDate?: string;
+  @IsIn(['today', 'week', 'month', 'lastMonth'])
+  collectedRange?: 'today' | 'week' | 'month' | 'lastMonth';
 
   @IsOptional()
   @Type(() => Number)
@@ -128,4 +122,20 @@ export class MarkBookingPaidRequest {
   @IsString()
   @IsIn([...LIBRARY_PAYMENT_METHOD_ENUM])
   paymentMethod?: (typeof LIBRARY_PAYMENT_METHOD_ENUM)[number];
+
+  @IsOptional()
+  @IsBoolean()
+  markPaid?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  duration?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @Min(1)
+  amount?: number;
 }

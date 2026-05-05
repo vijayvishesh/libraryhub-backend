@@ -4,6 +4,8 @@ export type OwnerFeeCollectionSummaryResult = {
   monthAmount: number;
   monthPayments: number;
   pendingCount: number;
+  expiringCount: number;
+  expiringAmount: number;
 };
 
 export type OwnerFeeCollectionItemResult = {
@@ -20,9 +22,11 @@ export type OwnerFeeCollectionItemResult = {
   overdueDays: number;
 };
 
+export type FeeCollectionTab = 'pending' | 'expiring' | 'collected';
+
 export type OwnerFeeCollectionResult = {
   summary: OwnerFeeCollectionSummaryResult;
-  tab: 'pending' | 'received_today';
+  tab: FeeCollectionTab;
   items: OwnerFeeCollectionItemResult[];
   page: number;
   limit: number;

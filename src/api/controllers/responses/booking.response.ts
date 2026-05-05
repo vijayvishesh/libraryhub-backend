@@ -431,12 +431,20 @@ export class OwnerFeeCollectionSummaryData {
   @IsNumber()
   pendingCount!: number;
 
+  @IsNumber()
+  expiringCount!: number;
+
+  @IsNumber()
+  expiringAmount!: number;
+
   constructor(params?: {
     todayAmount: number;
     todayPayments: number;
     monthAmount: number;
     monthPayments: number;
     pendingCount: number;
+    expiringCount: number;
+    expiringAmount: number;
   }) {
     if (!params) {
       return;
@@ -447,6 +455,8 @@ export class OwnerFeeCollectionSummaryData {
     this.monthAmount = params.monthAmount;
     this.monthPayments = params.monthPayments;
     this.pendingCount = params.pendingCount;
+    this.expiringCount = params.expiringCount;
+    this.expiringAmount = params.expiringAmount;
   }
 }
 
