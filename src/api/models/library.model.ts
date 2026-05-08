@@ -18,6 +18,8 @@ export type LibrarySlot = {
   endTime: string;
   pricePerMonth: number;
   isActive: boolean;
+  plans?: LibrarySlotPlan[];   
+  trials?: LibrarySlotTrial[];
 };
 
 export type LibraryPhoto = {
@@ -61,6 +63,16 @@ export type LibraryStats = {
   activeMembers: number;
   rating: number;
   reviewCount: number;
+};
+export type LibrarySlotPlan = {
+  duration: string;  // '1m', '3m', '6m', '12m'
+  isActive: boolean;
+  discountPercent: number;
+};
+
+export type LibrarySlotTrial = {
+  duration: string;  // '1d', '3d', '7d' etc
+  isActive: boolean;
 };
 
 export type LibraryPaymentMethodConfig = {

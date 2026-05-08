@@ -63,4 +63,10 @@ export class MemberModel {
 
   @Column()
   updatedAt!: Date;
+  
+  @Column()
+  isInviteSubmission?: boolean;
+
+  @Column()
+  isNewUser?: boolean;
 }

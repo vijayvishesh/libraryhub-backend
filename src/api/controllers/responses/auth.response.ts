@@ -50,6 +50,18 @@ export class AuthUserData {
   @IsBoolean()
   hasJoinedLibrary?: boolean;
 
+  @IsOptional()
+  @IsString()
+  email?: string | null;
+
+  @IsOptional()
+  @IsString()
+  city?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bio?: string | null;
+
   constructor(
     id: string,
     name: string,
@@ -59,6 +71,9 @@ export class AuthUserData {
     statusFlags?: {
       hasCreatedLibrary?: boolean;
       hasJoinedLibrary?: boolean;
+      email?: string | null;     
+      city?: string | null;      
+      bio?: string | null; 
     },
   ) {
     this.id = id;
@@ -73,6 +88,17 @@ export class AuthUserData {
 
     if (typeof statusFlags?.hasJoinedLibrary === 'boolean') {
       this.hasJoinedLibrary = statusFlags.hasJoinedLibrary;
+    }
+    if (statusFlags?.email !== undefined) {
+      this.email = statusFlags.email;
+    }
+
+    if (statusFlags?.city !== undefined) {
+      this.city = statusFlags.city;
+    }
+
+    if (statusFlags?.bio !== undefined) {
+      this.bio = statusFlags.bio;
     }
   }
 }
@@ -182,6 +208,18 @@ export class UserProfileData {
   @IsString()
   createdAt?: string;
 
+  @IsOptional()
+  @IsString()
+  email?: string | null;
+
+  @IsOptional()
+  @IsString()
+  city?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bio?: string | null;
+
   constructor(user?: AuthUserData, createdAt?: Date) {
     if (!user) {
       return;
@@ -205,6 +243,9 @@ export class UserProfileData {
     if (createdAt) {
       this.createdAt = createdAt.toISOString();
     }
+    if (user.email !== undefined) this.email = user.email;
+    if (user.city !== undefined) this.city = user.city;
+    if (user.bio !== undefined) this.bio = user.bio;
   }
 }
 
@@ -485,6 +526,39 @@ export class LogoutApiResponse {
       return;
     }
 
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+
+}
+
+export class MemberOtpSendData {
+  @IsString()
+  phone!: string;
+
+  @IsNumber()
+  expiresIn!: number;
+
+  @IsBoolean()
+  hasAccount!: boolean; 
+
+  constructor(phone: string, expiresIn: number, hasAccount: boolean) {
+    this.phone = phone;
+    this.expiresIn = expiresIn;
+    this.hasAccount = hasAccount;
+  }
+}
+
+export class MemberOtpSendApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => MemberOtpSendData)
+  data!: MemberOtpSendData;
+
+  constructor(data?: MemberOtpSendData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
     this.responseCode = responseCode;
     this.data = data;
   }

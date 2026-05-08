@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -130,9 +130,9 @@ export class VerifyOtpRequest {
 
 export class VerifyOtpWithRoleRequest extends VerifyOtpRequest {
   @Transform(trimString)
-  @IsNotEmpty()
+  @IsOptional() 
   @IsIn([...USER_ROLE_ENUM])
-  role!: AuthRequestRole;
+  role?: AuthRequestRole;
 }
 
 export class RegisterStudentRequest {
@@ -189,4 +189,132 @@ export class UpdateProfileRequest {
   @Transform(trimString)
   @IsIn([...USER_GENDER_ENUM])
   gender?: AuthRequestGender;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
+  city?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  bio?: string;
 }
+
+export class ChangePasswordRequest {
+  @IsNotEmpty()
+  @IsString()
+  oldPassword!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(6)
+  newPassword!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  confirmPassword!: string;
+}
+
+export class ForgotPasswordRequest {
+  @Transform(trimString)
+  @IsNotEmpty()
+  @Matches(PHONE_REGEX, {
+    message: 'phone must be a valid Indian mobile number',
+  })
+  phone!: string;
+
+  @Transform(trimString)
+  @IsNotEmpty()
+  @IsIn([...USER_ROLE_ENUM])
+  role!: AuthRequestRole;
+}
+
+export class ForgotPasswordVerifyRequest {
+  @Transform(trimString)
+  @IsNotEmpty()
+  @Matches(PHONE_REGEX, {
+    message: 'phone must be a valid Indian mobile number',
+  })
+  phone!: string;
+
+  @Transform(trimString)
+  @IsNotEmpty()
+  @Matches(/^[0-9]{4,6}$/, {
+    message: 'otp must be a valid 4 to 6 digit number',
+  })
+  otp!: string;
+
+  @Transform(trimString)
+  @IsNotEmpty()
+  @IsIn([...USER_ROLE_ENUM])
+  role!: AuthRequestRole;
+}
+
+export class ResetPasswordRequest {
+  @IsNotEmpty()
+  @IsString()
+  resetToken!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(6)
+  newPassword!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  confirmPassword!: string;
+}
+
+const RESEND_OTP_PURPOSE_ENUM = ['register', 'forgot-password', 'member-login'] as const;
+export type ResendOtpPurpose = (typeof RESEND_OTP_PURPOSE_ENUM)[number];
+
+export class ResendOtpRequest {
+  @Transform(trimString)
+  @IsNotEmpty()
+  @Matches(PHONE_REGEX, {
+    message: 'phone must be a valid Indian mobile number',
+  })
+  phone!: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsIn([...USER_ROLE_ENUM])
+  role?: AuthRequestRole;
+
+  @Transform(trimString)
+  @IsNotEmpty()
+  @IsIn([...RESEND_OTP_PURPOSE_ENUM])
+  purpose!: ResendOtpPurpose;
+}
+
+export class MemberOtpLoginSendRequest {
+  @Transform(trimString)
+  @IsNotEmpty()
+  @Matches(PHONE_REGEX, {
+    message: 'phone must be a valid Indian mobile number',
+  })
+  phone!: string;
+}
+
+// export class MemberOtpLoginVerifyRequest {
+//   @Transform(trimString)
+//   @IsNotEmpty()
+//   @Matches(PHONE_REGEX, {
+//     message: 'phone must be a valid Indian mobile number',
+//   })
+//   phone!: string;
+
+//   @Transform(trimString)
+//   @IsNotEmpty()
+//   @Matches(/^[0-9]{4,6}$/, {
+//     message: 'otp must be a valid 4 to 6 digit number',
+//   })
+//   otp!: string;
+// }

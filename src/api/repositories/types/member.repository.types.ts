@@ -15,12 +15,16 @@ export type CreateMemberInput = {
   bookingId: string | null;
   paidAt: Date | null;
   notes: string | null;
+  isInviteSubmission?: boolean;
+  isNewUser?: boolean; 
 };
 
 export type MemberRecord = CreateMemberInput & {
   id: string;
   createdAt: Date;
   updatedAt: Date;
+  isInviteSubmission?: boolean;
+  isNewUser?: boolean; 
 };
 
 export type UpdateMemberInput = Partial<

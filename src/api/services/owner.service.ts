@@ -44,6 +44,7 @@ export class OwnerService {
           name: library.name,
           location: this.formatLibraryLocation(library),
           capacity: library.totalSeats,
+          libraryId: library.id,
         },
         revenue,
         seats: {

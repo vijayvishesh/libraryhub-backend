@@ -15,6 +15,8 @@ export type CreateLibrarySlotInput = {
   endTime: string;
   pricePerMonth: number;
   isActive: boolean;
+  plans?: { duration: string; isActive: boolean; discountPercent: number }[];
+  trials?: { duration: string; isActive: boolean }[];
 };
 
 export type CreateLibraryPhotoInput = {
@@ -107,6 +109,10 @@ export type ListLibrariesQuery = {
   city?: string;
   page: number;
   limit: number;
+  facilities?: string[];
+  minRating?: number;
+  priceSort?: 'low_to_high' | 'high_to_low';
+  ratingSort?: 'top_rated';
 };
 
 export type ListLibrariesResult = {

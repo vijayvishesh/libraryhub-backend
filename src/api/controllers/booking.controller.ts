@@ -130,6 +130,7 @@ export class BookingController {
       libraryPincode: params.libraryPincode,
       libraryLatitude: params.libraryLatitude,
       libraryLongitude: params.libraryLongitude,
+      duration: params.duration,
     });
   }
 }

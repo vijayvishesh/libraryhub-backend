@@ -30,6 +30,7 @@ export type OwnerDashboardResult = {
     name: string;
     location: string;
     capacity: number;
+    libraryId: string;
   };
   revenue: OwnerDashboardRevenue;
   seats: OwnerDashboardSeats;

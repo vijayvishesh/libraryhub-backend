@@ -2,7 +2,7 @@ import { ObjectId } from 'mongodb';
 import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
-import { LibraryPaymentMethod } from '../constants/library.constants';
+import { LibraryPaymentMethod, LibrarySlotType } from '../constants/library.constants';
 import { BookingModel, BookingStatus } from '../models/booking.model';
 import {
   BookingRecord,
@@ -474,4 +474,42 @@ export class BookingRepository {
   private getBookingRepository(): MongoRepository<BookingModel> {
     return getDataSource().getMongoRepository(BookingModel);
   }
+
+  public async createInviteBooking(input: {
+  libraryId: string;
+  studentId: string;
+  libraryName: string;
+  libraryAddress: string;
+  slotType: string;
+  slotName: string;
+  slotStartTime: string;
+  slotEndTime: string;
+  seatId: string;
+  sectionId: string | null;
+  duration: number;
+  startDate: string;
+  validUntil: string;
+}): Promise<BookingRecord> {
+  return this.createBooking({
+    libraryId: input.libraryId,
+    studentId: input.studentId,
+    libraryName: input.libraryName,
+    libraryAddress: input.libraryAddress,
+    slotType: (input.slotType || 'fullday') as LibrarySlotType,
+    slotName: input.slotName || 'Full Day',
+    slotStartTime: input.slotStartTime || '06:00',
+    slotEndTime: input.slotEndTime || '22:00',
+    seatId: input.seatId,
+    sectionId: input.sectionId,
+    paymentMethod: 'cash' as LibraryPaymentMethod,
+    amount: 0,
+    duration: input.duration,
+    startDate: input.startDate,
+    validUntil: input.validUntil,
+    status: 'pending_approval',
+    checkedInAt: null,
+    checkedOutAt: null,
+    invoiceNo: `INV-INVITE-${Date.now()}`,
+  });
+}
 }

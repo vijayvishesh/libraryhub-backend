@@ -211,62 +211,72 @@ export class BookingService {
     }
   }
 
-  private async syncMemberForBooking(
-    student: { id: string; name: string; phone: string },
-    libraryId: string,
-    seatId: string,
-    slotId: string,
-    planAmount: number,
-    startDate: string,
-    endDate: string,
-    memberStatus: 'active' | 'pending' = 'active',
-    bookingId: string | null = null,
-    duration = 1,
-  ): Promise<void> {
-    // Check by studentId first, then by mobileNo (owner may have added member manually)
-    let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
-      student.id,
+ 
+private async syncMemberForBooking(
+  student: { id: string; name: string; phone: string },
+  libraryId: string,
+  seatId: string,
+  slotId: string,
+  planAmount: number,
+  startDate: string,
+  endDate: string,
+  memberStatus: 'active' | 'pending' = 'active',
+  bookingId: string | null = null,
+  duration = 1,
+): Promise<void> {
+  // Find existing member FIRST before counting records
+  let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
+    student.id,
+    libraryId,
+  );
+  if (!existingMember) {
+    existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
       libraryId,
+      student.phone,
     );
-    if (!existingMember) {
-      existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
-        libraryId,
-        student.phone,
-      );
-    }
-    if (!existingMember) {
-      await this.memberRepository.createMember({
-        fullName: student.name,
-        mobileNo: student.phone,
-        aadharId: null,
-        studentId: student.id,
-        email: null,
-        duration,
-        libraryId,
-        seatId,
-        slotId,
-        status: memberStatus,
-        planAmount,
-        startDate,
-        endDate,
-        bookingId,
-        paidAt: null,
-        notes: null,
-      });
-    } else {
-      await this.memberRepository.updateMemberByIdAndLibrary(existingMember.id, libraryId, {
-        studentId: student.id,
-        bookingId,
-        seatId,
-        slotId,
-        status: memberStatus,
-        planAmount,
-        startDate,
-        endDate,
-        updatedAt: new Date(),
-      });
-    }
   }
+
+  // isNewUser = true only if no member records exist anywhere else
+  // const allMemberRecords = await this.memberRepository.findAllMembersByPhone(student.phone);
+  // const otherLibraryRecords = allMemberRecords.filter(m => m.libraryId !== libraryId);
+  // const isNewUser = !existingMember && otherLibraryRecords.length === 0;
+
+  if (!existingMember) {
+    await this.memberRepository.createMember({
+      fullName: student.name,
+      mobileNo: student.phone,
+      aadharId: null,
+      studentId: student.id,
+      email: null,
+      duration,
+      libraryId,
+      seatId,
+      slotId,
+      status: memberStatus,
+      planAmount,
+      startDate,
+      endDate,
+      bookingId,
+      paidAt: null,
+      notes: null,
+      isNewUser: false,
+      isInviteSubmission: false,
+    });
+  } else {
+    await this.memberRepository.updateMemberByIdAndLibrary(existingMember.id, libraryId, {
+      studentId: student.id,
+      bookingId,
+      seatId,
+      slotId,
+      status: memberStatus,
+      planAmount,
+      startDate,
+      endDate,
+      updatedAt: new Date(),
+      // isNewUser intentionally NOT here — preserve original value
+    });
+  }
+}
 
   public async listMyBookings(
     studentId: string,
@@ -473,7 +483,8 @@ export class BookingService {
       status: string;
       invoiceNo: string;
       libraryAddress: string;
-    },
+      duration: number;
+  },
     library?: LibraryRecord | null,
   ): BookingResult {
     return {
@@ -497,6 +508,7 @@ export class BookingService {
       libraryPincode: library?.pincode ?? '',
       libraryLatitude: library?.location?.coordinates?.[1] ?? null,
       libraryLongitude: library?.location?.coordinates?.[0] ?? null,
+      duration: booking.duration,
     };
   }
 

@@ -243,3 +243,20 @@ export class SubmitMemberViaInviteLinkRequest {
   @IsString()
   notes?: string;
 }
+
+// Add to existing member.request.ts
+
+export class ListMemberPaymentsQueryRequest {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}

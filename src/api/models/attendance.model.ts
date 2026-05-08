@@ -27,7 +27,7 @@ export class AttendanceModel {
   studentName!: string;
 
   @Column()
-  date!: string; // YYYY-MM-DD
+  date: string;
 
   @Column()
   checkInTime!: Date;

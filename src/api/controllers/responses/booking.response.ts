@@ -278,6 +278,8 @@ export class BookingData {
   @IsOptional()
   longitude?: number;
 
+  @IsNumber() duration!: number;
+
   constructor(params?: {
     id: string;
     libraryId: string;
@@ -299,6 +301,7 @@ export class BookingData {
     libraryPincode: string;
     libraryLatitude: number | null;
     libraryLongitude: number | null;
+    duration: number;
   }) {
     if (!params) {
       return;
@@ -326,6 +329,7 @@ export class BookingData {
     this.libraryPincode = params.libraryPincode;
     this.latitude = params.libraryLatitude ?? undefined;
     this.longitude = params.libraryLongitude ?? undefined;
+    this.duration = params.duration ?? 1;
   }
 }
 

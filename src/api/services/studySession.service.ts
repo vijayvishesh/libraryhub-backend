@@ -141,4 +141,12 @@ export class StudySessionService {
     }
     return streak;
   }
+
+  public async getSessionHistory(
+  studentId: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<StudySessionRecord[]> {
+  return this.studySessionRepository.findByStudentWithDateFilter(studentId, fromDate, toDate);
+}
 }

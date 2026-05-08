@@ -43,6 +43,9 @@ export type StudentRecord = {
   isPhoneVerified: boolean;
   hasJoinedLibrary: boolean;
   role: AuthUserRole;
+  email?: string | null;   
+  city?: string | null;    
+  bio?: string | null; 
 };
 
 export type CreateStudentInput = {
@@ -106,6 +109,9 @@ export type UpdateOwnerProfileInput = {
 export type UpdateStudentProfileInput = {
   name?: string;
   gender?: 'male' | 'female' | 'other';
+  email?: string;   
+  city?: string;    
+  bio?: string;
 };
 
 export type AuthSessionRecord = {

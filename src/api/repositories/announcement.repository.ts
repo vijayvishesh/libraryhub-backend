@@ -55,4 +55,27 @@ export class AnnouncementRepository {
     const saved = await repo.save(model);
     return this.toRecord(saved);
   }
+  public async update(
+  id: string,
+  input: Partial<CreateAnnouncementInput>,
+): Promise<AnnouncementRecord | null> {
+  if (!ObjectId.isValid(id)) return null;
+  const repo = this.getRepo();
+  const existing = await repo.findOneById(new ObjectId(id));
+  if (!existing) return null;
+  Object.assign(existing, input, { updatedAt: new Date() });
+  const saved = await repo.save(existing);
+  return this.toRecord(saved);
+}
+
+public async softDelete(id: string): Promise<boolean> {
+  if (!ObjectId.isValid(id)) return false;
+  const repo = this.getRepo();
+  const existing = await repo.findOneById(new ObjectId(id));
+  if (!existing) return false;
+  existing.deletedAt = new Date();
+  existing.updatedAt = new Date();
+  await repo.save(existing);
+  return true;
+}
 }

@@ -69,4 +69,11 @@ export class StudyTimetableService {
       throw new NotFoundError('TIMETABLE_NOT_FOUND');
     }
   }
+  public async getTimetableHistory(
+  studentId: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<StudyTimetableRecord[]> {
+  return this.studyTimetableRepository.findByStudentWithDateFilter(studentId, fromDate, toDate);
+}
 }

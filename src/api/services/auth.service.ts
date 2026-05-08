@@ -7,10 +7,16 @@ import { AuthJwtPayload, AuthTokenType, AuthUserGender } from '../../types/jwtTo
 import {
   AuthRequestGender,
   AuthRequestRole,
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  ForgotPasswordVerifyRequest,
   LoginRequest,
   LogoutRequest,
+  MemberOtpLoginSendRequest,
   RefreshSessionRequest,
   RegisterRequest,
+  ResendOtpRequest,
+  ResetPasswordRequest,
   SendOtpRequest,
   UpdateProfileRequest,
   VerifyOtpWithRoleRequest,
@@ -31,6 +37,7 @@ import {
   AuthTenantRecord,
   StudentRecord,
 } from '../repositories/types/auth.repository.types';
+import { MemberRepository } from '../repositories/member.repository';
 
 const ACCESS_TOKEN_EXPIRY = '60m';
 const REFRESH_TOKEN_EXPIRY = '7d';
@@ -58,7 +65,10 @@ type AuthTokenIdentity = {
 
 @Service()
 export class AuthService {
-  constructor(private readonly authRepository: AuthRepository) {}
+  constructor(
+    private readonly authRepository: AuthRepository,
+     private readonly memberRepository: MemberRepository,
+  ) {}
 
   public async register(payload: RegisterRequest): Promise<AuthRegisterData> {
     try {
@@ -124,69 +134,76 @@ export class AuthService {
   }
 
   public async verifyOtpAndLogin(payload: VerifyOtpWithRoleRequest): Promise<AuthData> {
-    try {
-      const phone = this.normalizePhone(payload.phone);
-      const normalizedRole = this.normalizeRequestRole(payload.role);
+  try {
+    const phone = this.normalizePhone(payload.phone);
 
-      this.validateOtp(payload.otp);
-      await this.ensurePhoneNotRegistered(phone);
+    // ✅ No role = member OTP login flow
+    if (!payload.role) {
+      return this.handleMemberOtpVerify(phone, payload.otp);
+    }
 
-      if (normalizedRole === 'OWNER') {
-        const pendingOwnerSignup = await this.authRepository.findPendingOwnerSignupByPhone(phone);
-        if (!pendingOwnerSignup) {
-          throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
-        }
+    // ── existing register + verify flow ──────────────────────────────────
+    const normalizedRole = this.normalizeRequestRole(payload.role);
 
-        if (this.isOtpExpired(pendingOwnerSignup.expiresAt)) {
-          throw new UnauthorizedError('OTP_EXPIRED');
-        }
+    this.validateOtp(payload.otp);
+    await this.ensurePhoneNotRegistered(phone);
 
-        const tenant = await this.authRepository.createTenant({
-          name: pendingOwnerSignup.libraryName || pendingOwnerSignup.name,
-          city: pendingOwnerSignup.city || '',
-          isSetupCompleted: false,
-          ownerId: '',
-        });
-
-        const owner = await this.authRepository.createOwner({
-          tenantId: tenant.id,
-          name: pendingOwnerSignup.name,
-          phone,
-          password: pendingOwnerSignup.password,
-          hasCreatedLibrary: false,
-          role: 'OWNER',
-        });
-
-        await this.authRepository.updateTenantOwnerId(tenant.id, owner.id);
-        await this.authRepository.deletePendingOwnerSignupByPhone(phone);
-        return this.createOwnerAuthData(owner, tenant);
-      }
-
-      const pendingStudentSignup = await this.authRepository.findPendingStudentSignupByPhone(phone);
-      if (!pendingStudentSignup) {
+    if (normalizedRole === 'OWNER') {
+      const pendingOwnerSignup = await this.authRepository.findPendingOwnerSignupByPhone(phone);
+      if (!pendingOwnerSignup) {
         throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
       }
-
-      if (this.isOtpExpired(pendingStudentSignup.expiresAt)) {
+      if (this.isOtpExpired(pendingOwnerSignup.expiresAt)) {
         throw new UnauthorizedError('OTP_EXPIRED');
       }
 
-      const student = await this.authRepository.createStudent({
-        name: pendingStudentSignup.name,
-        phone,
-        gender: pendingStudentSignup.gender,
-        password: pendingStudentSignup.password,
-        isPhoneVerified: true,
-        hasJoinedLibrary: false,
-        role: 'STUDENT',
+      const tenant = await this.authRepository.createTenant({
+        name: pendingOwnerSignup.libraryName || pendingOwnerSignup.name,
+        city: pendingOwnerSignup.city || '',
+        isSetupCompleted: false,
+        ownerId: '',
       });
 
-      await this.authRepository.deletePendingStudentSignupByPhone(phone);
-      return this.createStudentAuthData(student);
-    } catch (error) {
-      this.rethrowAuthError(error, 'VERIFY_OTP_FAILED');
+      const owner = await this.authRepository.createOwner({
+        tenantId: tenant.id,
+        name: pendingOwnerSignup.name,
+        phone,
+        password: pendingOwnerSignup.password,
+        hasCreatedLibrary: false,
+        role: 'OWNER',
+      });
+
+      await this.authRepository.updateTenantOwnerId(tenant.id, owner.id);
+      await this.authRepository.deletePendingOwnerSignupByPhone(phone);
+      return this.createOwnerAuthData(owner, tenant);
     }
+
+    // STUDENT register verify
+    const pendingStudentSignup = await this.authRepository.findPendingStudentSignupByPhone(phone);
+    if (!pendingStudentSignup) {
+      throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
+    }
+    if (this.isOtpExpired(pendingStudentSignup.expiresAt)) {
+      throw new UnauthorizedError('OTP_EXPIRED');
+    }
+
+    const student = await this.authRepository.createStudent({
+      name: pendingStudentSignup.name,
+      phone,
+      gender: pendingStudentSignup.gender,
+      password: pendingStudentSignup.password,
+      isPhoneVerified: true,
+      hasJoinedLibrary: false,
+      role: 'STUDENT',
+    });
+
+    await this.authRepository.deletePendingStudentSignupByPhone(phone);
+    return this.createStudentAuthData(student);
+
+  } catch (error) {
+    this.rethrowAuthError(error, 'VERIFY_OTP_FAILED');
   }
+}
 
   public async login(payload: LoginRequest): Promise<AuthData> {
     try {
@@ -379,6 +396,9 @@ export class AuthService {
       return new CurrentSessionData(
         new AuthUserData(student.id, student.name, student.phone, student.gender, student.role, {
           hasJoinedLibrary: student.hasJoinedLibrary,
+          email: student.email,   
+          city: student.city,     
+          bio: student.bio,
         }),
       );
     } catch (error) {
@@ -421,11 +441,25 @@ export class AuthService {
       const updated = await this.authRepository.updateStudentProfile(session.user.id, {
         name: payload.name,
         gender: payload.gender ? this.normalizeRequestGender(payload.gender) : undefined,
+        email: payload.email,    
+        city: payload.city,      
+        bio: payload.bio, 
       });
       if (!updated) {
         throw new NotFoundError('USER_NOT_FOUND');
       }
+      if (payload.name) {
+  const members = await this.memberRepository.findAllMembersByStudentId(updated.id);
 
+  await Promise.all(
+    members.map(member =>
+      this.memberRepository.updateMemberByIdAndLibrary(member.id, member.libraryId, {
+        fullName: updated.name,
+        updatedAt: new Date(),
+      }),
+    ),
+  );
+}
       return new CurrentSessionData(
         new AuthUserData(updated.id, updated.name, updated.phone, updated.gender, updated.role, {
           hasJoinedLibrary: updated.hasJoinedLibrary,
@@ -504,6 +538,9 @@ export class AuthService {
       tokens.refreshToken,
       new AuthUserData(student.id, student.name, student.phone, student.gender, student.role, {
         hasJoinedLibrary: student.hasJoinedLibrary,
+        email: student.email, 
+        city: student.city,   
+        bio: student.bio, 
       }),
     );
   }
@@ -722,4 +759,323 @@ export class AuthService {
     const errorCode = (error as { code?: number }).code;
     return errorCode === 11000;
   }
+
+  public async changePassword(
+  session: CurrentSessionData,
+  payload: ChangePasswordRequest,
+): Promise<void> {
+  try {
+    if (payload.newPassword !== payload.confirmPassword) {
+      throw new HttpError(400, 'PASSWORDS_DO_NOT_MATCH');
+    }
+
+    const role = session.user.role;
+
+    if (role === 'OWNER') {
+      const owner = await this.authRepository.findOwnerById(session.user.id);
+      if (!owner) throw new NotFoundError('USER_NOT_FOUND');
+
+      const isValid = await bcrypt.compare(payload.oldPassword, owner.password);
+      if (!isValid) throw new HttpError(400, 'INVALID_OLD_PASSWORD');
+
+      const hashed = await bcrypt.hash(payload.newPassword, PASSWORD_SALT_ROUNDS);
+      await this.authRepository.updateOwnerPassword(session.user.id, hashed);
+      return;
+    }
+
+    const student = await this.authRepository.findStudentById(session.user.id);
+    if (!student) throw new NotFoundError('USER_NOT_FOUND');
+
+    const isValid = await bcrypt.compare(payload.oldPassword, student.password);
+    if (!isValid) throw new HttpError(400, 'INVALID_OLD_PASSWORD');
+
+    const hashed = await bcrypt.hash(payload.newPassword, PASSWORD_SALT_ROUNDS);
+    await this.authRepository.updateStudentPassword(session.user.id, hashed);
+  } catch (error) {
+    this.rethrowAuthError(error, 'CHANGE_PASSWORD_FAILED');
+  }
+}
+public async forgotPassword(payload: ForgotPasswordRequest): Promise<number> {
+  try {
+    const phone = this.normalizePhone(payload.phone);
+    const normalizedRole = this.normalizeRequestRole(payload.role);
+
+    if (normalizedRole === 'OWNER') {
+      const owner = await this.authRepository.findOwnerByPhone(phone);
+      if (!owner) throw new UnauthorizedError('USER_NOT_FOUND');
+    } else {
+      const student = await this.authRepository.findStudentByPhone(phone);
+      if (!student) throw new UnauthorizedError('USER_NOT_FOUND');
+    }
+
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    await this.authRepository.savePasswordResetToken(phone, normalizedRole, STATIC_OTP, expiresAt);
+    await this.sendOtpViaWhatsApp(phone, STATIC_OTP);
+    return OTP_EXPIRY_MINUTES * 60;
+  } catch (error) {
+    this.rethrowAuthError(error, 'FORGOT_PASSWORD_FAILED');
+  }
+}
+
+public async forgotPasswordVerify(payload: ForgotPasswordVerifyRequest): Promise<string> {
+  try {
+    const phone = this.normalizePhone(payload.phone);
+    const normalizedRole = this.normalizeRequestRole(payload.role);
+
+    this.validateOtp(payload.otp);
+
+    const isValid = await this.authRepository.findAndValidateResetToken(
+      phone,
+      normalizedRole,
+      payload.otp,
+    );
+    if (!isValid) throw new UnauthorizedError('INVALID_OR_EXPIRED_OTP');
+
+    // Generate a reset token — reuse JWT signing
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) throw new InternalServerError('JWT_SECRET_MISCONFIGURED');
+
+    const resetToken = jwt.sign(
+      { phone, role: normalizedRole, type: 'reset' },
+      jwtSecret,
+      { expiresIn: '15m' },
+    );
+
+    return resetToken;
+  } catch (error) {
+    this.rethrowAuthError(error, 'FORGOT_PASSWORD_VERIFY_FAILED');
+  }
+}
+
+public async resetPassword(payload: ResetPasswordRequest): Promise<void> {
+  try {
+    if (payload.newPassword !== payload.confirmPassword) {
+      throw new HttpError(400, 'PASSWORDS_DO_NOT_MATCH');
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) throw new InternalServerError('JWT_SECRET_MISCONFIGURED');
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(payload.resetToken, jwtSecret);
+    } catch {
+      throw new UnauthorizedError('INVALID_OR_EXPIRED_RESET_TOKEN');
+    }
+
+    if (decoded.type !== 'reset') throw new UnauthorizedError('INVALID_RESET_TOKEN');
+
+    const phone = decoded.phone;
+    const role = decoded.role;
+    const hashed = await bcrypt.hash(payload.newPassword, PASSWORD_SALT_ROUNDS);
+
+    if (role === 'OWNER') {
+      const owner = await this.authRepository.findOwnerByPhone(phone);
+      if (!owner) throw new NotFoundError('USER_NOT_FOUND');
+      await this.authRepository.updateOwnerPassword(owner.id, hashed);
+      return;
+    }
+
+    const student = await this.authRepository.findStudentByPhone(phone);
+    if (!student) throw new NotFoundError('USER_NOT_FOUND');
+    await this.authRepository.updateStudentPassword(student.id, hashed);
+  } catch (error) {
+    this.rethrowAuthError(error, 'RESET_PASSWORD_FAILED');
+  }
+}
+public async resendOtp(payload: ResendOtpRequest): Promise<number> {
+  try {
+    const phone = this.normalizePhone(payload.phone);
+
+    if (payload.purpose === 'member-login') {
+      // Phone must exist as a member
+      const members = await this.memberRepository.findAllMembersByPhone(phone);
+      if (!members.length) {
+        throw new UnauthorizedError('MEMBER_NOT_FOUND');
+      }
+
+      const existingStudent = await this.authRepository.findStudentByPhone(phone);
+      const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+      // Reuse pending signup slot same as memberOtpLoginSend
+      await this.authRepository.upsertPendingStudentSignup({
+        name: existingStudent?.name ?? members[0].fullName,
+        phone,
+        gender: existingStudent?.gender ?? 'other',
+        password: existingStudent?.password ?? '',
+        otp: STATIC_OTP,
+        expiresAt,
+      });
+
+      await this.sendOtpViaWhatsApp(phone, STATIC_OTP);
+      return OTP_EXPIRY_MINUTES * 60;
+    }
+
+    // ── register resend ───────────────────────────────────────────────────
+    if (payload.purpose === 'register') {
+      const normalizedRole = this.normalizeRequestRole(payload.role!);
+
+      if (normalizedRole === 'OWNER') {
+        const pendingOwner = await this.authRepository.findPendingOwnerSignupByPhone(phone);
+        if (!pendingOwner) {
+          throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
+        }
+        const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+        await this.authRepository.upsertPendingOwnerSignup({
+          ...pendingOwner,
+          otp: STATIC_OTP,
+          expiresAt,
+        });
+        await this.sendOtpViaWhatsApp(phone, STATIC_OTP);
+        return OTP_EXPIRY_MINUTES * 60;
+      }
+
+      // STUDENT register resend
+      const pendingStudent = await this.authRepository.findPendingStudentSignupByPhone(phone);
+      if (!pendingStudent) {
+        throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
+      }
+      const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+      await this.authRepository.upsertPendingStudentSignup({
+        ...pendingStudent,
+        otp: STATIC_OTP,
+        expiresAt,
+      });
+      await this.sendOtpViaWhatsApp(phone, STATIC_OTP);
+      return OTP_EXPIRY_MINUTES * 60;
+    }
+
+    // ── forgot-password resend ────────────────────────────────────────────
+    const normalizedRole = this.normalizeRequestRole(payload.role!);
+
+    if (normalizedRole === 'OWNER') {
+      const owner = await this.authRepository.findOwnerByPhone(phone);
+      if (!owner) throw new UnauthorizedError('USER_NOT_FOUND');
+    } else {
+      const student = await this.authRepository.findStudentByPhone(phone);
+      if (!student) throw new UnauthorizedError('USER_NOT_FOUND');
+    }
+
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    await this.authRepository.savePasswordResetToken(phone, normalizedRole, STATIC_OTP, expiresAt);
+    await this.sendOtpViaWhatsApp(phone, STATIC_OTP);
+    return OTP_EXPIRY_MINUTES * 60;
+
+  } catch (error) {
+    this.rethrowAuthError(error, 'RESEND_OTP_FAILED');
+  }
+}
+
+
+public async memberOtpLoginSend(payload: MemberOtpLoginSendRequest): Promise<{
+  phone: string;
+  expiresIn: number;
+  hasAccount: boolean;
+}> {
+  try {
+    const phone = this.normalizePhone(payload.phone);
+
+    // Must exist as a member in at least one library
+    const members = await this.memberRepository.findAllMembersByPhone(phone);
+    if (!members.length) {
+      throw new UnauthorizedError('MEMBER_NOT_FOUND');
+    }
+
+    // Check if they already have a student account
+    const existingStudent = await this.authRepository.findStudentByPhone(phone);
+
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+    // Store OTP in pending student signup slot (reuse existing mechanism)
+    await this.authRepository.upsertPendingStudentSignup({
+      name: existingStudent?.name ?? members[0].fullName,
+      phone,
+      gender: existingStudent?.gender ?? 'other',
+      password: existingStudent?.password ?? '',
+      otp: STATIC_OTP,
+      expiresAt,
+    });
+
+    await this.sendOtpViaWhatsApp(phone, STATIC_OTP);
+
+    return {
+      phone: this.toE164IndianPhone(phone),
+      expiresIn: OTP_EXPIRY_MINUTES * 60,
+      hasAccount: !!existingStudent,
+    };
+  } catch (error) {
+    this.rethrowAuthError(error, 'MEMBER_OTP_SEND_FAILED');
+  }
+}
+
+// ✅ extracted member OTP verify logic — called by verifyOtpAndLogin when no role
+private async handleMemberOtpVerify(phone: string, otp: string): Promise<AuthData> {
+  // 1. Validate OTP
+  this.validateOtp(otp);
+
+  // 2. Find pending OTP record
+  const pending = await this.authRepository.findPendingStudentSignupByPhone(phone);
+  if (!pending) {
+    throw new UnauthorizedError('NO_PENDING_OTP_FOUND');
+  }
+  if (this.isOtpExpired(pending.expiresAt)) {
+    throw new UnauthorizedError('OTP_EXPIRED');
+  }
+
+  // 3. Member must exist with this phone
+  const members = await this.memberRepository.findAllMembersByPhone(phone);
+  if (!members.length) {
+    throw new UnauthorizedError('MEMBER_NOT_FOUND');
+  }
+
+  // 4. If student account already exists → just log in
+  const existingStudent = await this.authRepository.findStudentByPhone(phone);
+  if (existingStudent) {
+    await this.authRepository.deletePendingStudentSignupByPhone(phone);
+
+    // Link any unlinked member records
+    const unlinkedMembers = members.filter(m => !m.studentId);
+    if (unlinkedMembers.length) {
+      await Promise.all(
+        unlinkedMembers.map(m =>
+          this.memberRepository.updateMemberByIdAndLibrary(m.id, m.libraryId, {
+            studentId: existingStudent.id,
+            updatedAt: new Date(),
+          }),
+        ),
+      );
+    }
+    return this.createStudentAuthData(existingStudent);
+  }
+
+  // 5. First-time OTP login → create student account from member data
+  const primaryMember = members[0];
+  const tempPassword = await bcrypt.hash(
+    `member_otp_${phone}_${Date.now()}`,
+    PASSWORD_SALT_ROUNDS,
+  );
+
+  const student = await this.authRepository.createStudent({
+    name: primaryMember.fullName,
+    phone,
+    gender: 'other',
+    password: tempPassword,
+    isPhoneVerified: true,
+    hasJoinedLibrary: true,
+    role: 'STUDENT',
+  });
+
+  // 6. Link all member records to new student
+  await Promise.all(
+    members.map(m =>
+      this.memberRepository.updateMemberByIdAndLibrary(m.id, m.libraryId, {
+        studentId: student.id,
+        updatedAt: new Date(),
+      }),
+    ),
+  );
+
+  await this.authRepository.deletePendingStudentSignupByPhone(phone);
+  return this.createStudentAuthData(student);
+}
 }

@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { AnnouncementTarget } from '../../models/announcement.model';
 
 const VALID_TARGETS: AnnouncementTarget[] = [
@@ -22,4 +22,21 @@ export class CreateAnnouncementRequest {
   @IsString()
   @IsIn(VALID_TARGETS)
   target!: AnnouncementTarget;
+}
+
+export class UpdateAnnouncementRequest {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  message?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['all', 'fullday', 'firsthalf', 'secondhalf', 'twentyfour', 'overdue'])
+  target?: AnnouncementTarget;
 }

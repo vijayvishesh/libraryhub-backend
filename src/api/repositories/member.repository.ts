@@ -20,11 +20,12 @@ export class MemberRepository {
 
     const memberRepository = this.getMemberRepository();
     const now = new Date();
-    const { aadharId, ...rest } = input;
+    const { aadharId, isInviteSubmission, ...rest } = input;
     const memberData: Record<string, unknown> = {
       ...rest,
       createdAt: now,
       updatedAt: now,
+      isInviteSubmission: isInviteSubmission ?? false,
     };
     // Only set aadharId if it has a value — null would conflict with the unique partial index
     if (aadharId) {
@@ -216,6 +217,7 @@ export class MemberRepository {
     if (input.paidAt !== undefined) {
       member.paidAt = input.paidAt;
     }
+    if (input.isNewUser !== undefined) member.isNewUser = input.isNewUser;
 
     member.updatedAt = input.updatedAt || new Date();
     const savedMember = await memberRepository.save(member);
@@ -411,6 +413,8 @@ export class MemberRepository {
       notes: member.notes ?? null,
       createdAt: member.createdAt,
       updatedAt: member.updatedAt,
+      isInviteSubmission: member.isInviteSubmission ?? false,
+      isNewUser: member.isNewUser ?? false,
     };
   }
 
@@ -425,4 +429,18 @@ export class MemberRepository {
   private getMemberRepository(): MongoRepository<MemberModel> {
     return getDataSource().getMongoRepository(MemberModel);
   }
+  public async findAllMembersByStudentId(studentId: string): Promise<MemberRecord[]> {
+  const members = await this.getMemberRepository().find({
+    where: { studentId } as any,
+  });
+  return members.map(item => this.mapMember(item));
+}
+
+public async findAllMembersByPhone(mobileNo: string): Promise<MemberRecord[]> {
+  const members = await this.getMemberRepository().find({
+    where: { mobileNo } as any,
+    order: { createdAt: 'DESC' },
+  });
+  return members.map(item => this.mapMember(item));
+}
 }

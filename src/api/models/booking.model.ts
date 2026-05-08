@@ -81,4 +81,5 @@ export class BookingModel {
 
   @Column()
   updatedAt!: Date;
+
 }
