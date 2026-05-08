@@ -354,6 +354,10 @@ export class LibrarySetupData {
   @IsString()
   updatedAt!: string;
 
+  @IsOptional()
+  @IsNumber()
+  distanceKm?: number;
+
   constructor(params?: {
     id: string;
     ownerId: string;

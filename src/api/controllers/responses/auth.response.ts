@@ -529,4 +529,37 @@ export class LogoutApiResponse {
     this.responseCode = responseCode;
     this.data = data;
   }
+
+}
+
+export class MemberOtpSendData {
+  @IsString()
+  phone!: string;
+
+  @IsNumber()
+  expiresIn!: number;
+
+  @IsBoolean()
+  hasAccount!: boolean; 
+
+  constructor(phone: string, expiresIn: number, hasAccount: boolean) {
+    this.phone = phone;
+    this.expiresIn = expiresIn;
+    this.hasAccount = hasAccount;
+  }
+}
+
+export class MemberOtpSendApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => MemberOtpSendData)
+  data!: MemberOtpSendData;
+
+  constructor(data?: MemberOtpSendData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
+    this.responseCode = responseCode;
+    this.data = data;
+  }
 }

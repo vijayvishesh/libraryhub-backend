@@ -21,6 +21,9 @@ import { FcmTokenModel } from '../../api/models/fcmToken.model';
 import { MemberBulkUploadModel } from '../../api/models/memberBulkUpload.model';
 import { MemberInviteLinkModel } from '../../api/models/memberInviteLink.model';
 import { BannerModel } from '../../api/models/banner.model';
+import { LibraryRatingModel } from '../../api/models/libraryRating.model';
+import { MemberPaymentModel } from '../../api/models/memberPayment.model';
+import { MemberInviteSubmissionModel } from '../../api/models/memberInviteSubmission.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -65,7 +68,10 @@ const createDataSource = (): DataSource =>
       MemberBulkUploadModel,
       MemberInviteLinkModel,
       SuperAdminModel,
-      BannerModel
+      BannerModel,
+      LibraryRatingModel,
+      MemberPaymentModel,
+      MemberInviteSubmissionModel
     ],
     synchronize: true,
     logging: false,

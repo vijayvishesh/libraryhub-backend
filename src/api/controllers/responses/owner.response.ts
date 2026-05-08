@@ -11,14 +11,18 @@ export class OwnerDashboardLibraryData {
   @IsNumber()
   capacity!: number;
 
-  constructor(name?: string, location?: string, capacity?: number) {
-    if (!name || !location || typeof capacity !== 'number') {
+  @IsString()
+  libraryId: string;
+
+  constructor(name?: string, location?: string, capacity?: number, libraryId?: string) {
+    if (!name || !location || typeof capacity !== 'number' || !libraryId) {
       return;
     }
 
     this.name = name;
     this.location = location;
     this.capacity = capacity;
+    this.libraryId = libraryId;
   }
 }
 
@@ -135,6 +139,9 @@ export class OwnerDashboardRecentActivityData {
 }
 
 export class OwnerDashboardData {
+  // @IsString()
+  // libraryId!: string;
+
   @ValidateNested()
   @Type(() => OwnerDashboardLibraryData)
   library!: OwnerDashboardLibraryData;
@@ -157,6 +164,7 @@ export class OwnerDashboardData {
   recentActivity!: OwnerDashboardRecentActivityData[];
 
   constructor(params?: {
+    // libraryId: string;
     library: OwnerDashboardLibraryData;
     revenue: OwnerDashboardRevenueData;
     seats: OwnerDashboardSeatsData;
@@ -166,7 +174,7 @@ export class OwnerDashboardData {
     if (!params) {
       return;
     }
-
+    // this.libraryId = params.libraryId;
     this.library = params.library;
     this.revenue = params.revenue;
     this.seats = params.seats;

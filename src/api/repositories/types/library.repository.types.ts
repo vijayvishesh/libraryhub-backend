@@ -109,6 +109,10 @@ export type ListLibrariesQuery = {
   city?: string;
   page: number;
   limit: number;
+  facilities?: string[];
+  minRating?: number;
+  priceSort?: 'low_to_high' | 'high_to_low';
+  ratingSort?: 'top_rated';
 };
 
 export type ListLibrariesResult = {

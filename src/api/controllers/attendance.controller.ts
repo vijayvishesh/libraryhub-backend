@@ -15,13 +15,16 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { AttendanceService } from '../services/attendance.service';
-import { CheckInRequest, StudentAttendanceHistoryQuery } from './requests/attendance.request';
+import { CheckInRequest, StudentAttendanceByIdQuery, StudentAttendanceHistoryQuery } from './requests/attendance.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
   AttendanceApiResponse,
   AttendanceData,
   AttendanceHistoryListApiResponse,
   AttendanceHistoryListPayloadData,
+  StudentAttendanceByIdApiResponse,
+  StudentAttendanceByIdPayloadData,
+  StudentAttendanceStatsData,
 //   AttendanceSummaryData,
 //   TodayAttendanceApiResponse,
 //   TodayAttendanceData,
@@ -144,6 +147,47 @@ public async getMyAttendanceHistory(
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new InternalServerError('GET_ATTENDANCE_HISTORY_FAILED');
+  }
+}
+@Get('/students/:studentId/history')
+@Authorized('OWNER')
+@OpenAPI({
+  summary: 'Get attendance history of a student by ID with stats',
+  security: [{ bearerAuth: [] }],
+})
+@ResponseSchema(StudentAttendanceByIdApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async getStudentAttendanceById(
+  @CurrentUser({ required: true }) _session: CurrentSessionData,
+  @Param('studentId') studentId: string,
+  @QueryParams() query: StudentAttendanceByIdQuery,
+): Promise<StudentAttendanceByIdApiResponse> {
+  try {
+    const result = await this.attendanceService.getStudentAttendanceById(
+      studentId,
+      {
+        fromDate: query.fromDate,
+        toDate:   query.toDate,
+        page:     query.page,
+        limit:    query.limit,
+      },
+    );
+
+    return new StudentAttendanceByIdApiResponse(
+      new StudentAttendanceByIdPayloadData({
+        records: result.records.map(r => new AttendanceData(r)),
+        total:   result.total,
+        page:    result.page,
+        limit:   result.limit,
+        stats:   new StudentAttendanceStatsData(result.stats),
+      }),
+      200,
+    );
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('GET_STUDENT_ATTENDANCE_BY_ID_FAILED');
   }
 }
 }

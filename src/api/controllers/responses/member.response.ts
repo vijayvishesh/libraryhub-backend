@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { env } from '../../../env';
+import { IsArray, IsBoolean, IsEmail, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+// import { env } from '../../../env';
 
 export class MemberData {
   @IsString()
@@ -71,6 +71,31 @@ export class MemberData {
   @IsString()
   updatedAt!: string;
 
+  @IsOptional()
+  @IsBoolean()
+  isInviteSubmission?: boolean;  
+  
+  @IsBoolean()
+  isNewUser!: boolean;
+
+  @IsBoolean()
+  isExistingMember!: boolean;
+
+  @IsBoolean()
+  hasPendingFee!: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  pendingFeeAmount!: number | null;
+
+  @IsOptional()
+  @IsString()
+  previousEndDate!: string | null;
+
+  @IsBoolean()
+  isDuplicate!: boolean;
+
+
   constructor(data?: {
     id: string;
     fullName: string;
@@ -91,6 +116,13 @@ export class MemberData {
     notes: string | null;
     createdAt: Date;
     updatedAt: Date;
+    isInviteSubmission?: boolean;
+    isNewUser?: boolean;
+    isExistingMember?: boolean;
+    hasPendingFee?: boolean;
+    pendingFeeAmount?: number | null;
+    previousEndDate?: string | null;
+    isDuplicate?: boolean;
   }) {
     if (!data) {
       return;
@@ -115,6 +147,13 @@ export class MemberData {
     this.notes = data.notes ?? undefined;
     this.createdAt = data.createdAt.toISOString();
     this.updatedAt = data.updatedAt.toISOString();
+    this.isInviteSubmission = data.isInviteSubmission ?? false;
+    this.isNewUser = data.isNewUser ?? false;
+    this.isExistingMember = data.isExistingMember ?? false;
+    this.hasPendingFee = data.hasPendingFee ?? false;
+    this.pendingFeeAmount = data.pendingFeeAmount ?? null;
+    this.previousEndDate = data.previousEndDate ?? null;
+    this.isDuplicate = data.isDuplicate ?? false;
   }
 }
 
@@ -363,7 +402,7 @@ export class MemberInviteLinkData {
     this.token = data.token;
     this.siteLibraryId = data.siteLibraryId;
     this.expiresIn = Math.max(0, Math.floor((data.expiresAt.getTime() - Date.now()) / 1000));
-    this.shareUrl = `${env.app.baseUrl}/public/members/invite/${data.token}`;
+    this.shareUrl = `/public/members/invite/${data.token}`;
   }
 }
 
@@ -436,6 +475,103 @@ export class RenewalRemindersApiResponse {
   data!: RenewalRemindersPayloadData;
 
   constructor(data?: RenewalRemindersPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}
+
+
+export class MemberPaymentData {
+  @IsString()
+  id!: string;
+
+  @IsString()
+  memberId!: string;
+
+  @IsNumber()
+  amount!: number;
+
+  @IsNumber()
+  duration!: number;
+
+  @IsString()
+  startDate!: string;
+
+  @IsString()
+  endDate!: string;
+
+  @IsString()
+  paidAt!: string;
+
+  @IsString()
+  createdAt!: string;
+
+  constructor(data?: {
+    id: string;
+    memberId: string;
+    amount: number;
+    duration: number;
+    startDate: string;
+    endDate: string;
+    paidAt: Date;
+    createdAt: Date;
+  }) {
+    if (!data) return;
+    this.id = data.id;
+    this.memberId = data.memberId;
+    this.amount = data.amount;
+    this.duration = data.duration;
+    this.startDate = data.startDate;
+    this.endDate = data.endDate;
+    this.paidAt = data.paidAt.toISOString();
+    this.createdAt = data.createdAt.toISOString();
+  }
+}
+
+export class MemberPaymentListPayloadData {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MemberPaymentData)
+  payments!: MemberPaymentData[];
+
+  @IsNumber()
+  page!: number;
+
+  @IsNumber()
+  limit!: number;
+
+  @IsNumber()
+  total!: number;
+
+  constructor(
+    payments?: MemberPaymentData[],
+    page?: number,
+    limit?: number,
+    total?: number,
+  ) {
+    if (
+      !payments ||
+      typeof page !== 'number' ||
+      typeof limit !== 'number' ||
+      typeof total !== 'number'
+    ) return;
+    this.payments = payments;
+    this.page = page;
+    this.limit = limit;
+    this.total = total;
+  }
+}
+
+export class MemberPaymentListApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => MemberPaymentListPayloadData)
+  data!: MemberPaymentListPayloadData;
+
+  constructor(data?: MemberPaymentListPayloadData, responseCode = 200) {
     if (!data || typeof responseCode !== 'number') return;
     this.responseCode = responseCode;
     this.data = data;

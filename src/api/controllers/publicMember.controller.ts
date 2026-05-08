@@ -63,17 +63,20 @@ export class PublicMemberController {
       token: string;
       expiresIn: number;
       siteLibraryId: string;
+      libraryName: string;
+      libraryAddress: string;
       slots: { slotType: string; name: string; startTime: string; endTime: string; isActive: boolean }[];
       seats: { seatId: string; label: string; gender: string; isActive: boolean }[];
     };
-  }> {
+  }>
+ {
     try {
       const formData = await this.memberService.getInviteLinkFormData(token.trim());
       if (!formData) {
         throw new NotFoundError('INVITE_LINK_INVALID_OR_EXPIRED');
       }
 
-      const { inviteLink, slots, seats } = formData;
+      const { inviteLink, slots, seats, libraryName, libraryAddress } = formData;
       const expiresIn = Math.max(
         0,
         Math.floor((inviteLink.expiresAt.getTime() - Date.now()) / 1000),
@@ -84,6 +87,8 @@ export class PublicMemberController {
           token: inviteLink.token,
           expiresIn,
           siteLibraryId: inviteLink.siteLibraryId,
+          libraryName,
+          libraryAddress,
           slots,
           seats,
         },

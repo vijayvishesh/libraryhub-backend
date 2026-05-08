@@ -3,6 +3,7 @@ import { Service } from 'typedi';
 import { v4 as uuidv4 } from 'uuid';
 import {
   AddMemberRequest,
+  ListMemberPaymentsQueryRequest,
   ListMembersQueryRequest,
   ListMemberUploadsQueryRequest,
   SubmitMemberViaInviteLinkRequest,
@@ -27,13 +28,29 @@ import { MemberBulkUploadRepository } from '../repositories/memberBulkUpload.rep
 import { MemberInviteLinkRecord } from '../repositories/types/memberInviteLink.repository.types';
 import { MemberMsgResponse, MemberRecord } from '../repositories/types/member.repository.types';
 import { MemberBulkUploadRecord } from '../repositories/types/memberBulkUpload.repository.types';
+import { MemberPaymentRepository } from '../repositories/memberPayment.repository';
+import { ListMemberPaymentsResult } from '../repositories/types/memberPayment.repository.types';
+import { MemberInviteSubmissionRepository } from '../repositories/memberInviteSubmission.repository';
+import { SubmissionRecord } from '../repositories/types/memberInviteSubmission.repository.types';
 
 export type ListMembersResult = {
-  members: MemberRecord[];
+  members: MemberWithFlags[];
   page: number;
   limit: number;
   total: number;
 };
+
+export type InviteFlags = {
+  isInviteSubmission: boolean;
+  isNewUser: boolean;
+  isExistingMember: boolean;
+  hasPendingFee: boolean;
+  pendingFeeAmount: number | null;
+  previousEndDate: string | null;
+  isDuplicate: boolean;
+};
+
+export type MemberWithFlags = MemberRecord & InviteFlags;
 
 export type ListMemberUploadsResult = {
   uploads: MemberBulkUploadRecord[];
@@ -51,6 +68,8 @@ export class MemberService {
     private readonly memberBulkUploadRepository: MemberBulkUploadRepository,
     private readonly memberInviteLinkRepository: MemberInviteLinkRepository,
     private readonly librarySeatRepository: LibrarySeatRepository,
+    private readonly memberPaymentRepository: MemberPaymentRepository,
+    private readonly memberInviteSubmissionRepository: MemberInviteSubmissionRepository,y
   ) {}
 
   public async addMember(ownerId: string, payload: AddMemberRequest): Promise<MemberMsgResponse> {
@@ -71,58 +90,55 @@ export class MemberService {
   }
 
   public async listMembers(
-    ownerId: string,
-    query: ListMembersQueryRequest,
-  ): Promise<ListMembersResult> {
-    try {
-      const library = await this.getOwnerLibraryOrThrow(ownerId);
-      const page = query.page ?? 1;
-      const limit = query.limit ?? 20;
+  ownerId: string,
+  query: ListMembersQueryRequest,
+): Promise<ListMembersResult> {
+  try {
+    const library = await this.getOwnerLibraryOrThrow(ownerId);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
 
-      const result = await this.memberRepository.listMembersByLibrary({
-        libraryId: library.id,
-        page,
-        limit,
-        search: query.search?.trim() || undefined,
-        status: query.status as 'active' | 'inactive' | 'expired' | 'pending' | undefined,
-        slotId: query.slotId?.trim() || undefined,
-      });
+    const result = await this.memberRepository.listMembersByLibrary({
+      libraryId: library.id,
+      page,
+      limit,
+      search: query.search?.trim() || undefined,
+      status: query.status as 'active' | 'inactive' | 'expired' | 'pending' | undefined,
+      slotId: query.slotId?.trim() || undefined,
+    });
 
-      return {
-        members: result.members,
-        page,
-        limit,
-        total: result.total,
-      };
-    } catch (error) {
-      if (error instanceof HttpError) {
-        throw error;
-      }
+    // Batch fetch submissions for all members in one query
+    const memberIds = result.members.map(m => m.id);
+    const submissionMap = await this.memberInviteSubmissionRepository.findByMemberIds(memberIds);
 
-      throw new InternalServerError('LIST_MEMBERS_FAILED');
-    }
+    return {
+      members: result.members.map(m => this.mergeInviteFlags(m, submissionMap)),
+      page,
+      limit,
+      total: result.total,
+    };
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('LIST_MEMBERS_FAILED');
   }
+}
 
-  public async getMemberById(ownerId: string, memberId: string): Promise<MemberRecord> {
-    try {
-      const library = await this.getOwnerLibraryOrThrow(ownerId);
-      const member = await this.memberRepository.findMemberByIdAndLibrary(
-        memberId.trim(),
-        library.id,
-      );
-      if (!member) {
-        throw new NotFoundError('MEMBER_NOT_FOUND');
-      }
+ public async getMemberById(ownerId: string, memberId: string): Promise<MemberWithFlags> {
+  try {
+    const library = await this.getOwnerLibraryOrThrow(ownerId);
+    const member = await this.memberRepository.findMemberByIdAndLibrary(
+      memberId.trim(),
+      library.id,
+    );
+    if (!member) throw new NotFoundError('MEMBER_NOT_FOUND');
 
-      return member;
-    } catch (error) {
-      if (error instanceof HttpError) {
-        throw error;
-      }
-
-      throw new InternalServerError('GET_MEMBER_FAILED');
-    }
+    const submissionMap = await this.memberInviteSubmissionRepository.findByMemberIds([member.id]);
+    return this.mergeInviteFlags(member, submissionMap);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('GET_MEMBER_FAILED');
   }
+}
 
   public async updateMember(
     ownerId: string,
@@ -506,11 +522,13 @@ export class MemberService {
     }
   }
 
-  public async getInviteLinkFormData(token: string): Promise<{
-    inviteLink: MemberInviteLinkRecord;
-    slots: { slotType: string; name: string; startTime: string; endTime: string; isActive: boolean }[];
-    seats: { seatId: string; label: string; gender: string; isActive: boolean }[];
-  } | null> {
+public async getInviteLinkFormData(token: string): Promise<{
+  inviteLink: MemberInviteLinkRecord;
+  libraryName: string;
+  libraryAddress: string;
+  slots: { slotType: string; name: string; startTime: string; endTime: string; isActive: boolean }[];
+  seats: { seatId: string; label: string; gender: string; isActive: boolean }[];
+} | null> {
     try {
       const inviteLink = await this.memberInviteLinkRepository.findValidLinkByToken(token);
       if (!inviteLink) return null;
@@ -530,6 +548,8 @@ export class MemberService {
 
       return {
         inviteLink,
+        libraryName: library?.name ?? '',
+        libraryAddress: library ? `${library.address ?? ''}, ${library.city ?? ''}`.replace(/^,\s*/, '').trim() : '',
         slots,
         seats: seats.map(s => ({
           seatId: s.seatId,
@@ -626,6 +646,42 @@ export class MemberService {
       }
 
       throw new InternalServerError('SUBMIT_MEMBER_VIA_INVITE_LINK_FAILED');
+    }
+  }
+  public async getMemberPaymentHistory(
+    ownerId: string,
+    memberId: string,
+    query: ListMemberPaymentsQueryRequest,
+  ): Promise<ListMemberPaymentsResult> {
+    try {
+      const library = await this.getOwnerLibraryOrThrow(ownerId);
+
+      const member = await this.memberRepository.findMemberByIdAndLibrary(
+        memberId.trim(),
+        library.id,
+      );
+      if (!member) {
+        throw new NotFoundError('MEMBER_NOT_FOUND');
+      }
+
+      const page = query.page ?? 1;
+      const limit = query.limit ?? 20;
+
+      const result = await this.memberPaymentRepository.listPaymentsByMember({
+        memberId: member.id,
+        libraryId: library.id,
+        page,
+        limit,
+      });
+
+      return {
+        payments: result.payments,
+        total: result.total,
+      };
+    } catch (error) {
+      console.error('getMemberPaymentHistory error:', error);
+      if (error instanceof HttpError) throw error;
+      throw new InternalServerError('GET_MEMBER_PAYMENT_HISTORY_FAILED');
     }
   }
 
@@ -726,4 +782,21 @@ export class MemberService {
     date.setUTCMonth(date.getUTCMonth() + monthsToAdd);
     return date.toISOString().slice(0, 10);
   }
+
+  private mergeInviteFlags(
+  member: MemberRecord,
+  submissionMap: Map<string, SubmissionRecord>,
+): MemberWithFlags {
+  const submission = member.id ? submissionMap.get(member.id) : undefined;
+  return {
+    ...member,
+    isInviteSubmission: submission?.isInviteSubmission ?? false,
+    isNewUser: submission?.isNewUser ?? member.isNewUser ?? false,
+    isExistingMember: submission?.isExistingMember ?? false,
+    hasPendingFee: submission?.hasPendingFee ?? false,
+    pendingFeeAmount: submission?.pendingFeeAmount ?? null,
+    previousEndDate: submission?.previousEndDate ?? null,
+    isDuplicate: submission?.isDuplicate ?? false,
+  };
+}
 }

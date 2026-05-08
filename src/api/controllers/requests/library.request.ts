@@ -367,10 +367,35 @@ export class LibraryListQueryRequest {
   @IsNumber()
   lng?: number;
 
+  // Facilities filter — comma separated e.g. "wifi,ac,cctv"
+  @IsOptional()
+  @IsString()
+  facilities?: string;
+
   @IsOptional()
   @IsString()
   @IsIn([...LIBRARY_SEATING_GENDER_ENUM])
   gender?: string;
+
+  // Rating filter — minimum rating e.g. 4.0
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(5)
+  minRating?: number;
+
+  // Price sort
+  @IsOptional()
+  @IsString()
+  @IsIn(['low_to_high', 'high_to_low'])
+  priceSort?: 'low_to_high' | 'high_to_low'
+
+  // Rating sort
+  @IsOptional()
+  @IsString()
+  @IsIn(['top_rated'])
+  ratingSort?: 'top_rated';
 }
 
 export class UpdateLibraryRequest {

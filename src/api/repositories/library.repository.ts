@@ -67,42 +67,68 @@ export class LibraryRepository {
     return libraries.map(library => this.mapLibrary(library));
   }
 
-  public async findListedLibraries(query: ListLibrariesQuery): Promise<ListLibrariesResult> {
-    await this.ensureIndexes();
+ public async findListedLibraries(query: ListLibrariesQuery): Promise<ListLibrariesResult> {
+  await this.ensureIndexes();
 
-    const libraryRepository = this.getLibraryRepository();
-    const filter: Record<string, unknown> = {
-      isActive: true,
-      isMarketplaceVisible: true,
-      deletedAt: null,
-    };
+  const libraryRepository = this.getLibraryRepository();
+  const filter: Record<string, unknown> = {
+    isActive: true,
+    isMarketplaceVisible: true,
+    deletedAt: null,
+  };
 
-    if (query.city) {
-      const escapedCity = query.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.city = { $regex: `^${escapedCity}$`, $options: 'i' };
-    }
-
-    if (query.search) {
-      const escapedSearch = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const searchRegex = { $regex: escapedSearch, $options: 'i' };
-      filter.$or = [{ name: searchRegex }, { city: searchRegex }, { contactPhone: searchRegex }];
-    }
-
-    const [libraries, total] = await Promise.all([
-      libraryRepository.find({
-        where: filter,
-        order: { updatedAt: 'DESC' },
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      libraryRepository.count({ where: filter }),
-    ]);
-
-    return {
-      libraries: libraries.map(library => this.mapLibrary(library)),
-      total,
-    };
+  if (query.city) {
+    const escapedCity = query.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.city = { $regex: `^${escapedCity}$`, $options: 'i' };
   }
+
+  if (query.search) {
+    const escapedSearch = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = { $regex: escapedSearch, $options: 'i' };
+    filter.$or = [
+      { name: searchRegex },
+      { city: searchRegex },
+      { address: searchRegex },
+      { contactPhone: searchRegex },
+    ];
+  }
+
+  // Facilities filter
+  if (query.facilities && query.facilities.length > 0) {
+    filter.facilities = { $all: query.facilities };
+  }
+
+  // Min rating filter
+  if (query.minRating !== undefined) {
+    filter['stats.rating'] = { $gte: query.minRating };
+  }
+
+  // Build sort
+  let sortOrder: Record<string, unknown> = { updatedAt: 'DESC' };
+
+  if (query.ratingSort === 'top_rated') {
+    sortOrder = { 'stats.rating': -1 };
+  } else if (query.priceSort === 'low_to_high') {
+    sortOrder = { 'slots.0.pricePerMonth': 1 };
+  } else if (query.priceSort === 'high_to_low') {
+    sortOrder = { 'slots.0.pricePerMonth': -1 };
+  }
+
+  const [libraries, total] = await Promise.all([
+    libraryRepository.find({
+      where: filter,
+      order: sortOrder as any,
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+    }),
+    libraryRepository.count({ where: filter }),
+  ]);
+
+  return {
+    libraries: libraries.map(library => this.mapLibrary(library)),
+    total,
+  };
+}
 
   public async updateLibrary(
     libraryId: string,
@@ -280,5 +306,24 @@ export class LibraryRepository {
   library.updatedAt = new Date();
   const saved = await repo.save(library);
   return this.mapLibrary(saved);
+}
+public async updateLibraryStats(
+  libraryId: string,
+  stats: { rating: number; reviewCount: number },
+): Promise<void> {
+  const objectId = this.tryParseObjectId(libraryId);
+  if (!objectId) return;
+
+  const repo = this.getLibraryRepository();
+  const library = await repo.findOneById(objectId);
+  if (!library) return;
+
+  library.stats = {
+    ...library.stats,
+    rating: stats.rating,
+    reviewCount: stats.reviewCount,
+  };
+  library.updatedAt = new Date();
+  await repo.save(library);
 }
 }

@@ -164,3 +164,82 @@ export class OwnerAttendanceHistoryApiResponse {
     this.data = data;
   }
 }
+
+export class StudentAttendanceStatsData {
+  @IsNumber() weeklyPresentDays!: number;
+  @IsNumber() weeklyWorkingDays!: number;
+  @IsNumber() weeklyPercentage!: number;
+
+  @IsNumber() monthlyPresentDays!: number;
+  @IsNumber() monthlyWorkingDays!: number;
+  @IsNumber() monthlyPercentage!: number;
+
+  @IsNumber() currentStreak!: number;
+
+  @IsString() currentDate!: string;
+
+  constructor(params?: {
+    weeklyPresentDays: number;
+    weeklyWorkingDays: number;
+    weeklyPercentage: number;
+    monthlyPresentDays: number;
+    monthlyWorkingDays: number;
+    monthlyPercentage: number;
+    currentStreak: number;
+    currentDate: string;
+  }) {
+    if (!params) return;
+    this.weeklyPresentDays    = params.weeklyPresentDays;
+    this.weeklyWorkingDays    = params.weeklyWorkingDays;
+    this.weeklyPercentage     = params.weeklyPercentage;
+    this.monthlyPresentDays   = params.monthlyPresentDays;
+    this.monthlyWorkingDays   = params.monthlyWorkingDays;
+    this.monthlyPercentage    = params.monthlyPercentage;
+    this.currentStreak        = params.currentStreak;
+    this.currentDate          = params.currentDate;
+  }
+}
+
+export class StudentAttendanceByIdPayloadData {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttendanceData)
+  records!: AttendanceData[];
+
+  @IsNumber() total!: number;
+  @IsNumber() page!: number;
+  @IsNumber() limit!: number;
+
+  @ValidateNested()
+  @Type(() => StudentAttendanceStatsData)
+  stats!: StudentAttendanceStatsData;
+
+  constructor(params?: {
+    records: AttendanceData[];
+    total: number;
+    page: number;
+    limit: number;
+    stats: StudentAttendanceStatsData;
+  }) {
+    if (!params) return;
+    this.records = params.records;
+    this.total   = params.total;
+    this.page    = params.page;
+    this.limit   = params.limit;
+    this.stats   = params.stats;
+  }
+}
+
+export class StudentAttendanceByIdApiResponse {
+  @IsNumber() responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => StudentAttendanceByIdPayloadData)
+  data!: StudentAttendanceByIdPayloadData;
+
+  constructor(data?: StudentAttendanceByIdPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}

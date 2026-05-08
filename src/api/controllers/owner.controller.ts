@@ -29,6 +29,7 @@ import { MarkBookingPaidRequest, OwnerFeeCollectionQueryRequest } from './reques
 import {
   AddMemberRequest,
   GenerateMemberInviteLinkRequest,
+  ListMemberPaymentsQueryRequest,
   ListMembersQueryRequest,
   ListMemberUploadsQueryRequest,
   UpdateMemberRequest,
@@ -50,6 +51,9 @@ import {
   MemberInviteLinkData,
   MemberListApiResponse,
   MemberListPayloadData,
+  MemberPaymentData,
+  MemberPaymentListApiResponse,
+  MemberPaymentListPayloadData,
   MemberUploadData,
   MemberUploadListApiResponse,
   MemberUploadListPayloadData,
@@ -202,6 +206,7 @@ export class OwnerController {
             dashboard.library.name,
             dashboard.library.location,
             dashboard.library.capacity,
+            dashboard.library.libraryId
           ),
           revenue: new OwnerDashboardRevenueData(
             dashboard.revenue.today,
@@ -642,4 +647,34 @@ export class OwnerController {
       throw new InternalServerError('SYNC_EXPIRED_MEMBERS_FAILED');
     }
   }
+@Get('/members/:memberId/payments')
+@Authorized('OWNER')
+@OpenAPI({ summary: 'Get payment history for a member', security: [{ bearerAuth: [] }] })
+@ResponseSchema(MemberPaymentListApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async getMemberPaymentHistory(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @Param('memberId') memberId: string,
+  @QueryParams() query: ListMemberPaymentsQueryRequest,
+): Promise<MemberPaymentListApiResponse> {
+  try {
+    const result = await this.memberService.getMemberPaymentHistory(
+      session.user.id,
+      memberId,
+      query,
+    );
+    return new MemberPaymentListApiResponse(
+      new MemberPaymentListPayloadData(
+        result.payments.map(p => new MemberPaymentData(p)),
+        result.total,
+      ),
+      200,
+    );
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('GET_MEMBER_PAYMENT_HISTORY_FAILED');
+  }
+}
 }

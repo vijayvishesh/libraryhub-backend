@@ -164,4 +164,157 @@ public async getOwnerAttendanceHistory(
 
   return { ...result, page, limit };
 }
+
+public async getStudentAttendanceById(
+  studentId: string,
+  query: {
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  },
+): Promise<{
+  records: AttendanceRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  stats: {
+    weeklyPresentDays: number;
+    weeklyWorkingDays: number;
+    weeklyPercentage: number;
+    monthlyPresentDays: number;
+    monthlyWorkingDays: number;
+    monthlyPercentage: number;
+    currentStreak: number;
+    currentDate: string;
+  };
+}> {
+  const page  = query.page  ?? 1;
+  const limit = query.limit ?? 20;
+
+  const today     = new Date();
+  const todayStr  = today.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+
+  // ── 1. Determine history date range ─────────────────────────────────────
+  // If no dates given → full current month
+  const historyFrom = query.fromDate
+    ?? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  const historyTo   = query.toDate ?? todayStr;
+
+  // ── 2. Fetch paginated records for history list ──────────────────────────
+  const allFiltered = await this.attendanceRepository.findByStudentWithFilters(
+    studentId,
+    historyFrom,
+    historyTo,
+  );
+
+  const total        = allFiltered.length;
+  const paginatedRec = allFiltered.slice((page - 1) * limit, page * limit);
+
+  // ── 3. Weekly stats (Mon–today of current week) ──────────────────────────
+  const dayOfWeek      = today.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  // Monday of current week
+  const diffToMonday   = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday         = new Date(today);
+  monday.setDate(today.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const weekFrom = monday.toISOString().split('T')[0];
+  const weekTo   = todayStr;
+
+  // Count Mon–today working days (Mon–Sat = 6 days, exclude Sun)
+  let weeklyWorkingDays = 0;
+  const cur = new Date(monday);
+  while (cur <= today) {
+    if (cur.getDay() !== 0) weeklyWorkingDays++; // exclude Sunday
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  const weekRecords = await this.attendanceRepository.findByStudentWithFilters(
+    studentId,
+    weekFrom,
+    weekTo,
+  );
+  // Unique days present this week
+  const weekPresentDays = new Set(weekRecords.map(r => r.date)).size;
+  const weeklyPercentage =
+    weeklyWorkingDays > 0
+      ? Math.round((weekPresentDays / weeklyWorkingDays) * 100)
+      : 0;
+
+  // ── 4. Monthly stats (1st of month → today) ──────────────────────────────
+  const monthFrom = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  const monthTo   = todayStr;
+
+  // Count working days Mon–Sat from 1st to today
+  let monthlyWorkingDays = 0;
+  const mCur = new Date(monthFrom);
+  while (mCur <= today) {
+    if (mCur.getDay() !== 0) monthlyWorkingDays++;
+    mCur.setDate(mCur.getDate() + 1);
+  }
+
+  const monthRecords = await this.attendanceRepository.findByStudentWithFilters(
+    studentId,
+    monthFrom,
+    monthTo,
+  );
+  const monthPresentDays = new Set(monthRecords.map(r => r.date)).size;
+  const monthlyPercentage =
+    monthlyWorkingDays > 0
+      ? Math.round((monthPresentDays / monthlyWorkingDays) * 100)
+      : 0;
+
+  // ── 5. Current streak (consecutive days present going back from today) ───
+  // Fetch last 90 days to calculate streak
+  const ninetyDaysAgo = new Date(today);
+  ninetyDaysAgo.setDate(today.getDate() - 90);
+  const streakFrom = ninetyDaysAgo.toISOString().split('T')[0];
+
+  const streakRecords = await this.attendanceRepository.findByStudentWithFilters(
+    studentId,
+    streakFrom,
+    todayStr,
+  );
+
+  // Build a Set of all present dates
+  const presentDatesSet = new Set(streakRecords.map(r => r.date));
+
+  // Walk backwards from today counting consecutive present days
+  let currentStreak   = 0;
+  const streakCur     = new Date(today);
+
+  while (true) {
+    const dateStr = streakCur.toISOString().split('T')[0];
+    // Skip Sundays (non-working day — don't break streak)
+    if (streakCur.getDay() === 0) {
+      streakCur.setDate(streakCur.getDate() - 1);
+      continue;
+    }
+    if (presentDatesSet.has(dateStr)) {
+      currentStreak++;
+      streakCur.setDate(streakCur.getDate() - 1);
+    } else {
+      // If today itself is absent, streak is 0 — don't penalise past days
+      break;
+    }
+  }
+
+  return {
+    records: paginatedRec,
+    total,
+    page,
+    limit,
+    stats: {
+      weeklyPresentDays:  weekPresentDays,
+      weeklyWorkingDays,
+      weeklyPercentage,
+      monthlyPresentDays: monthPresentDays,
+      monthlyWorkingDays,
+      monthlyPercentage,
+      currentStreak,
+      currentDate: todayStr,
+    },
+  };
+}
 }

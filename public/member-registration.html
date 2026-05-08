@@ -4,600 +4,1677 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Library Member Registration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    /* ============================================================
+       CSS VARIABLES & RESET
+    ============================================================ */
+    :root {
+      --ink:        #0f0e0d;
+      --ink-soft:   #4a4845;
+      --ink-muted:  #9a9490;
+      --surface:    #faf8f5;
+      --surface-2:  #f2efe9;
+      --surface-3:  #e8e4dc;
+      --border:     #dedad2;
+      --border-focus: #b8a88a;
+      --amber:      #c8882a;
+      --amber-light:#fdf3e3;
+      --amber-deep: #a06820;
+      --green:      #2d7a4f;
+      --green-light:#e8f5ed;
+      --red:        #c0392b;
+      --red-light:  #fdecea;
+      --radius-sm:  6px;
+      --radius-md:  12px;
+      --radius-lg:  20px;
+      --shadow-sm:  0 1px 3px rgba(15,14,13,0.06), 0 1px 2px rgba(15,14,13,0.04);
+      --shadow-md:  0 4px 16px rgba(15,14,13,0.08), 0 2px 6px rgba(15,14,13,0.05);
+      --shadow-lg:  0 20px 60px rgba(15,14,13,0.12), 0 8px 24px rgba(15,14,13,0.08);
+      --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
     }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-        sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'DM Sans', sans-serif;
+      background: var(--surface);
+      color: var(--ink);
       min-height: 100vh;
       display: flex;
+      align-items: flex-start;
       justify-content: center;
-      align-items: center;
-      padding: 16px;
+      padding: 24px 16px 60px;
+      position: relative;
+      overflow-x: hidden;
     }
 
-    .container {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      max-width: 500px;
+    /* ── Background pattern ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(200,136,42,0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(45,122,79,0.05) 0%, transparent 50%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23b8a88a' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ============================================================
+       MAIN CARD
+    ============================================================ */
+    .card {
+      position: relative;
+      z-index: 1;
+      background: #fff;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
       width: 100%;
-      padding: 40px;
+      max-width: 560px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      animation: cardIn 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
-    .header {
-      text-align: center;
-      margin-bottom: 32px;
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(24px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
     }
 
-    .header h1 {
-      font-size: 28px;
-      color: #333;
-      margin-bottom: 8px;
+    /* ── Header band ── */
+    .card-header {
+      background: var(--ink);
+      padding: 32px 36px 28px;
+      position: relative;
+      overflow: hidden;
     }
 
-    .header p {
-      color: #666;
-      font-size: 14px;
+    .card-header::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 180px; height: 180px;
+      border-radius: 50%;
+      background: rgba(200,136,42,0.12);
+      pointer-events: none;
     }
 
-    .expiry-badge {
-      display: inline-block;
-      background: #fef3cd;
-      color: #856404;
+    .card-header::after {
+      content: '';
+      position: absolute;
+      bottom: -60px; left: 20px;
+      width: 140px; height: 140px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.03);
+      pointer-events: none;
+    }
+
+.header-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.header-top-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.header-library-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.library-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.library-addr {
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.45);
+  margin-top: 2px;
+  font-weight: 300;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 21px;
+  color: #fff;
+  line-height: 1.15;
+  margin-bottom: 4px;
+}
+
+.header-sub {
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.45);
+  font-weight: 300;
+}
+
+    .header-icon {
+      width: 32px; height: 32px;
+      background: var(--amber);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .header-icon svg { width: 16px; height: 16px; fill: #fff; }
+
+  .header-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.header-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 26px;
+  color: #fff;
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+
+.header-sub {
+  font-size: 13.5px;
+  color: rgba(255,255,255,0.5);
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+    /* ── Timer pill ── */
+    .timer-pill {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 100px;
       padding: 6px 12px;
-      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(8px);
+      transition: var(--transition);
+    }
+
+    .timer-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .timer-dot.urgent { background: #f87171; animation: pulse-fast 0.8s ease-in-out infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .timer-text {
       font-size: 12px;
-      margin-top: 8px;
-      font-weight: 500;
+      font-weight: 600;
+      color: rgba(255,255,255,0.85);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Progress steps ── */
+    .progress-bar {
+      height: 3px;
+      background: var(--surface-3);
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--amber) 0%, var(--amber-deep) 100%);
+      width: 0%;
+      transition: width 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ── Body ── */
+    .card-body {
+      padding: 32px 36px 36px;
+    }
+
+    /* ============================================================
+       ALERTS
+    ============================================================ */
+    .alert {
+      display: none;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      margin-bottom: 24px;
+      font-size: 13.5px;
+      line-height: 1.5;
+      animation: alertIn 250ms ease both;
+    }
+
+    @keyframes alertIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .alert.show { display: flex; }
+
+    .alert-icon {
+      width: 20px; height: 20px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .alert-error {
+      background: var(--red-light);
+      border: 1px solid rgba(192,57,43,0.18);
+      color: var(--red);
+    }
+
+    .alert-success {
+      background: var(--green-light);
+      border: 1px solid rgba(45,122,79,0.2);
+      color: var(--green);
+    }
+
+    /* ============================================================
+       FORM ELEMENTS
+    ============================================================ */
+    .section-title {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
     }
 
     .form-group {
       margin-bottom: 20px;
     }
 
-    label {
-      display: block;
-      margin-bottom: 8px;
-      color: #333;
-      font-weight: 500;
-      font-size: 14px;
-    }
-
-    .required::after {
-      content: ' *';
-      color: #e74c3c;
-    }
-
-    input,
-    textarea,
-    select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 14px;
-      font-family: inherit;
-      transition: border-color 0.3s, box-shadow 0.3s;
-    }
-
-    input:focus,
-    textarea:focus,
-    select:focus {
-      outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
-
     .form-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 14px;
     }
 
-    .form-row .form-group {
-      margin-bottom: 20px;
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-soft);
+      margin-bottom: 7px;
+      letter-spacing: -0.01em;
     }
 
-    .error {
-      color: #e74c3c;
-      font-size: 12px;
-      margin-top: 4px;
+    label .req {
+      color: var(--amber);
+      margin-left: 2px;
+    }
+
+    /* ── Text inputs & selects ── */
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap .input-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px;
+      color: var(--ink-muted);
+      pointer-events: none;
+      transition: color var(--transition);
+    }
+
+    .input-wrap input,
+    .input-wrap select {
+      padding-left: 38px;
+    }
+
+    input[type="text"],
+    input[type="tel"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 11px 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      outline: none;
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input[type="text"]:hover,
+    input[type="tel"]:hover,
+    input[type="date"]:hover,
+    select:hover {
+      border-color: var(--border-focus);
+      background: #fff;
+    }
+
+    input[type="text"]:focus,
+    input[type="tel"]:focus,
+    input[type="date"]:focus,
+    select:focus {
+      border-color: var(--amber);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(200,136,42,0.12);
+    }
+
+    input[type="text"]:focus ~ .input-icon,
+    input[type="tel"]:focus ~ .input-icon,
+    .input-wrap:focus-within .input-icon {
+      color: var(--amber);
+    }
+
+    input.has-error,
+    select.has-error {
+      border-color: var(--red);
+      background: var(--red-light);
+    }
+
+    input.has-error:focus,
+    select.has-error:focus {
+      box-shadow: 0 0 0 3px rgba(192,57,43,0.1);
+    }
+
+    /* Custom select arrow */
+    .select-wrap {
+      position: relative;
+    }
+
+    .select-wrap::after {
+      content: '';
+      position: absolute;
+      right: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 5px solid var(--ink-muted);
+      pointer-events: none;
+      transition: var(--transition);
+    }
+
+    select { padding-right: 36px; cursor: pointer; }
+
+    select option[value=""] { color: var(--ink-muted); }
+
+    /* ── Date input ── */
+    input[type="date"] {
+      cursor: pointer;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      opacity: 0.4;
+      cursor: pointer;
+      filter: invert(0.3);
+    }
+
+    /* ── Error messages ── */
+    .field-error {
       display: none;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--red);
+      margin-top: 5px;
+      font-weight: 400;
     }
 
-    .error.visible {
+    .field-error.show { display: flex; }
+
+    .field-error svg {
+      width: 12px; height: 12px;
+      flex-shrink: 0;
+    }
+
+    /* ── Gender radio buttons ── */
+    .gender-options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .gender-option {
+      position: relative;
+    }
+
+    .gender-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0; height: 0;
+    }
+
+    .gender-option label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 8px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition);
+      background: var(--surface);
+      margin-bottom: 0;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      font-weight: 500;
+      text-align: center;
+      user-select: none;
+    }
+
+    .gender-option label .gender-icon {
+      font-size: 20px;
+      line-height: 1;
       display: block;
     }
 
-    .button-group {
+    .gender-option input:checked + label {
+      border-color: var(--amber);
+      background: var(--amber-light);
+      color: var(--amber-deep);
+      box-shadow: 0 0 0 3px rgba(200,136,42,0.1);
+    }
+
+    .gender-option label:hover {
+      border-color: var(--border-focus);
+      background: #fff;
+    }
+
+    /* ── Seat option card ── */
+    .seat-option-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 2px;
+    }
+
+    .seat-option-grid::-webkit-scrollbar {
+      width: 4px;
+    }
+    .seat-option-grid::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 4px; }
+    .seat-option-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .seat-card {
+      position: relative;
+    }
+
+    .seat-card input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0; height: 0;
+    }
+
+    .seat-card label {
       display: flex;
-      gap: 12px;
-      margin-top: 32px;
-    }
-
-    button {
-      flex: 1;
-      padding: 12px 24px;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 10px 6px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: all 0.3s;
+      transition: all var(--transition);
+      background: var(--surface);
+      margin-bottom: 0;
+      font-size: 12px;
+      color: var(--ink-soft);
+      font-weight: 500;
+      text-align: center;
+      user-select: none;
     }
 
+    .seat-card label .seat-num {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .seat-card label .seat-gender {
+      font-size: 10px;
+      color: var(--ink-muted);
+      font-weight: 400;
+    }
+
+    .seat-card input:checked + label {
+      border-color: var(--amber);
+      background: var(--amber-light);
+      box-shadow: 0 0 0 2px rgba(200,136,42,0.15);
+    }
+
+    .seat-card input:checked + label .seat-num { color: var(--amber-deep); }
+
+    .seat-card label:hover {
+      border-color: var(--border-focus);
+      background: #fff;
+    }
+
+    .seat-card.unavailable label {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* ── Select seat placeholder ── */
+    .seat-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius-md);
+      color: var(--ink-muted);
+      font-size: 13px;
+      gap: 8px;
+      text-align: center;
+    }
+
+    .seat-placeholder svg {
+      width: 28px; height: 28px;
+      opacity: 0.3;
+    }
+
+    /* ── Slot select ── */
+    .slot-badge-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .slot-badge {
+      position: relative;
+    }
+
+    .slot-badge input[type="radio"] {
+      position: absolute;
+      opacity: 0; width: 0; height: 0;
+    }
+
+    .slot-badge label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      cursor: pointer;
+      transition: all var(--transition);
+      background: var(--surface);
+      margin-bottom: 0;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .slot-badge input:checked + label {
+      border-color: var(--amber);
+      background: var(--amber-light);
+      color: var(--amber-deep);
+    }
+
+    .slot-badge label:hover {
+      border-color: var(--border-focus);
+      background: #fff;
+    }
+
+    /* No slots / No seats messages */
+    .empty-state {
+      font-size: 13px;
+      color: var(--ink-muted);
+      padding: 10px 0;
+      font-style: italic;
+    }
+
+    /* ============================================================
+       SUBMIT BUTTON
+    ============================================================ */
     .btn-submit {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      width: 100%;
+      padding: 15px 24px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #fff;
+      background: var(--ink);
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+      margin-top: 8px;
     }
 
+    .btn-submit::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(200,136,42,0.15) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .btn-submit:hover:not(:disabled)::before { opacity: 1; }
     .btn-submit:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(15,14,13,0.2);
+    }
+
+    .btn-submit:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: var(--shadow-sm);
     }
 
     .btn-submit:disabled {
-      opacity: 0.6;
+      opacity: 0.5;
       cursor: not-allowed;
     }
 
-    .success-message {
-      background: #d4edda;
-      color: #155724;
-      padding: 16px;
-      border-radius: 6px;
-      display: none;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .success-message.visible {
-      display: block;
-    }
-
-    .loading {
-      display: none;
-      text-align: center;
-      color: #667eea;
-      font-size: 14px;
-    }
-
-    .loading.visible {
-      display: block;
-    }
-
-    .spinner {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid #f3f3f3;
-      border-top: 2px solid #667eea;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-right: 8px;
-    }
-
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg);
-      }
-      100% {
-        transform: rotate(360deg);
-      }
-    }
-
-    .alert {
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      display: none;
-    }
-
-    .alert.visible {
-      display: block;
-    }
-
-    .alert-error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-
-    .alert-success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-
-    .radio-group {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-      margin-top: 4px;
-    }
-
-    .radio-label {
+    .btn-inner {
       display: flex;
       align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .btn-arrow {
+      width: 18px; height: 18px;
+      transition: transform var(--transition);
+    }
+
+    .btn-submit:hover:not(:disabled) .btn-arrow {
+      transform: translateX(3px);
+    }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ============================================================
+       SUCCESS STATE
+    ============================================================ */
+    .success-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 16px 0 8px;
+      animation: fadeIn 400ms ease both;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .success-state.show { display: flex; }
+
+    .success-checkmark {
+      width: 72px; height: 72px;
+      background: var(--green-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      border: 2px solid rgba(45,122,79,0.2);
+      animation: popIn 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both 150ms;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.5); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .success-checkmark svg {
+      width: 32px; height: 32px;
+      stroke: var(--green);
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    .success-checkmark svg path {
+      stroke-dasharray: 50;
+      stroke-dashoffset: 50;
+      animation: drawCheck 500ms ease forwards 400ms;
+    }
+
+    @keyframes drawCheck {
+      to { stroke-dashoffset: 0; }
+    }
+
+    .success-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+
+    .success-desc {
+      font-size: 14px;
+      color: var(--ink-soft);
+      line-height: 1.6;
+      max-width: 320px;
+    }
+
+    .success-badge {
+      display: inline-flex;
+      align-items: center;
       gap: 6px;
-      font-weight: normal;
-      cursor: pointer;
-      color: #444;
+      background: var(--green-light);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-top: 16px;
     }
 
-    .radio-label input[type='radio'] {
-      width: auto;
-      margin: 0;
+    /* ============================================================
+       EXPIRED STATE
+    ============================================================ */
+    .expired-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 16px 0 8px;
     }
 
-    select option.seat-inactive {
-      color: #999;
+    .expired-state.show { display: flex; }
+
+    .expired-icon {
+      width: 64px; height: 64px;
+      background: var(--red-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      border: 2px solid rgba(192,57,43,0.15);
     }
 
+    .expired-icon svg { width: 28px; height: 28px; stroke: var(--red); fill: none; stroke-width: 2; }
+
+    .expired-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 20px;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+
+    .expired-desc {
+      font-size: 13.5px;
+      color: var(--ink-soft);
+      line-height: 1.6;
+    }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    .card-footer {
+      padding: 14px 36px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: var(--surface);
+    }
+
+    .footer-text {
+      font-size: 11.5px;
+      color: var(--ink-muted);
+    }
+
+    .footer-lock {
+      width: 12px; height: 12px;
+      color: var(--ink-muted);
+    }
+
+    /* ============================================================
+       LOADING SKELETON (while fetching details)
+    ============================================================ */
+    .skeleton-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+      background-size: 200% 100%;
+      border-radius: var(--radius-sm);
+      animation: shimmer 1.5s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton-label { height: 13px; width: 35%; margin-bottom: 7px; }
+    .skeleton-input { height: 42px; width: 100%; }
+    .skeleton-half { height: 42px; width: 48%; display: inline-block; }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
     @media (max-width: 600px) {
-      .container {
-        padding: 24px;
-      }
-
-      .header h1 {
-        font-size: 24px;
-      }
-
-      .form-row {
-        grid-template-columns: 1fr;
-      }
+      body { padding: 0 0 40px; align-items: flex-start; }
+      .card { border-radius: 0; max-width: 100%; min-height: 100vh; }
+      .card-header { padding: 28px 24px 24px; }
+      .card-body { padding: 28px 24px 32px; }
+      .card-footer { padding: 14px 24px; }
+      .form-row { grid-template-columns: 1fr; gap: 0; }
+      .gender-options { grid-template-columns: repeat(3, 1fr); }
+      .header-top-row { flex-wrap: wrap; gap: 8px; }
+.library-name { font-size: 14px; }
     }
+
+    @media (max-width: 380px) {
+      .gender-options { grid-template-columns: 1fr 1fr; }
+      .gender-option:last-child { grid-column: span 2; }
+    }
+
+    .library-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.library-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.library-addr {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+  font-weight: 300;
+}
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>Library Member Registration</h1>
-      <p>Complete your registration to access the library</p>
-      <div class="expiry-badge" id="expiryBadge">Expires in <span id="expiryTime">15:00</span></div>
+
+<div class="card" id="mainCard">
+
+  <!-- HEADER -->
+ <div class="card-header">
+  <div class="header-top-row">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>
-
-    <div class="alert alert-error" id="errorAlert"></div>
-    <div class="success-message" id="successMessage">
-      ✓ Registration completed successfully! You can now access the library.
+    <div class="header-library-info">
+      <div class="library-name" id="libraryName">Loading…</div>
+      <div class="library-addr" id="libraryAddr"></div>
     </div>
+    <div class="timer-pill" id="timerPill">
+      <div class="timer-dot" id="timerDot"></div>
+      <span class="timer-text" id="timerText">15:00</span>
+    </div>
+  </div>
+  <h1 class="header-title">Member Registration</h1>
+  <p class="header-sub">Fill in your details to join</p>
+</div>
 
-    <form id="memberForm">
-      <div class="form-group">
-        <label for="fullName" class="required">Full Name</label>
-        <input type="text" id="fullName" name="fullName" placeholder="Enter your full name" />
-        <div class="error" id="fullNameError"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="email">Email Address</label>
-        <input type="email" id="email" name="email" placeholder="your.email@example.com" />
-        <div class="error" id="emailError"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="mobileNo" class="required">Mobile Number</label>
-        <input
-          type="tel"
-          id="mobileNo"
-          name="mobileNo"
-          placeholder="Enter your mobile number"
-          pattern="[0-9]{10}"
-          maxlength="10"
-        />
-        <div class="error" id="mobileNoError"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="aadharId">Aadhar ID</label>
-        <input
-          type="text"
-          id="aadharId"
-          name="aadharId"
-          placeholder="Enter your Aadhar ID"
-          pattern="[0-9]{12}"
-          maxlength="12"
-        />
-        <div class="error" id="aadharIdError"></div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="duration" class="required">Duration (months)</label>
-          <input type="number" id="duration" name="duration" placeholder="e.g., 3" min="1" />
-          <div class="error" id="durationError"></div>
-        </div>
-
-        <div class="form-group">
-          <label for="planAmount">Plan Amount (₹)</label>
-          <input type="number" id="planAmount" name="planAmount" placeholder="Amount" min="0" />
-          <div class="error" id="planAmountError"></div>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="startDate">Start Date</label>
-          <input type="date" id="startDate" name="startDate" />
-          <div class="error" id="startDateError"></div>
-        </div>
-
-        <div class="form-group">
-          <label for="endDate">End Date</label>
-          <input type="date" id="endDate" name="endDate" />
-          <div class="error" id="endDateError"></div>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="slotId">Slot ID</label>
-        <select id="slotId" name="slotId">
-          <option value="">Select Slot</option>
-        </select>
-        <div class="error" id="slotIdError"></div>
-      </div>
-
-      <div class="form-group">
-        <label class="required">Gender</label>
-        <div class="radio-group">
-          <label class="radio-label"><input type="radio" name="gender" value="male" /> Male</label>
-          <label class="radio-label"><input type="radio" name="gender" value="female" /> Female</label>
-          <label class="radio-label"><input type="radio" name="gender" value="any" /> Any</label>
-        </div>
-        <div class="error" id="genderError"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="seatId">Seat ID</label>
-        <select id="seatId" name="seatId">
-          <option value="">Select gender first</option>
-        </select>
-        <div class="error" id="seatIdError"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="status">Status</label>
-        <select id="status" name="status">
-          <option value="">Select Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
-          <option value="SUSPENDED">Suspended</option>
-        </select>
-        <div class="error" id="statusError"></div>
-      </div>
-
-      <div class="form-group">
-        <label for="notes">Notes</label>
-        <textarea id="notes" name="notes" placeholder="Any additional notes..."></textarea>
-      </div>
-
-      <div class="loading" id="loading">
-        <span class="spinner"></span> Submitting your registration...
-      </div>
-
-      <div class="button-group">
-        <button type="submit" class="btn-submit" id="submitBtn">Register Now</button>
-      </div>
-    </form>
+  <!-- Progress -->
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
   </div>
 
-  <script>
-    const API_BASE = window.location.origin;
-    const TOKEN = new URLSearchParams(window.location.search).get('token') ||
-      window.location.pathname.split('/').pop();
-    let remainingSeconds = 900;
+  <!-- BODY -->
+  <div class="card-body" id="cardBody">
 
-    const form = document.getElementById('memberForm');
-    const loading = document.getElementById('loading');
-    const errorAlert = document.getElementById('errorAlert');
-    const successMessage = document.getElementById('successMessage');
-    const expiryTime = document.getElementById('expiryTime');
-    const submitBtn = document.getElementById('submitBtn');
+    <!-- Global alert -->
+    <div class="alert alert-error" id="alertError" role="alert">
+      <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span id="alertErrorText"></span>
+    </div>
 
-    // Expiry countdown timer
-    function startExpiryTimer() {
-      updateExpiryDisplay();
+    <!-- Skeleton loading -->
+    <div class="skeleton-wrap" id="skeletonLoader">
+      <div>
+        <div class="skeleton skeleton-label"></div>
+        <div class="skeleton skeleton-input"></div>
+      </div>
+      <div>
+        <div class="skeleton skeleton-label"></div>
+        <div class="skeleton skeleton-input"></div>
+      </div>
+      <div style="display:flex;gap:14px">
+        <div style="flex:1">
+          <div class="skeleton skeleton-label"></div>
+          <div class="skeleton skeleton-input"></div>
+        </div>
+        <div style="flex:1">
+          <div class="skeleton skeleton-label"></div>
+          <div class="skeleton skeleton-input"></div>
+        </div>
+      </div>
+    </div>
 
-      const interval = setInterval(() => {
-        remainingSeconds--;
-        if (remainingSeconds <= 0) {
-          clearInterval(interval);
-          submitBtn.disabled = true;
-          showError('This invite link has expired. Please request a new one.');
-          return;
-        }
-        updateExpiryDisplay();
-      }, 1000);
-    }
+    <!-- Form (hidden until loaded) -->
+    <form id="memberForm" style="display:none" novalidate autocomplete="off">
 
-    function updateExpiryDisplay() {
-      const minutes = Math.floor(remainingSeconds / 60);
-      const seconds = remainingSeconds % 60;
-      expiryTime.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
+      <!-- Personal Info Section -->
+      <p class="section-title">Personal Info</p>
 
-    let allSeats = [];
+      <!-- Full Name -->
+      <div class="form-group">
+        <label for="fullName">Full Name <span class="req">*</span></label>
+        <div class="input-wrap">
+          <input type="text" id="fullName" name="fullName"
+            placeholder="Enter your full name"
+            autocomplete="name" />
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <div class="field-error" id="fullNameError">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span></span>
+        </div>
+      </div>
 
-    function populateSeatsByGender(gender) {
-      const seatSelect = document.getElementById('seatId');
-      seatSelect.innerHTML = '<option value="">Select Seat</option>';
-      const filtered = gender ? allSeats.filter(s => s.gender === gender || s.gender === 'any') : allSeats;
-      filtered.forEach(seat => {
-        const today = new Date().toISOString().slice(0, 10);
-        const endDateVal = document.getElementById('endDate').value;
-        let status;
-        if (endDateVal) {
-          status = endDateVal >= today ? 'Active' : 'Inactive';
-        } else {
-          status = seat.isActive ? 'Active' : 'Inactive';
-        }
-        const opt = document.createElement('option');
-        opt.value = seat.seatId;
-        opt.textContent = `${seat.label || seat.seatId} (${status})`;
-        if (status === 'Inactive') opt.className = 'seat-inactive';
-        seatSelect.appendChild(opt);
-      });
-    }
+      <!-- Mobile -->
+      <div class="form-group">
+        <label for="mobileNo">Mobile Number <span class="req">*</span></label>
+        <div class="input-wrap">
+          <input type="tel" id="mobileNo" name="mobileNo"
+            placeholder="10-digit mobile number"
+            maxlength="10" pattern="[6-9][0-9]{9}"
+            autocomplete="tel" inputmode="numeric" />
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.08 6.08l.85-.85a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </div>
+        <div class="field-error" id="mobileNoError">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span></span>
+        </div>
+      </div>
 
-    document.querySelectorAll('input[name="gender"]').forEach(radio => {
-      radio.addEventListener('change', () => populateSeatsByGender(radio.value));
-    });
+      <!-- Gender -->
+      <div class="form-group">
+        <label>Gender <span class="req">*</span></label>
+        <div class="gender-options">
+          <div class="gender-option">
+            <input type="radio" id="genderMale" name="gender" value="male" />
+            <label for="genderMale">
+              <span class="gender-icon">♂</span>Male
+            </label>
+          </div>
+          <div class="gender-option">
+            <input type="radio" id="genderFemale" name="gender" value="female" />
+            <label for="genderFemale">
+              <span class="gender-icon">♀</span>Female
+            </label>
+          </div>
+          <div class="gender-option">
+            <input type="radio" id="genderOther" name="gender" value="other" />
+            <label for="genderOther">
+              <span class="gender-icon">⚬</span>Other
+            </label>
+          </div>
+        </div>
+        <div class="field-error" id="genderError">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Please select your gender</span>
+        </div>
+      </div>
 
-    document.getElementById('endDate').addEventListener('change', () => {
-      const checked = document.querySelector('input[name="gender"]:checked');
-      populateSeatsByGender(checked ? checked.value : '');
-    });
+      <!-- Membership Details Section -->
+      <p class="section-title" style="margin-top:8px">Membership Details</p>
 
-    async function loadInviteDetails() {
-      const response = await fetch(`${API_BASE}/api/public/members/invite/${TOKEN}/details`);
-      if (!response.ok) {
-        throw new Error('This invite link is invalid or expired.');
-      }
+      <!-- Dates row -->
+      <div class="form-row" style="margin-bottom:20px">
+        <div class="form-group" style="margin-bottom:0">
+          <label for="startDate">Start Date <span class="req">*</span></label>
+          <div class="input-wrap">
+            <input type="date" id="startDate" name="startDate" />
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div class="field-error" id="startDateError">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span></span>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="endDate">End Date <span class="req">*</span></label>
+          <div class="input-wrap">
+            <input type="date" id="endDate" name="endDate" />
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div class="field-error" id="endDateError">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span></span>
+          </div>
+        </div>
+      </div>
 
-      const payload = await response.json();
-      remainingSeconds = payload?.data?.expiresIn ?? 0;
+      <!-- Slot Section -->
+      <p class="section-title" style="margin-top:8px">Slot & Seat</p>
 
-      // Populate slots dropdown
-      const slotSelect = document.getElementById('slotId');
-      const slots = payload?.data?.slots ?? [];
-      slots.forEach(slot => {
-        if (!slot.isActive) return;
-        const opt = document.createElement('option');
-        opt.value = slot.slotType;
-        opt.textContent = `${slot.name} (${slot.startTime} - ${slot.endTime})`;
-        slotSelect.appendChild(opt);
-      });
+      <!-- Slot selection -->
+      <div class="form-group" id="slotGroup">
+       <label>Time Slot <span class="req">*</span></label>
+        <div class="slot-badge-grid" id="slotOptions">
+          <span class="empty-state">Loading slots…</span>
+        </div>
+        <input type="hidden" id="slotId" name="slotId" />
+      </div>
 
-      // Store seats for gender-based filtering
-      allSeats = payload?.data?.seats ?? [];
+      <!-- Seat selection -->
+      <div class="form-group">
+        <label>Seat <span style="font-weight:400;color:var(--ink-muted);font-size:12px">(optional)</span></label>
+        <div id="seatContainer">
+          <div class="seat-placeholder" id="seatPlaceholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6z"/><path d="M2 18h20M6 18v-4M18 18v-4"/>
+            </svg>
+            <span>Select your gender above to view available seats</span>
+          </div>
+          <div class="seat-option-grid" id="seatOptions" style="display:none"></div>
+        </div>
+        <input type="hidden" id="seatId" name="seatId" />
+        <div class="field-error" id="seatIdError">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span></span>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="btn-submit" id="submitBtn">
+        <span class="btn-inner" id="btnInner">
+          <span>Submit Registration</span>
+          <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </span>
+      </button>
+
+    </form>
+
+    <!-- SUCCESS STATE -->
+    <div class="success-state" id="successState">
+      <div class="success-checkmark">
+        <svg viewBox="0 0 24 24">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </div>
+      <h2 class="success-title">You're all set!</h2>
+      <p class="success-desc">
+        Your registration has been submitted. The library owner will review and confirm your membership shortly.
+      </p>
+      <div class="success-badge">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Pending Approval
+      </div>
+    </div>
+
+    <!-- EXPIRED STATE -->
+    <div class="expired-state" id="expiredState">
+      <div class="expired-icon">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <h2 class="expired-title">Link Expired</h2>
+      <p class="expired-desc">This invite link is no longer valid.<br/>Please request a new link from the library.</p>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="card-footer">
+    <svg class="footer-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+    <span class="footer-text">Your information is secure &amp; encrypted</span>
+  </div>
+
+</div>
+
+<script>
+  /* ============================================================
+     CONFIGURATION — change API_BASE if backend runs elsewhere
+  ============================================================ */
+  const API_BASE = window.location.origin;
+  const TOKEN = (() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('token')) return params.get('token');
+    const parts = window.location.pathname.split('/').filter(Boolean);
+    return parts[parts.length - 1] || '';
+  })();
+
+  /* ============================================================
+     STATE
+  ============================================================ */
+  let allSeats = [];
+  let allSlots = [];
+  let remainingSeconds = 900;
+  let timerInterval = null;
+  let isLoading = false;
+
+  /* ============================================================
+     DOM REFERENCES
+  ============================================================ */
+  const $  = id => document.getElementById(id);
+  const skeletonLoader = $('skeletonLoader');
+  const memberForm     = $('memberForm');
+  const successState   = $('successState');
+  const expiredState   = $('expiredState');
+  const alertError     = $('alertError');
+  const alertErrorText = $('alertErrorText');
+  const submitBtn      = $('submitBtn');
+  const btnInner       = $('btnInner');
+  const timerText      = $('timerText');
+  const timerDot       = $('timerDot');
+  const progressFill   = $('progressFill');
+
+  /* ============================================================
+     TIMER
+  ============================================================ */
+  function startTimer() {
+    updateTimer();
+    timerInterval = setInterval(() => {
+      remainingSeconds--;
       if (remainingSeconds <= 0) {
-        submitBtn.disabled = true;
-        showError('This invite link has expired. Please request a new one.');
-      }
-    }
-
-    function showError(message) {
-      errorAlert.textContent = message;
-      errorAlert.classList.add('visible');
-      successMessage.classList.remove('visible');
-    }
-
-    function showSuccess() {
-      successMessage.classList.add('visible');
-      errorAlert.classList.remove('visible');
-      form.style.display = 'none';
-    }
-
-    function hideLoading() {
-      loading.classList.remove('visible');
-      submitBtn.disabled = false;
-    }
-
-    function showLoading() {
-      loading.classList.add('visible');
-      submitBtn.disabled = true;
-    }
-
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
-      clearErrors();
-
-      const formData = {
-        fullName: document.getElementById('fullName').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        mobileNo: document.getElementById('mobileNo').value.trim(),
-        aadharId: document.getElementById('aadharId').value.trim(),
-        duration: document.getElementById('duration').value ? parseInt(document.getElementById('duration').value) : null,
-        planAmount: document.getElementById('planAmount').value
-          ? parseInt(document.getElementById('planAmount').value)
-          : null,
-        startDate: document.getElementById('startDate').value,
-        endDate: document.getElementById('endDate').value,
-        seatId: document.getElementById('seatId').value.trim(),
-        slotId: document.getElementById('slotId').value.trim(),
-        gender: document.querySelector('input[name="gender"]:checked')?.value || '',
-        status: document.getElementById('status').value.trim(),
-        notes: document.getElementById('notes').value.trim(),
-      };
-
-      // Client-side validation
-      if (!formData.fullName) {
-        showFieldError('fullName', 'Full name is required');
+        clearInterval(timerInterval);
+        showExpired();
         return;
       }
+      updateTimer();
+    }, 1000);
+  }
 
-      if (!formData.mobileNo || formData.mobileNo.length !== 10 || !/^\d+$/.test(formData.mobileNo)) {
-        showFieldError('mobileNo', 'Valid 10-digit mobile number is required');
-        return;
-      }
+  function updateTimer() {
+    const m = Math.floor(remainingSeconds / 60);
+    const s = remainingSeconds % 60;
+    timerText.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    if (remainingSeconds <= 120) {
+      timerDot.classList.add('urgent');
+      timerText.style.color = '#f87171';
+    }
+  }
 
-      if (!formData.duration || formData.duration < 1) {
-        showFieldError('duration', 'Duration must be at least 1 month');
-        return;
-      }
+  /* ============================================================
+     PROGRESS (based on filled required fields)
+  ============================================================ */
+  function updateProgress() {
+    const fields = [
+      $('fullName').value.trim(),
+      $('mobileNo').value.trim(),
+      document.querySelector('input[name="gender"]:checked')?.value,
+      $('startDate').value,
+      $('endDate').value,
+    ];
+    const filled = fields.filter(Boolean).length;
+    progressFill.style.width = `${(filled / fields.length) * 100}%`;
+  }
 
-      showLoading();
+  /* ============================================================
+     SLOT RENDERING
+  ============================================================ */
+ function renderSlots(slots) {
+  const container = $('slotOptions');
+  const active = slots.filter(s => s.isActive);
 
-      try {
-        const response = await fetch(`${API_BASE}/api/public/members/invite/${TOKEN}/submit`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        });
+  if (!active.length) {
+    container.innerHTML = '<span class="empty-state">No slots configured for this library</span>';
+    $('slotId').value = '';
+    return;
+  }
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Registration failed');
-        }
+  container.innerHTML = '';
 
-        showSuccess();
-      } catch (error) {
-        showError(error.message || 'An error occurred. Please try again.');
-        console.error('Submission error:', error);
-      } finally {
-        hideLoading();
-      }
+  // NO "Any time" option — slot is required
+  active.forEach((slot, index) => {
+    const div = document.createElement('div');
+    div.className = 'slot-badge';
+    const id = `slot_${slot.slotType}`;
+    div.innerHTML = `
+      <input type="radio" id="${id}" name="slotRadio" value="${slot.slotType}"
+        ${index === 0 ? 'checked' : ''} />
+      <label for="${id}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        ${escHtml(slot.name)}&nbsp;<span style="opacity:.6;font-size:11px">${slot.startTime}–${slot.endTime}</span>
+      </label>`;
+    div.querySelector('input').addEventListener('change', () => {
+      $('slotId').value = slot.slotType;
+      renderSeatsByGender();
+    });
+    container.appendChild(div);
+  });
+
+  // Auto-select first slot
+  $('slotId').value = active[0].slotType;
+}
+
+
+  /* ============================================================
+     SEAT RENDERING
+  ============================================================ */
+  function renderSeatsByGender() {
+    const gender = document.querySelector('input[name="gender"]:checked')?.value || '';
+    const selectedSlot = $('slotId').value;
+    const placeholder = $('seatPlaceholder');
+    const seatGrid    = $('seatOptions');
+    const seatHidden  = $('seatId');
+
+    if (!gender) {
+      placeholder.style.display = '';
+      seatGrid.style.display = 'none';
+      seatHidden.value = '';
+      return;
+    }
+
+    // Filter by gender and slot
+    const filtered = allSeats.filter(s => {
+      const genderOk = s.gender === 'any' || s.gender === gender;
+      return genderOk;
     });
 
-    function showFieldError(fieldName, message) {
-      const errorElement = document.getElementById(`${fieldName}Error`);
-      if (errorElement) {
-        errorElement.textContent = message;
-        errorElement.classList.add('visible');
-        document.getElementById(fieldName).focus();
+    if (!filtered.length) {
+      placeholder.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6z"/>
+          <path d="M2 18h20M6 18v-4M18 18v-4"/>
+        </svg>
+        <span>No seats available for your gender selection</span>`;
+      placeholder.style.display = '';
+      seatGrid.style.display = 'none';
+      seatHidden.value = '';
+      return;
+    }
+
+    placeholder.style.display = 'none';
+    seatGrid.style.display = 'grid';
+    seatGrid.innerHTML = '';
+
+    // Clear current seat selection
+    const currentSeatId = seatHidden.value;
+
+    filtered.forEach(seat => {
+      const div = document.createElement('div');
+      div.className = 'seat-card' + (seat.isActive ? '' : ' unavailable');
+      const domId = `seat_${seat.seatId}`;
+      const genderLabel = seat.gender === 'any' ? 'Any' : seat.gender.charAt(0).toUpperCase() + seat.gender.slice(1);
+      div.innerHTML = `
+        <input type="radio" id="${domId}" name="seatRadio" value="${escHtml(seat.seatId)}"
+          ${!seat.isActive ? 'disabled' : ''}
+          ${seat.seatId === currentSeatId ? 'checked' : ''} />
+        <label for="${domId}">
+          <span class="seat-num">${escHtml(seat.label || seat.seatId)}</span>
+          <span class="seat-gender">${genderLabel}${seat.isActive ? '' : ' · Taken'}</span>
+        </label>`;
+      div.querySelector('input').addEventListener('change', () => {
+        seatHidden.value = seat.seatId;
+        clearFieldError('seatId');
+      });
+      seatGrid.appendChild(div);
+    });
+  }
+
+  /* ============================================================
+     LOAD INVITE DETAILS
+  ============================================================ */
+  async function loadDetails() {
+    if (!TOKEN) {
+      showGlobalError('Invalid invite link. No token found.');
+      hideSkeleton();
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/public/members/invite/${TOKEN}/details`);
+
+      if (res.status === 404) {
+        hideSkeleton();
+        showExpired();
+        return;
       }
+
+      if (!res.ok) throw new Error('Failed to load invite details');
+
+      const payload = await res.json();
+      const data    = payload?.data ?? payload;
+
+      remainingSeconds = data.expiresIn ?? 0;
+      allSlots = data.slots ?? [];
+      allSeats = data.seats ?? [];
+      $('libraryName').textContent = data.libraryName || 'Library';
+      $('libraryAddr').textContent = data.libraryAddress || '';
+
+      if (remainingSeconds <= 0) {
+        hideSkeleton();
+        showExpired();
+        return;
+      }
+
+      renderSlots(allSlots);
+
+      // Set default dates
+      const today = new Date();
+      const nextMonth = new Date(today);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      $('startDate').value = today.toISOString().split('T')[0];
+      $('endDate').value   = nextMonth.toISOString().split('T')[0];
+
+      hideSkeleton();
+      memberForm.style.display = 'block';
+      startTimer();
+      attachListeners();
+
+    } catch (err) {
+      console.error(err);
+      hideSkeleton();
+      showGlobalError('Unable to load invite details. Please refresh or try again later.');
+    }
+  }
+
+  function hideSkeleton() {
+    skeletonLoader.style.display = 'none';
+  }
+
+  /* ============================================================
+     ATTACH EVENT LISTENERS
+  ============================================================ */
+  function attachListeners() {
+    // Progress tracking
+    ['fullName','mobileNo','startDate','endDate'].forEach(id => {
+      $(id).addEventListener('input', updateProgress);
+    });
+    document.querySelectorAll('input[name="gender"]').forEach(r => {
+      r.addEventListener('change', () => {
+        clearFieldError('gender');
+        renderSeatsByGender();
+        updateProgress();
+      });
+    });
+
+    // Clear errors on input
+    $('fullName').addEventListener('input', () => clearFieldError('fullName'));
+    $('mobileNo').addEventListener('input', () => {
+      $('mobileNo').value = $('mobileNo').value.replace(/\D/g,'');
+      clearFieldError('mobileNo');
+    });
+    $('startDate').addEventListener('change', () => {
+      clearFieldError('startDate');
+      updateProgress();
+    });
+    $('endDate').addEventListener('change', () => {
+      clearFieldError('endDate');
+      updateProgress();
+    });
+
+    // Form submit
+    memberForm.addEventListener('submit', handleSubmit);
+  }
+
+  /* ============================================================
+     FORM SUBMISSION
+  ============================================================ */
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (isLoading) return;
+
+    clearAllErrors();
+
+    const fullName  = $('fullName').value.trim();
+    const mobileNo  = $('mobileNo').value.trim();
+    const gender    = document.querySelector('input[name="gender"]:checked')?.value || '';
+    const startDate = $('startDate').value;
+    const endDate   = $('endDate').value;
+    const slotId    = $('slotId').value || undefined;
+    const seatId    = $('seatId').value || undefined;
+
+    // ── Validation ──
+    let hasError = false;
+
+    if (!fullName) {
+      showFieldError('fullName', 'Full name is required');
+      hasError = true;
+    } else if (fullName.length < 2) {
+      showFieldError('fullName', 'Name must be at least 2 characters');
+      hasError = true;
     }
 
-    function clearErrors() {
-      document.querySelectorAll('.error').forEach(el => {
-        el.classList.remove('visible');
-        el.textContent = '';
-      });
-      errorAlert.classList.remove('visible');
+    if (!mobileNo) {
+      showFieldError('mobileNo', 'Mobile number is required');
+      hasError = true;
+    } else if (!/^[6-9]\d{9}$/.test(mobileNo)) {
+      showFieldError('mobileNo', 'Enter a valid 10-digit Indian mobile number');
+      hasError = true;
     }
 
-    // Initialize
-    loadInviteDetails()
-      .then(() => startExpiryTimer())
-      .catch(error => {
-        submitBtn.disabled = true;
-        showError(error.message || 'Unable to load invite details.');
-      });
-  </script>
+    if (!gender) {
+      showFieldError('gender', 'Please select your gender');
+      hasError = true;
+    }
+
+    if (!startDate) {
+      showFieldError('startDate', 'Start date is required');
+      hasError = true;
+    }
+
+    if (!endDate) {
+      showFieldError('endDate', 'End date is required');
+      hasError = true;
+    } else if (startDate && endDate <= startDate) {
+      showFieldError('endDate', 'End date must be after start date');
+      hasError = true;
+    }
+
+    const slotValue = $('slotId').value;
+    if (!slotValue) {
+      showGlobalError('Please select a time slot');
+      hasError = true;
+    }
+
+    if (hasError) {
+      // Scroll to first error
+      const firstError = memberForm.querySelector('.field-error.show');
+      if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // ── Build payload ──
+    const payload = {
+      fullName,
+      mobileNo,
+      gender,
+      startDate,
+      endDate,
+      ...(slotId ? { slotId } : {}),
+      ...(seatId ? { seatId } : {}),
+    };
+
+    // ── Submit ──
+    setLoading(true);
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/public/members/invite/${TOKEN}/submit-v2`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 409) {
+        showGlobalError(data?.message || 'This phone number is already registered with this library.');
+        setLoading(false);
+        return;
+      }
+
+      if (res.status === 404) {
+        showExpired();
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.message || `Error ${res.status}`);
+      }
+
+      // SUCCESS
+      clearInterval(timerInterval);
+      memberForm.style.display = 'none';
+      $('timerPill').style.display = 'none';
+      progressFill.style.width = '100%';
+      progressFill.style.background = 'linear-gradient(90deg, #2d7a4f, #45a76d)';
+      successState.classList.add('show');
+
+    } catch (err) {
+      console.error(err);
+      showGlobalError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /* ============================================================
+     UI HELPERS
+  ============================================================ */
+  function setLoading(on) {
+    isLoading = on;
+    submitBtn.disabled = on;
+    btnInner.innerHTML = on
+      ? '<div class="spinner"></div><span>Submitting…</span>'
+      : `<span>Submit Registration</span>
+         <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+           <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+         </svg>`;
+  }
+
+  function showGlobalError(msg) {
+    alertErrorText.textContent = msg;
+    alertError.classList.add('show');
+    alertError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function showFieldError(fieldId, msg) {
+    const errEl = $(`${fieldId}Error`);
+    const input = $(fieldId);
+    if (errEl) {
+      errEl.querySelector('span').textContent = msg;
+      errEl.classList.add('show');
+    }
+    if (input) input.classList.add('has-error');
+  }
+
+  function clearFieldError(fieldId) {
+    const errEl = $(`${fieldId}Error`);
+    const input = $(fieldId);
+    if (errEl) errEl.classList.remove('show');
+    if (input) input.classList.remove('has-error');
+    alertError.classList.remove('show');
+  }
+
+  function clearAllErrors() {
+    document.querySelectorAll('.field-error').forEach(el => el.classList.remove('show'));
+    document.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
+    alertError.classList.remove('show');
+  }
+
+  function showExpired() {
+    clearInterval(timerInterval);
+    memberForm.style.display = 'none';
+    skeletonLoader.style.display = 'none';
+    submitBtn && (submitBtn.disabled = true);
+    $('timerPill').style.display = 'none';
+    expiredState.classList.add('show');
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ============================================================
+     INITIALISE
+  ============================================================ */
+  loadDetails();
+</script>
+
 </body>
 </html>

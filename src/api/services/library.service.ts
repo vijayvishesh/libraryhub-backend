@@ -111,28 +111,90 @@ export class LibraryService {
     }
   }
 
-  public async getListedLibraries(query: LibraryListQueryRequest): Promise<ListedLibrariesResult> {
-    try {
-      const page = query.page ?? 1;
-      const limit = query.limit ?? 20;
+ public async getListedLibraries(query: LibraryListQueryRequest): Promise<ListedLibrariesResult> {
+  try {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
 
-      const result = await this.libraryRepository.findListedLibraries({
-        search: query.search?.trim() || undefined,
-        city: query.city?.trim() || undefined,
-        page,
-        limit,
-      });
+    // Parse facilities from comma separated string
+    const facilities = query.facilities
+      ? query.facilities.split(',').map(f => f.trim()).filter(Boolean)
+      : undefined;
 
-      return {
-        libraries: result.libraries.map(library => this.mapLibrarySetupData(library)),
-        page,
-        limit,
-        total: result.total,
-      };
-    } catch (error) {
-      this.rethrowLibraryError(error, 'GET_LISTED_LIBRARIES_FAILED');
+    const result = await this.libraryRepository.findListedLibraries({
+      search: query.search?.trim() || undefined,
+      city: query.city?.trim() || undefined,
+      page,
+      limit,
+      facilities,
+      minRating: query.minRating,
+      priceSort: query.priceSort,
+      ratingSort: query.ratingSort,
+    });
+
+    let libraries = result.libraries.map(library => this.mapLibrarySetupData(library));
+
+    // Distance sorting — if student lat/lng provided, sort by nearest
+    if (query.lat !== undefined && query.lng !== undefined) {
+      libraries = this.sortByDistance(libraries, query.lat, query.lng);
     }
+
+    return {
+      libraries,
+      page,
+      limit,
+      total: result.total,
+    };
+  } catch (error) {
+    this.rethrowLibraryError(error, 'GET_LISTED_LIBRARIES_FAILED');
   }
+}
+private sortByDistance(
+  libraries: LibrarySetupData[],
+  studentLat: number,
+  studentLng: number,
+): LibrarySetupData[] {
+  return libraries
+    .map(library => {
+      const coords = library.location?.coordinates;
+      if (!coords || coords.length < 2) {
+        return { library, distance: Infinity };
+      }
+      // coords[0] = longitude, coords[1] = latitude
+      const distance = this.calculateDistanceKm(
+        studentLat,
+        studentLng,
+        coords[1],
+        coords[0],
+      );
+      return { library, distance };
+    })
+    .sort((a, b) => a.distance - b.distance)
+    .map(item => item.library);
+}
+
+private calculateDistanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371; // Earth radius in km
+  const dLat = this.toRad(lat2 - lat1);
+  const dLng = this.toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(this.toRad(lat1)) *
+      Math.cos(this.toRad(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+private toRad(value: number): number {
+  return (value * Math.PI) / 180;
+}
 
   public async updateLibrary(
     ownerId: string,
