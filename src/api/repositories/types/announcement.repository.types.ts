@@ -8,6 +8,10 @@ export type AnnouncementRecord = {
   message: string;
   target: AnnouncementTarget;
   sentCount: number;
+  isActive: boolean;
+  expiresAt: Date | null;
+  expiryUnit: 'hours' | 'days' | null;
+  expiryValue: number | null;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -20,4 +24,8 @@ export type CreateAnnouncementInput = {
   message: string;
   target: AnnouncementTarget;
   sentCount: number;
+  isActive: boolean;
+  expiresAt: Date | null;
+  expiryUnit: 'hours' | 'days' | null;
+  expiryValue: number | null;
 };

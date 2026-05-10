@@ -29,92 +29,6 @@ export class MemberInviteSubmissionService {
     private readonly bookingRepository: BookingRepository,
   ) {}
 
-// // ── PUBLIC: Student submits the invite form ──────────────────────────────
-// public async submitForm(
-//   token: string,
-//   payload: SubmitInviteFormRequest,
-// ): Promise<SubmissionRecord> {
-//   // 1. Validate invite link
-//   const link = await this.inviteLinkRepository.findValidLinkByToken(token);
-//   if (!link) throw new HttpError(404, 'INVITE_LINK_INVALID_OR_EXPIRED');
-
-//   // 2. Validate seat if provided
-//   if (payload.seatId) {
-//     await this.validateSeat(link.libraryId, payload.seatId, payload.gender, payload.slotId);
-//   }
-
-//   // 3. Check if phone already exists as member of this library
-//   const existing = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
-//     link.libraryId,
-//     payload.mobileNo,
-//   );
-//   if (existing) throw new HttpError(409, 'PHONE_ALREADY_MEMBER_OF_LIBRARY');
-
-//   // 4. Store in staging (member_invite_submissions)
-//   const submission = await this.submissionRepository.create({
-//     inviteLinkId: link.id,
-//     inviteLinkToken: token,
-//     libraryId: link.libraryId,
-//     ownerId: link.ownerId,
-//     fullName: payload.fullName.trim(),
-//     mobileNo: payload.mobileNo.trim(),
-//     gender: payload.gender,
-//     startDate: payload.startDate,
-//     endDate: payload.endDate,
-//     seatId: payload.seatId?.trim() ?? null,
-//     slotId: payload.slotId?.trim() ?? null,
-//   });
-
-//   // 5. Mirror into members table with studentId + isInviteSubmission: true
-//   try {
-//     const start = new Date(payload.startDate);
-//     const end = new Date(payload.endDate);
-//     const diffMs = end.getTime() - start.getTime();
-//     const duration = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30)));
-
-//     // Find existing student or create new one
-//     let student = await this.authRepository.findStudentByPhone(payload.mobileNo.trim());
-//     if (!student) {
-//       const tempPassword = await bcrypt.hash(
-//         `invite_${payload.mobileNo}_${Date.now()}`,
-//         10,
-//       );
-//       student = await this.authRepository.createStudent({
-//         name: payload.fullName.trim(),
-//         phone: payload.mobileNo.trim(),
-//         gender: payload.gender,
-//         password: tempPassword,
-//         isPhoneVerified: false,
-//         hasJoinedLibrary: true,
-//         role: 'STUDENT',
-//       });
-//     }
-
-//     await this.memberRepository.createMember({
-//       fullName: payload.fullName.trim(),
-//       mobileNo: payload.mobileNo.trim(),
-//       aadharId: null,
-//       studentId: student.id,
-//       email: null,
-//       duration,
-//       libraryId: link.libraryId,
-//       seatId: payload.seatId?.trim() ?? null,
-//       slotId: payload.slotId?.trim() ?? null,
-//       status: 'pending',
-//       planAmount: null,
-//       startDate: payload.startDate,
-//       endDate: payload.endDate,
-//       bookingId: null,
-//       paidAt: null,
-//       notes: null,
-//       isInviteSubmission: true,
-//     });
-//   } catch (memberError) {
-//     console.error('Failed to mirror invite submission into members table:', memberError);
-//   }
-
-//   return submission;
-// }
 
 public async submitForm(
   token: string,
@@ -124,37 +38,37 @@ public async submitForm(
   const link = await this.inviteLinkRepository.findValidLinkByToken(token);
   if (!link) throw new HttpError(404, 'INVITE_LINK_INVALID_OR_EXPIRED');
 
-  // 2. Validate seat if provided
+  // 2. Fetch library early — needed for planAmount resolution + booking
+  const library = await this.libraryRepository.findLibraryById(link.libraryId);
+  if (!library) throw new HttpError(404, 'LIBRARY_NOT_FOUND');
+
+  // 3. Validate seat if provided
   if (payload.seatId) {
     await this.validateSeat(link.libraryId, payload.seatId, payload.gender, payload.slotId);
   }
 
-  // 3. Compute smart flags before saving
   const mobileNo = payload.mobileNo.trim();
 
-  // Check if student account exists
+  // 4. Compute smart flags
   const existingStudent = await this.authRepository.findStudentByPhone(mobileNo);
   const isNewUser = !existingStudent;
 
-  // Check if already a member of THIS library
   const existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
     link.libraryId,
     mobileNo,
   );
-  const isExistingMember = !!existingMember;
-  const isDuplicate = isExistingMember;
-
-  if (isDuplicate) {
+  if (existingMember) {
     throw new HttpError(409, 'PHONE_ALREADY_MEMBER_OF_LIBRARY');
   }
 
-  // Check pending fee from previous membership (any library)
+  const isExistingMember = false;
+  // const isDuplicate = false;
+
   let hasPendingFee = false;
   let pendingFeeAmount: number | null = null;
   let previousEndDate: string | null = null;
 
   if (existingStudent) {
-    // Check all libraries this student was a member of
     const allMemberRecords = await this.memberRepository.findAllMembersByPhone(mobileNo);
     const pendingRecord = allMemberRecords.find(
       m => m.status === 'pending' && (m.planAmount ?? 0) > 0,
@@ -163,7 +77,6 @@ public async submitForm(
       hasPendingFee = true;
       pendingFeeAmount = pendingRecord.planAmount ?? null;
     }
-    // Get the most recent endDate from any membership
     const sorted = allMemberRecords
       .filter(m => m.endDate)
       .sort((a, b) => (b.endDate! > a.endDate! ? 1 : -1));
@@ -172,7 +85,7 @@ public async submitForm(
     }
   }
 
-  // 4. Find or create student account
+  // 5. Find or create student account
   let student = existingStudent;
   if (!student) {
     const tempPassword = await bcrypt.hash(
@@ -190,26 +103,31 @@ public async submitForm(
     });
   }
 
-  // 5. Calculate duration from date range
+  // 6. Calculate duration from date range
   const start = new Date(payload.startDate);
   const end = new Date(payload.endDate);
   const diffMs = end.getTime() - start.getTime();
   const duration = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30)));
 
-  // 6. Create booking entry so approval flow works
+  // 7. Resolve planAmount from library slot config
+  const resolvedPlanAmount = this.resolvePlanAmount(
+    library.slots ?? [],
+    payload.slotId,
+    duration,
+  );
+
+  // 8. Find slot info for booking
+  const slotInfo = (library.slots ?? []).find(s => s.slotType === payload.slotId);
+
+  // 9. Create booking entry so approval flow works
   let bookingId: string | null = null;
   if (payload.seatId) {
     try {
-      const library = await this.libraryRepository.findLibraryById(link.libraryId);
-      const slotInfo = (library?.slots ?? []).find(
-        s => s.slotType === payload.slotId,
-      );
-
       const booking = await this.bookingRepository.createInviteBooking({
         libraryId: link.libraryId,
         studentId: student.id,
-        libraryName: library?.name ?? '',
-        libraryAddress: library?.address ?? '',
+        libraryName: library.name ?? '',
+        libraryAddress: library.address ?? '',
         slotType: payload.slotId ?? 'fullday',
         slotName: slotInfo?.name ?? 'Full Day',
         slotStartTime: slotInfo?.startTime ?? '06:00',
@@ -219,6 +137,7 @@ public async submitForm(
         duration,
         startDate: payload.startDate,
         validUntil: payload.endDate,
+        amount: resolvedPlanAmount ?? 0,
       });
       bookingId = booking.id;
     } catch (bookingError) {
@@ -226,7 +145,7 @@ public async submitForm(
     }
   }
 
-  // 7. Create member record in members table
+  // 10. Create member record with resolved planAmount
   const member = await this.memberRepository.createMember({
     fullName: payload.fullName.trim(),
     mobileNo,
@@ -238,7 +157,7 @@ public async submitForm(
     seatId: payload.seatId?.trim() ?? null,
     slotId: payload.slotId?.trim() ?? null,
     status: 'pending',
-    planAmount: null,
+    planAmount: resolvedPlanAmount,
     startDate: payload.startDate,
     endDate: payload.endDate,
     bookingId,
@@ -247,7 +166,7 @@ public async submitForm(
     isInviteSubmission: true,
   });
 
-  // 8. Save submission with all flags
+  // 11. Save submission with all flags
   const submission = await this.submissionRepository.create({
     inviteLinkId: link.id,
     inviteLinkToken: token,
@@ -266,11 +185,11 @@ public async submitForm(
     hasPendingFee,
     pendingFeeAmount,
     previousEndDate,
-    isDuplicate: false, // already threw 409 if true
+    isDuplicate: false,
     bookingId,
   });
 
-  // 9. Update submission with memberId now that member is created
+  // 12. Update submission with memberId and studentId
   await this.submissionRepository.update(submission.id, link.libraryId, {
     memberId: member.id,
     studentId: student.id,
@@ -507,33 +426,66 @@ public async submitForm(
   }
 
   // ── Seat validation ──────────────────────────────────────────────────────
-  private async validateSeat(
-    libraryId: string,
-    seatId: string,
-    gender: string,
-    slotId?: string | null,
-  ): Promise<void> {
-    const seat = await this.librarySeatRepository.findSeatByLibraryAndSeatId(libraryId, seatId);
-    if (!seat) throw new HttpError(400, 'SEAT_NOT_FOUND');
-    if (!seat.isActive) throw new HttpError(400, 'SEAT_NOT_ACTIVE');
+private async validateSeat(
+  libraryId: string,
+  seatId: string,
+  gender: string,
+  slotId?: string | null,
+): Promise<void> {
+  // 1. Check seat exists and is active
+  const seat = await this.librarySeatRepository.findSeatByLibraryAndSeatId(libraryId, seatId);
+  if (!seat) throw new HttpError(400, 'SEAT_NOT_FOUND');
+  if (!seat.isActive) throw new HttpError(400, 'SEAT_NOT_ACTIVE');
 
-    // Gender check — seat gender must be 'any' or match student gender
-    if (seat.gender !== 'any' && seat.gender !== gender) {
-      throw new HttpError(400, 'SEAT_GENDER_MISMATCH');
-    }
-
-    // Availability check
-    const conflict = await this.memberRepository.findActiveMemberBySeat(
-      libraryId,
-      seatId,
-      slotId ?? undefined,
-    );
-    if (conflict) throw new HttpError(409, 'SEAT_ALREADY_ASSIGNED');
+  // 2. Gender check
+  if (seat.gender !== 'any' && seat.gender !== gender) {
+    throw new HttpError(400, 'SEAT_GENDER_MISMATCH');
   }
+
+  // 3. Availability check using updated findActiveMemberBySeat
+  // The method now internally handles fullday/twentyfour blocking logic
+  const conflict = await this.memberRepository.findActiveMemberBySeat(
+    libraryId,
+    seatId,
+    slotId ?? undefined,
+  );
+  if (conflict) throw new HttpError(409, 'SEAT_ALREADY_ASSIGNED');
+}
 
   private async getOwnerLibraryOrThrow(ownerId: string) {
     const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
     if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
     return library;
   }
+
+  private resolvePlanAmount(
+  slots: Array<{
+    slotType: string;
+    pricePerMonth: number;
+    isActive: boolean;
+    plans?: { duration: string; isActive: boolean; discountPercent: number }[];
+  }>,
+  slotId: string | null | undefined,
+  duration: number,
+): number | null {
+  if (!slotId) return null;
+
+  const slot = slots.find(s => s.slotType === slotId && s.isActive);
+  if (!slot) return null;
+
+  const baseAmount = slot.pricePerMonth * duration;
+
+  if (slot.plans && slot.plans.length > 0) {
+    const durationKey = `${duration}m`;
+    const matchedPlan = slot.plans.find(
+      p => p.duration === durationKey && p.isActive,
+    );
+    if (matchedPlan && matchedPlan.discountPercent > 0) {
+      const discount = (baseAmount * matchedPlan.discountPercent) / 100;
+      return Math.round(baseAmount - discount);
+    }
+  }
+
+  return baseAmount;
+}
 }

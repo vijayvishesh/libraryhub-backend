@@ -290,32 +290,56 @@ export class MemberRepository {
     return statusMap;
   }
 
-  public async findActiveMemberBySeat(
-    libraryId: string,
-    seatId: string,
-    slotId?: string,
-    excludeMemberId?: string,
-  ): Promise<MemberRecord | null> {
-    const whereFilter: Record<string, unknown> = {
-      libraryId,
-      seatId,
-      status: { $in: ['active', 'pending'] },
-    };
+ // Slot types that block the seat for ALL other slots
+private readonly FULL_BLOCKING_SLOTS = ['fullday', 'twentyfour'];
 
-    if (slotId) {
-      whereFilter.slotId = slotId;
+public async findActiveMemberBySeat(
+  libraryId: string,
+  seatId: string,
+  slotId?: string,
+  excludeMemberId?: string,
+): Promise<MemberRecord | null> {
+  const excludeFilter: Record<string, unknown> = {};
+  if (excludeMemberId) {
+    const objectId = this.tryParseObjectId(excludeMemberId);
+    if (objectId) {
+      excludeFilter['_id'] = { $ne: objectId };
     }
+  }
 
-    if (excludeMemberId) {
-      const objectId = this.tryParseObjectId(excludeMemberId);
-      if (objectId) {
-        whereFilter['_id'] = { $ne: objectId };
-      }
-    }
+  const baseFilter: Record<string, unknown> = {
+    libraryId,
+    seatId,
+    status: { $in: ['active', 'pending'] },
+    ...excludeFilter,
+  };
 
-    const member = await this.getMemberRepository().findOneBy(whereFilter);
+  const isNewBookingFullBlocking =
+    slotId && this.FULL_BLOCKING_SLOTS.includes(slotId);
+
+  if (!slotId || isNewBookingFullBlocking) {
+    // Case 1: No slot specified OR new booking is fullday/twentyfour
+    // → check if ANY active member exists for this seat
+    const member = await this.getMemberRepository().findOneBy(baseFilter);
     return member ? this.mapMember(member) : null;
   }
+
+  // Case 2: New booking is a time-based slot
+  // → blocked if existing booking is fullday/twentyfour OR same slot
+  const orConditions = [
+    // existing fullday/twentyfour blocks this seat
+    { slotId: { $in: this.FULL_BLOCKING_SLOTS } },
+    // same slot conflict
+    { slotId },
+  ];
+
+  const member = await this.getMemberRepository().findOneBy({
+    ...baseFilter,
+    $or: orConditions,
+  } as any);
+
+  return member ? this.mapMember(member) : null;
+}
 
   private async ensureIndexes(): Promise<void> {
     if (this.indexesEnsured) {

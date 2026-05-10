@@ -5,12 +5,15 @@ import {
   HttpError,
   InternalServerError,
   JsonController,
+  QueryParams,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { BannerService } from '../services/banner.service';
+import { StudentBannerQueryRequest } from './requests/banner.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
+  AnnouncementSummaryData,
   BannerData,
   BannerListApiResponse,
   BannerListPayloadData,
@@ -24,17 +27,35 @@ export class StudentBannerController {
 
   @Get('/')
   @Authorized('STUDENT')
-  @OpenAPI({ summary: 'Get active sponsored banners for students', security: [{ bearerAuth: [] }] })
+  @OpenAPI({
+    summary: 'Get active sponsored banners and library announcements for students',
+    security: [{ bearerAuth: [] }],
+  })
   @ResponseSchema(BannerListApiResponse, { statusCode: 200 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
   public async getActiveBanners(
-    @CurrentUser({ required: true }) _session: CurrentSessionData,
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @QueryParams() query: StudentBannerQueryRequest,
   ): Promise<BannerListApiResponse> {
     try {
-      const records = await this.bannerService.listActiveBanners();
+      // Always fetch global banners
+      const bannerRecords = await this.bannerService.listActiveBanners();
+
+      // Fetch announcements only if libraryId is provided
+      const announcementRecords = query.libraryId
+        ? await this.bannerService.listActiveAnnouncementsForStudent(
+            session.user.id,
+            query.libraryId,
+          )
+        : [];
+
       return new BannerListApiResponse(
-        new BannerListPayloadData(records.map(r => new BannerData(r)), records.length),
+        new BannerListPayloadData(
+          bannerRecords.map(r => new BannerData(r)),
+          announcementRecords.map(r => new AnnouncementSummaryData(r)),
+          bannerRecords.length,
+        ),
         200,
       );
     } catch (error) {

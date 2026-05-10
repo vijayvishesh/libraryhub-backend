@@ -1,7 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
 import {
-  LibraryFacility,
   LibraryPaymentMethod,
   LibrarySlotType,
 } from '../constants/library.constants';
@@ -126,7 +125,7 @@ export class LibraryModel {
   seating?: LibrarySeating;
 
   @Column()
-  facilities!: LibraryFacility[];
+ facilities!: string[];
 
   @Column()
   slots!: LibrarySlot[];

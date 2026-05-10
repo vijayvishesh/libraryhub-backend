@@ -23,10 +23,23 @@ export class AnnouncementRepository {
       message: model.message,
       target: model.target,
       sentCount: model.sentCount,
-      deletedAt: model.deletedAt,
+      isActive: model.isActive ?? true,
+      expiresAt: model.expiresAt ?? null,
+      expiryUnit: model.expiryUnit ?? null,
+      expiryValue: model.expiryValue ?? null,
+      deletedAt: model.deletedAt ?? null,
       createdAt: model.createdAt,
       updatedAt: model.updatedAt,
     };
+  }
+
+  // Auto-deactivate expired announcements before returning
+  private resolveIsActive(record: AnnouncementRecord): AnnouncementRecord {
+    if (!record.isActive) return record;
+    if (record.expiresAt && record.expiresAt.getTime() < Date.now()) {
+      return { ...record, isActive: false };
+    }
+    return record;
   }
 
   public async findByLibrary(libraryId: string): Promise<AnnouncementRecord[]> {
@@ -34,13 +47,13 @@ export class AnnouncementRepository {
       where: { libraryId, deletedAt: null } as any,
       order: { createdAt: 'DESC' } as any,
     });
-    return models.map(m => this.toRecord(m));
+    return models.map(m => this.resolveIsActive(this.toRecord(m)));
   }
 
   public async findById(id: string): Promise<AnnouncementRecord | null> {
     if (!ObjectId.isValid(id)) return null;
     const model = await this.getRepo().findOneById(new ObjectId(id));
-    return model ? this.toRecord(model) : null;
+    return model ? this.resolveIsActive(this.toRecord(model)) : null;
   }
 
   public async create(input: CreateAnnouncementInput): Promise<AnnouncementRecord> {
@@ -53,29 +66,43 @@ export class AnnouncementRepository {
       updatedAt: now,
     });
     const saved = await repo.save(model);
-    return this.toRecord(saved);
+    return this.resolveIsActive(this.toRecord(saved));
   }
-  public async update(
-  id: string,
-  input: Partial<CreateAnnouncementInput>,
-): Promise<AnnouncementRecord | null> {
-  if (!ObjectId.isValid(id)) return null;
-  const repo = this.getRepo();
-  const existing = await repo.findOneById(new ObjectId(id));
-  if (!existing) return null;
-  Object.assign(existing, input, { updatedAt: new Date() });
-  const saved = await repo.save(existing);
-  return this.toRecord(saved);
-}
 
-public async softDelete(id: string): Promise<boolean> {
-  if (!ObjectId.isValid(id)) return false;
-  const repo = this.getRepo();
-  const existing = await repo.findOneById(new ObjectId(id));
-  if (!existing) return false;
-  existing.deletedAt = new Date();
-  existing.updatedAt = new Date();
-  await repo.save(existing);
-  return true;
-}
+  public async update(
+    id: string,
+    input: Partial<CreateAnnouncementInput>,
+  ): Promise<AnnouncementRecord | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const repo = this.getRepo();
+    const existing = await repo.findOneById(new ObjectId(id));
+    if (!existing) return null;
+    Object.assign(existing, input, { updatedAt: new Date() });
+    const saved = await repo.save(existing);
+    return this.resolveIsActive(this.toRecord(saved));
+  }
+
+  // Toggle active/inactive manually
+  public async setActive(id: string, isActive: boolean): Promise<AnnouncementRecord | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const repo = this.getRepo();
+    const existing = await repo.findOneById(new ObjectId(id));
+    if (!existing) return null;
+    existing.isActive = isActive;
+    existing.updatedAt = new Date();
+    const saved = await repo.save(existing);
+    return this.resolveIsActive(this.toRecord(saved));
+  }
+
+  public async softDelete(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const repo = this.getRepo();
+    const existing = await repo.findOneById(new ObjectId(id));
+    if (!existing) return false;
+    existing.deletedAt = new Date();
+    existing.isActive = false;
+    existing.updatedAt = new Date();
+    await repo.save(existing);
+    return true;
+  }
 }

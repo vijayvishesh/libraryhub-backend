@@ -16,13 +16,18 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { AnnouncementService } from '../services/announcement.service';
-import { CreateAnnouncementRequest, UpdateAnnouncementRequest } from './requests/announcement.request';
+import {
+  CreateAnnouncementRequest,
+  ToggleAnnouncementRequest,
+  UpdateAnnouncementRequest,
+} from './requests/announcement.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
   AnnouncementApiResponse,
   AnnouncementData,
   AnnouncementListApiResponse,
   AnnouncementListPayloadData,
+  AnnouncementTargetListApiResponse,
 } from './responses/announcement.response';
 import { ErrorResponseModel } from './responses/common.reponse';
 
@@ -31,6 +36,27 @@ import { ErrorResponseModel } from './responses/common.reponse';
 export class AnnouncementController {
   constructor(private readonly announcementService: AnnouncementService) {}
 
+  // ── GET /targets — list available targets for this library ───────────────
+  @Get('/targets')
+  @Authorized('OWNER')
+  @OpenAPI({ summary: 'Get available announcement targets for this library', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(AnnouncementTargetListApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getTargets(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+  ): Promise<AnnouncementTargetListApiResponse> {
+    try {
+      const targets = await this.announcementService.getAnnouncementTargets(session.user.id);
+      return new AnnouncementTargetListApiResponse(targets, 200);
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new InternalServerError('GET_ANNOUNCEMENT_TARGETS_FAILED');
+    }
+  }
+
+  // ── POST / — create announcement ─────────────────────────────────────────
   @Post('/')
   @Authorized('OWNER')
   @HttpCode(201)
@@ -45,10 +71,7 @@ export class AnnouncementController {
     @Body() payload: CreateAnnouncementRequest,
   ): Promise<AnnouncementApiResponse> {
     try {
-      const record = await this.announcementService.createAnnouncement(
-        session.user.id,
-        payload,
-      );
+      const record = await this.announcementService.createAnnouncement(session.user.id, payload);
       return new AnnouncementApiResponse(new AnnouncementData(record), 201);
     } catch (error) {
       if (error instanceof HttpError) throw error;
@@ -56,6 +79,7 @@ export class AnnouncementController {
     }
   }
 
+  // ── GET / — list all announcements ───────────────────────────────────────
   @Get('/')
   @Authorized('OWNER')
   @OpenAPI({ summary: 'List all announcements for owner library', security: [{ bearerAuth: [] }] })
@@ -79,48 +103,73 @@ export class AnnouncementController {
       throw new InternalServerError('LIST_ANNOUNCEMENTS_FAILED');
     }
   }
-  @Patch('/:id')
-@Authorized('OWNER')
-@OpenAPI({ summary: 'Update an announcement', security: [{ bearerAuth: [] }] })
-@ResponseSchema(AnnouncementApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async updateAnnouncement(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-  @Param('id') id: string,
-  @Body() payload: UpdateAnnouncementRequest,
-): Promise<AnnouncementApiResponse> {
-  try {
-    const record = await this.announcementService.updateAnnouncement(
-      session.user.id,
-      id,
-      payload,
-    );
-    return new AnnouncementApiResponse(new AnnouncementData(record), 200);
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('UPDATE_ANNOUNCEMENT_FAILED');
-  }
-}
 
-@Delete('/:id')
-@Authorized('OWNER')
-@OnUndefined(204)
-@OpenAPI({ summary: 'Delete an announcement', security: [{ bearerAuth: [] }] })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async deleteAnnouncement(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-  @Param('id') id: string,
-): Promise<void> {
-  try {
-    await this.announcementService.deleteAnnouncement(session.user.id, id);
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('DELETE_ANNOUNCEMENT_FAILED');
+  // ── PATCH /:id — update announcement ─────────────────────────────────────
+  @Patch('/:id')
+  @Authorized('OWNER')
+  @OpenAPI({ summary: 'Update an announcement', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(AnnouncementApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async updateAnnouncement(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('id') id: string,
+    @Body() payload: UpdateAnnouncementRequest,
+  ): Promise<AnnouncementApiResponse> {
+    try {
+      const record = await this.announcementService.updateAnnouncement(session.user.id, id, payload);
+      return new AnnouncementApiResponse(new AnnouncementData(record), 200);
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new InternalServerError('UPDATE_ANNOUNCEMENT_FAILED');
+    }
   }
-}
+
+  // ── PATCH /:id/toggle — activate or deactivate ───────────────────────────
+  @Patch('/:id/toggle')
+  @Authorized('OWNER')
+  @OpenAPI({ summary: 'Activate or deactivate an announcement', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(AnnouncementApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async toggleAnnouncement(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('id') id: string,
+    @Body() payload: ToggleAnnouncementRequest,
+  ): Promise<AnnouncementApiResponse> {
+    try {
+      const record = await this.announcementService.toggleAnnouncement(
+        session.user.id,
+        id,
+        payload.isActive,
+      );
+      return new AnnouncementApiResponse(new AnnouncementData(record), 200);
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new InternalServerError('TOGGLE_ANNOUNCEMENT_FAILED');
+    }
+  }
+
+  // ── DELETE /:id — soft delete ─────────────────────────────────────────────
+  @Delete('/:id')
+  @Authorized('OWNER')
+  @OnUndefined(204)
+  @OpenAPI({ summary: 'Delete an announcement', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async deleteAnnouncement(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('id') id: string,
+  ): Promise<void> {
+    try {
+      await this.announcementService.deleteAnnouncement(session.user.id, id);
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new InternalServerError('DELETE_ANNOUNCEMENT_FAILED');
+    }
+  }
 }

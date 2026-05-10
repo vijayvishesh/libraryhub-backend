@@ -9,6 +9,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { BannerRecord } from '../../repositories/types/banner.repository.types';
+import { AnnouncementRecord } from '../../repositories/types/announcement.repository.types';
 
 export class BannerData {
   @IsString() id!: string;
@@ -45,6 +46,29 @@ export class BannerData {
   }
 }
 
+export class AnnouncementSummaryData {
+  @IsString() id!: string;
+  @IsString() libraryId!: string;
+  @IsString() title!: string;
+  @IsString() message!: string;
+  @IsString() target!: string;
+  @IsBoolean() isActive!: boolean;
+  @IsOptional() @IsString() expiresAt?: string | null;
+  @IsString() createdAt!: string;
+
+  constructor(r?: AnnouncementRecord) {
+    if (!r) return;
+    this.id = r.id;
+    this.libraryId = r.libraryId;
+    this.title = r.title;
+    this.message = r.message;
+    this.target = r.target;
+    this.isActive = r.isActive;
+    this.expiresAt = r.expiresAt?.toISOString() ?? null;
+    this.createdAt = r.createdAt.toISOString();
+  }
+}
+
 export class BannerApiResponse {
   @IsNumber() responseCode!: number;
   @ValidateNested()
@@ -64,11 +88,21 @@ export class BannerListPayloadData {
   @Type(() => BannerData)
   banners!: BannerData[];
 
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AnnouncementSummaryData)
+  announcements!: AnnouncementSummaryData[];
+
   @IsNumber() total!: number;
 
-  constructor(banners?: BannerData[], total?: number) {
-    if (!banners || typeof total !== 'number') return;
+  constructor(
+    banners?: BannerData[],
+    announcements?: AnnouncementSummaryData[],
+    total?: number,
+  ) {
+    if (!banners || !announcements || typeof total !== 'number') return;
     this.banners = banners;
+    this.announcements = announcements;
     this.total = total;
   }
 }
