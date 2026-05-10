@@ -24,6 +24,7 @@ import { BannerModel } from '../../api/models/banner.model';
 import { LibraryRatingModel } from '../../api/models/libraryRating.model';
 import { MemberPaymentModel } from '../../api/models/memberPayment.model';
 import { MemberInviteSubmissionModel } from '../../api/models/memberInviteSubmission.model';
+import { LibraryTransferModel } from '../../api/models/libraryTransfer.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -71,7 +72,8 @@ const createDataSource = (): DataSource =>
       BannerModel,
       LibraryRatingModel,
       MemberPaymentModel,
-      MemberInviteSubmissionModel
+      MemberInviteSubmissionModel,
+      LibraryTransferModel
     ],
     synchronize: true,
     logging: false,

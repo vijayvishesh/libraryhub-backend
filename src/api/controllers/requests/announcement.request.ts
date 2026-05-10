@@ -1,14 +1,51 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { AnnouncementTarget } from '../../models/announcement.model';
 
-const VALID_TARGETS: AnnouncementTarget[] = [
+// All possible targets — slot-based ones filtered dynamically per library
+export const ALL_ANNOUNCEMENT_TARGETS: AnnouncementTarget[] = [
   'all',
+  'absent',
+  'fee_due',
+  'expired',
+  'overdue',
   'fullday',
   'firsthalf',
   'secondhalf',
   'twentyfour',
-  'overdue',
+  'halfday',
+  'evening',
+  'morning',
+  'night',
+  'custom',
 ];
+
+export class AnnouncementExpiryRequest {
+  // Option A — duration based
+  @IsOptional()
+  @IsString()
+  @IsIn(['hours', 'days'])
+  unit?: 'hours' | 'days';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  value?: number;
+
+  // Option B — absolute datetime
+  @IsOptional()
+  @IsString()
+  expiresAt?: string; // ISO datetime string e.g. '2026-05-10T18:00:00Z'
+}
 
 export class CreateAnnouncementRequest {
   @IsString()
@@ -20,8 +57,19 @@ export class CreateAnnouncementRequest {
   message!: string;
 
   @IsString()
-  @IsIn(VALID_TARGETS)
+  @IsIn(ALL_ANNOUNCEMENT_TARGETS)
   target!: AnnouncementTarget;
+
+  // isActive defaults to true on create
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  // Optional expiry — either duration OR absolute datetime
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AnnouncementExpiryRequest)
+  expiry?: AnnouncementExpiryRequest;
 }
 
 export class UpdateAnnouncementRequest {
@@ -37,6 +85,20 @@ export class UpdateAnnouncementRequest {
 
   @IsOptional()
   @IsString()
-  @IsIn(['all', 'fullday', 'firsthalf', 'secondhalf', 'twentyfour', 'overdue'])
+  @IsIn(ALL_ANNOUNCEMENT_TARGETS)
   target?: AnnouncementTarget;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AnnouncementExpiryRequest)
+  expiry?: AnnouncementExpiryRequest;
+}
+
+export class ToggleAnnouncementRequest {
+  @IsBoolean()
+  isActive!: boolean;
 }

@@ -100,3 +100,9 @@ export class UpdateBannerRequest {
   @IsBoolean()
   isActive?: boolean;
 }
+  export class StudentBannerQueryRequest {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  libraryId?: string;
+}

@@ -1,5 +1,4 @@
 import {
-  LibraryFacility,
   LibraryPaymentMethod,
   LibrarySeatingArrangement,
   LibrarySeatingGender,
@@ -83,7 +82,7 @@ export type CreateLibraryInput = {
     coordinates: [number, number];
   };
   totalSeats: number;
-  facilities: LibraryFacility[];
+  facilities: string[];
   slots: CreateLibrarySlotInput[];
   seating?: LibrarySeating;
   photos: CreateLibraryPhotoInput[];

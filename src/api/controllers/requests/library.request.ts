@@ -18,7 +18,6 @@ import {
   ValidateNested,
 } from 'class-validator';
 import {
-  LIBRARY_FACILITY_ENUM,
   LIBRARY_PAYMENT_METHOD_ENUM,
   LIBRARY_SEATING_ARRANGEMENT_ENUM,
   LIBRARY_SEATING_GENDER_ENUM,
@@ -285,8 +284,9 @@ export class LibrarySetupRequest {
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @IsIn([...LIBRARY_FACILITY_ENUM], { each: true })
-  facilities?: (typeof LIBRARY_FACILITY_ENUM)[number][];
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  facilities?: string[];
 
   @IsOptional()
   @IsArray()
@@ -451,8 +451,9 @@ export class UpdateLibraryRequest {
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @IsIn([...LIBRARY_FACILITY_ENUM], { each: true })
-  facilities?: (typeof LIBRARY_FACILITY_ENUM)[number][];
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  facilities?: string[];
 
   @IsOptional()
   @IsArray()

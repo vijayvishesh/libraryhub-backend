@@ -69,31 +69,49 @@ export class BookingRepository {
     return this.mapBooking(booking);
   }
 
-  public async findActiveSeatBooking(
-    libraryId: string,
-    slotType: string,
-    seatId: string,
-  ): Promise<BookingRecord | null> {
-    const todayIsoDate = new Date().toISOString().slice(0, 10);
+  private readonly FULL_BLOCKING_SLOTS = ['fullday', 'twentyfour'];
+
+public async findActiveSeatBooking(
+  libraryId: string,
+  slotType: string,
+  seatId: string,
+): Promise<BookingRecord | null> {
+  const todayIsoDate = new Date().toISOString().slice(0, 10);
+
+  const baseFilter: Record<string, unknown> = {
+    libraryId,
+    seatId,
+    status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+    validUntil: { $gte: todayIsoDate },
+  };
+
+  const isNewBookingFullBlocking = this.FULL_BLOCKING_SLOTS.includes(slotType);
+
+  if (isNewBookingFullBlocking) {
+    // New booking is fullday/twentyfour → blocked if ANY active booking exists
     const bookings = await this.getBookingRepository().find({
-      where: {
-        libraryId,
-        slotType,
-        seatId,
-        status: { $in: [...ACTIVE_BOOKING_STATUSES] },
-        validUntil: { $gte: todayIsoDate },
-      },
+      where: baseFilter,
       order: { createdAt: 'DESC' },
       take: 1,
     });
-    const booking = bookings[0];
-
-    if (!booking) {
-      return null;
-    }
-
-    return this.mapBooking(booking);
+    return bookings[0] ? this.mapBooking(bookings[0]) : null;
   }
+
+  // New booking is time-based → blocked if existing is fullday/twentyfour OR same slot
+  const bookings = await this.getBookingRepository().find({
+    where: {
+      ...baseFilter,
+      $or: [
+        { slotType: { $in: this.FULL_BLOCKING_SLOTS } },
+        { slotType },
+      ],
+    } as any,
+    order: { createdAt: 'DESC' },
+    take: 1,
+  });
+
+  return bookings[0] ? this.mapBooking(bookings[0]) : null;
+}
 
   public async findActiveSeatStatusByLibraryAndSlot(
     libraryId: string,
@@ -489,6 +507,7 @@ export class BookingRepository {
   duration: number;
   startDate: string;
   validUntil: string;
+  amount?: number;
 }): Promise<BookingRecord> {
   return this.createBooking({
     libraryId: input.libraryId,
@@ -502,7 +521,7 @@ export class BookingRepository {
     seatId: input.seatId,
     sectionId: input.sectionId,
     paymentMethod: 'cash' as LibraryPaymentMethod,
-    amount: 0,
+    amount: input.amount ?? 0,
     duration: input.duration,
     startDate: input.startDate,
     validUntil: input.validUntil,
@@ -511,5 +530,20 @@ export class BookingRepository {
     checkedOutAt: null,
     invoiceNo: `INV-INVITE-${Date.now()}`,
   });
+}
+public async updateLibraryNameByLibraryId(
+  libraryId: string,
+  newLibraryName: string,
+): Promise<void> {
+  const repo = this.getBookingRepository(); // use your existing getRepo method name
+  const bookings = await repo.find({
+    where: { libraryId } as any,
+  });
+  await Promise.all(
+    bookings.map(async b => {
+      b.libraryName = newLibraryName;
+      await repo.save(b);
+    }),
+  );
 }
 }
