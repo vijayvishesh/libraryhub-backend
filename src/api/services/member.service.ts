@@ -96,7 +96,7 @@ export class MemberService {
   try {
     const library = await this.getOwnerLibraryOrThrow(ownerId);
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 100;
 
     const result = await this.memberRepository.listMembersByLibrary({
       libraryId: library.id,
@@ -440,7 +440,7 @@ export class MemberService {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
       const page = query.page ?? 1;
-      const limit = query.limit ?? 20;
+      const limit = query.limit ?? 100;
       const result = await this.memberBulkUploadRepository.listUploadsByLibrary({
         libraryId: library.id,
         page,
@@ -665,8 +665,7 @@ public async getInviteLinkFormData(token: string): Promise<{
       }
 
       const page = query.page ?? 1;
-      const limit = query.limit ?? 20;
-
+      const limit = query.limit ?? 100;
       const result = await this.memberPaymentRepository.listPaymentsByMember({
         memberId: member.id,
         libraryId: library.id,
