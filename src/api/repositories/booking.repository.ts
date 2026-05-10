@@ -546,4 +546,17 @@ public async updateLibraryNameByLibraryId(
     }),
   );
 }
+public async updateBookingSeatId(
+  bookingId: string,
+  seatId: string,
+): Promise<void> {
+  const objectId = this.tryParseObjectId(bookingId);
+  if (!objectId) return;
+
+  await this.getBookingRepository().updateOne(
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    { _id: objectId },
+    { $set: { seatId, updatedAt: new Date() } },
+  );
+}
 }
