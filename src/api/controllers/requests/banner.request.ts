@@ -105,4 +105,9 @@ export class UpdateBannerRequest {
   @IsString()
   @IsNotEmpty()
   libraryId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  studentId?: string;
 }

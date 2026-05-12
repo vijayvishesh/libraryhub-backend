@@ -135,7 +135,7 @@ export class MemberService {
     }
   }
 
-  public async updateMember(
+ public async updateMember(
     ownerId: string,
     memberId: string,
     payload: UpdateMemberRequest,
@@ -226,16 +226,57 @@ export class MemberService {
         throw new NotFoundError('MEMBER_NOT_FOUND');
       }
 
-      // When owner changes seat on member record, sync it to booking record too
-      if (
-        payload.seatId !== undefined &&
-        existingMember.bookingId &&
-        newSeatId !== existingMember.seatId
-      ) {
-        if (newSeatId) {
-          await this.bookingRepository.updateBookingSeatId(
+      // Sync updated fields to the booking record
+      if (existingMember.bookingId) {
+        const bookingUpdates: Record<string, unknown> = {};
+
+        // Sync seatId if changed
+        if (payload.seatId !== undefined && newSeatId !== existingMember.seatId && newSeatId) {
+          bookingUpdates.seatId = newSeatId;
+        }
+
+        // Sync slot fields if changed
+        if (payload.slotId !== undefined && newSlotId !== existingMember.slotId && newSlotId) {
+          bookingUpdates.slotType = newSlotId;
+          // Fetch library to resolve slot name and times
+          const memberLibrary = await this.libraryRepository.findLibraryById(existingMember.libraryId);
+          const slotInfo = memberLibrary?.slots?.find(s => s.slotType === newSlotId);
+          if (slotInfo) {
+            bookingUpdates.slotName = slotInfo.name;
+            bookingUpdates.slotStartTime = slotInfo.startTime;
+            bookingUpdates.slotEndTime = slotInfo.endTime;
+          }
+        }
+
+        // Sync amount if planAmount changed
+        if (payload.planAmount !== undefined) {
+          bookingUpdates.amount = Number(payload.planAmount);
+        }
+
+        // Sync duration if changed
+        if (payload.duration !== undefined) {
+          bookingUpdates.duration = payload.duration;
+        }
+
+        // Sync startDate if changed
+        if (payload.startDate !== undefined) {
+          bookingUpdates.startDate = payload.startDate;
+        }
+
+        // Sync validUntil when endDate, duration, or startDate changes
+        if (
+          resolvedEndDate &&
+          (payload.endDate !== undefined ||
+            payload.duration !== undefined ||
+            payload.startDate !== undefined)
+        ) {
+          bookingUpdates.validUntil = resolvedEndDate;
+        }
+
+        if (Object.keys(bookingUpdates).length > 0) {
+          await this.bookingRepository.updateBookingFields(
             existingMember.bookingId,
-            newSeatId,
+            bookingUpdates,
           );
         }
       }
