@@ -277,7 +277,8 @@ export class LibrarySetupData {
 
   @IsString()
   description!: string;
-
+  
+  @IsOptional()
   @IsString()
   contactPhone!: string;
 

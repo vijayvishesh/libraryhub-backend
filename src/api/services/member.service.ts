@@ -667,6 +667,15 @@ export class MemberService {
     const notes = payload.notes?.trim() ?? null;
     const planAmount = typeof payload.planAmount === 'number' ? payload.planAmount : null;
 
+    // Check if phone belongs to the library owner
+    const ownerLibrary = await this.libraryRepository.findLibraryById(libraryId);
+    if (ownerLibrary) {
+      const owner = await this.authRepository.findOwnerById(ownerLibrary.ownerId);
+      if (owner && owner.phone === mobileNo) {
+        throw new HttpError(409, 'OWNER_CANNOT_BE_ADDED_AS_MEMBER');
+      }
+    }
+
     // Check member already exists in this library
     const existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
       libraryId,
