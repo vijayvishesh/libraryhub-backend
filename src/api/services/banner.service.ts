@@ -10,6 +10,14 @@ import { CreateBannerRequest, UpdateBannerRequest } from '../controllers/request
 import { BannerDurationUnit } from '../models/banner.model';
 import { AnnouncementTarget } from '../models/announcement.model';
 
+export type MembershipAlert = {
+  type: 'expiring_soon' | 'expired' | 'overdue';
+  title: string;
+  message: string;
+  endDate: string | null;
+  daysRemaining: number; // positive = days left, negative = days overdue
+};
+
 @Service()
 export class BannerService {
   constructor(
@@ -70,7 +78,7 @@ export class BannerService {
     await this.bannerRepository.softDelete(id);
   }
 
-  //  get announcements relevant to this student in this library
+  // Get active announcements relevant to this student in this library
   public async listActiveAnnouncementsForStudent(
     studentId: string,
     libraryId: string,
@@ -78,7 +86,6 @@ export class BannerService {
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
 
-    // 1. Get all active non-expired announcements for this library
     const all = await this.announcementRepository.findByLibrary(libraryId);
     const active = all.filter(a =>
       a.isActive &&
@@ -88,18 +95,15 @@ export class BannerService {
 
     if (active.length === 0) return [];
 
-    // 2. Get student membership in this library
     const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
       studentId,
       libraryId,
     );
 
-    // Student has no membership — only show 'all' target announcements
     if (!member) {
       return active.filter(a => a.target === 'all');
     }
 
-    // 3. Get today's attendance for absent check
     const todayAttendance = await this.attendanceRepository.findTodayByStudentAndLibrary(
       studentId,
       libraryId,
@@ -107,10 +111,92 @@ export class BannerService {
     );
     const checkedInToday = !!todayAttendance;
 
-    // 4. Filter announcements where this student matches the target
     return active.filter(a =>
       this.studentMatchesTarget(a.target, member, checkedInToday, today),
     );
+  }
+
+  // New: build membership alert cards for the student
+  public async getMembershipAlerts(
+    studentId: string,
+    libraryId: string,
+  ): Promise<MembershipAlert[]> {
+    const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
+      studentId,
+      libraryId,
+    );
+
+    // No membership in this library — no alerts
+    if (!member) return [];
+
+    // Only alert for active, pending, or expired members
+    if (!['active', 'pending', 'expired'].includes(member.status)) return [];
+
+    const today = new Date().toISOString().slice(0, 10);
+    const endDate = member.endDate;
+
+    // pending with no endDate — fee due alert
+    if (member.status === 'pending') {
+      return [
+        {
+          type: 'overdue',
+          title: 'Fee Due',
+          message: 'Your library fee is pending. Please pay to activate your membership.',
+          endDate: endDate ?? null,
+          daysRemaining: 0,
+        },
+      ];
+    }
+
+    if (!endDate) return [];
+
+    const daysRemaining = this.getDaysDiff(today, endDate);
+
+    // Already expired
+    if (member.status === 'expired' || daysRemaining < 0) {
+      const overdueDays = Math.abs(daysRemaining);
+      return [
+        {
+          type: 'overdue',
+          title: 'Membership Overdue',
+          message:
+            overdueDays === 0
+              ? 'Your membership expired today. Please renew to continue.'
+              : `Your membership expired ${overdueDays} day${overdueDays === 1 ? '' : 's'} ago. Please renew.`,
+          endDate,
+          daysRemaining, // negative value
+        },
+      ];
+    }
+
+    // Expires today
+    if (daysRemaining === 0) {
+      return [
+        {
+          type: 'expiring_soon',
+          title: 'Expires Today',
+          message: 'Your membership expires today. Renew now to avoid interruption.',
+          endDate,
+          daysRemaining: 0,
+        },
+      ];
+    }
+
+    // Expiring within 7 days — show a graded alert
+    if (daysRemaining <= 7) {
+      return [
+        {
+          type: 'expiring_soon',
+          title: `Expiring in ${daysRemaining} Day${daysRemaining === 1 ? '' : 's'}`,
+          message: `Your membership expires on ${endDate}. Renew soon to avoid interruption.`,
+          endDate,
+          daysRemaining,
+        },
+      ];
+    }
+
+    // More than 7 days remaining — no alert needed
+    return [];
   }
 
   // ── Target matching logic ───────────────────────────────────────────────
@@ -129,19 +215,15 @@ export class BannerService {
         return member.status === 'active';
 
       case 'absent':
-        // Active member who has NOT checked in today
         return member.status === 'active' && !checkedInToday;
 
       case 'fee_due':
-        // Pending payment
         return member.status === 'pending';
 
       case 'expired':
-        // Membership expired
         return member.status === 'expired';
 
       case 'overdue':
-        // Expired OR pending OR past end date
         return (
           member.status === 'expired' ||
           member.status === 'pending' ||
@@ -149,9 +231,15 @@ export class BannerService {
         );
 
       default:
-        // Slot-based — match member's slotId to the target
         return member.status === 'active' && member.slotId === target;
     }
+  }
+
+  // Returns positive int if endDate is in the future, negative if past
+  private getDaysDiff(today: string, endDate: string): number {
+    const todayMs = new Date(`${today}T00:00:00.000Z`).getTime();
+    const endMs = new Date(`${endDate}T00:00:00.000Z`).getTime();
+    return Math.round((endMs - todayMs) / (1000 * 60 * 60 * 24));
   }
 
   private calculateEndDate(

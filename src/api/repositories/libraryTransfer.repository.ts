@@ -23,6 +23,7 @@ export class LibraryTransferRepository {
       newOwnerName: model.newOwnerName,
       newOwnerPhone: model.newOwnerPhone,
       newOwnerEmail: model.newOwnerEmail,
+      newOwnerPassword: model.newOwnerPassword,
       keepLibraryName: model.keepLibraryName,
       newLibraryName: model.newLibraryName,
       notifyStudents: model.notifyStudents,

@@ -22,42 +22,65 @@ export class BookingApprovalService {
     private readonly fcmTokenRepository: FcmTokenRepository,
   ) {}
 
-  public async approveBooking(
-    ownerId: string,
-    bookingId: string,
-    markPaid = false,
-    paymentMethod?: string,
-  ): Promise<BookingResult> {
-    try {
-      const library = await this.getOwnerLibraryOrThrow(ownerId);
-      const booking = await this.bookingRepository.findLibraryBookingById(library.id, bookingId);
-      if (!booking) {
-        throw new NotFoundError('BOOKING_NOT_FOUND');
+ public async approveBooking(
+  ownerId: string,
+  bookingId: string,
+  markPaid = false,
+  paymentMethod?: string,
+): Promise<BookingResult> {
+  try {
+    const library = await this.getOwnerLibraryOrThrow(ownerId);
+    const booking = await this.bookingRepository.findLibraryBookingById(library.id, bookingId);
+    if (!booking) {
+      throw new NotFoundError('BOOKING_NOT_FOUND');
+    }
+
+    if (booking.status !== 'pending_approval') {
+      throw new HttpError(409, 'BOOKING_NOT_PENDING_APPROVAL');
+    }
+
+    // Check if owner already changed the seat via updateMember before approval
+    // If so, use the member's current seat as the final seat (owner's decision wins)
+    const student = await this.authRepository.findStudentById(booking.studentId);
+    let finalSeatId = booking.seatId; // default: what student originally booked
+
+    if (student) {
+      const existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
+        student.id,
+        library.id,
+      );
+      // Owner changed seat on member record — use that as the final seat
+      if (existingMember?.seatId && existingMember.seatId !== booking.seatId) {
+        finalSeatId = existingMember.seatId;
       }
+    }
 
-      if (booking.status !== 'pending_approval') {
-        throw new HttpError(409, 'BOOKING_NOT_PENDING_APPROVAL');
-      }
+    // Sync booking record's seatId if owner changed it
+    // This frees the original seat and locks only the new one
+    if (finalSeatId !== booking.seatId) {
+      await this.bookingRepository.updateBookingSeatId(bookingId, finalSeatId);
+    }
 
-      const targetStatus = markPaid ? 'confirmed' : 'pending_payment';
-      const memberStatus = markPaid ? 'active' : 'pending';
+    const targetStatus = markPaid ? 'confirmed' : 'pending_payment';
+    const memberStatus = markPaid ? 'active' : 'pending';
 
-      const updated = markPaid
-        ? await this.bookingRepository.markBookingPaid(
-            bookingId,
-            paymentMethod as LibraryPaymentMethod | undefined,
-          )
-        : await this.bookingRepository.updateBookingStatus(bookingId, targetStatus);
-      if (!updated) {
-        throw new InternalServerError('APPROVE_BOOKING_FAILED');
-      }
+    const updated = markPaid
+      ? await this.bookingRepository.markBookingPaid(
+          bookingId,
+          paymentMethod as LibraryPaymentMethod | undefined,
+        )
+      : await this.bookingRepository.updateBookingStatus(bookingId, targetStatus);
 
-      const student = await this.authRepository.findStudentById(booking.studentId);
-      if (student) {
+    if (!updated) {
+      throw new InternalServerError('APPROVE_BOOKING_FAILED');
+    }
+
+    if (student) {
+      try {
         await this.syncMemberForBooking(
           student,
           library.id,
-          booking.seatId,
+          finalSeatId,        // ← resolved seat (owner's choice or student's original)
           booking.slotType,
           booking.amount,
           booking.startDate,
@@ -66,24 +89,29 @@ export class BookingApprovalService {
           bookingId,
           booking.duration,
         );
+      } catch (syncError) {
+        // Roll back booking status so owner can retry
+        await this.bookingRepository.updateBookingStatus(bookingId, 'pending_approval');
+        throw new InternalServerError('APPROVE_BOOKING_MEMBER_SYNC_FAILED');
       }
-
-      const notifMessage = markPaid
-        ? `Booking approved & paid for seat ${booking.seatId}`
-        : `Confirmed! Pay ₹${booking.amount} at counter for seat ${booking.seatId}`;
-
-      await this.createAndPushNotification(
-        booking.studentId,
-        'Booking Approved',
-        notifMessage,
-        bookingId,
-      );
-
-      return this.mapBookingResult(updated, library);
-    } catch (error) {
-      this.rethrowError(error, 'APPROVE_BOOKING_FAILED');
     }
+
+    const notifMessage = markPaid
+      ? `Booking approved & paid for seat ${finalSeatId}`
+      : `Confirmed! Pay ₹${booking.amount} at counter for seat ${finalSeatId}`;
+
+    await this.createAndPushNotification(
+      booking.studentId,
+      'Booking Approved',
+      notifMessage,
+      bookingId,
+    );
+
+    return this.mapBookingResult(updated, library);
+  } catch (error) {
+    this.rethrowError(error, 'APPROVE_BOOKING_FAILED');
   }
+}
 
   public async rejectBooking(ownerId: string, bookingId: string): Promise<BookingResult> {
     try {
@@ -181,7 +209,6 @@ private async syncMemberForBooking(
   bookingId: string | null = null,
   duration = 1,
 ): Promise<void> {
-  // Find existing member FIRST before counting records
   let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
     student.id,
     libraryId,
@@ -193,17 +220,14 @@ private async syncMemberForBooking(
     );
   }
 
-  // isNewUser = true only if no member records exist anywhere else
-  // const allMemberRecords = await this.memberRepository.findAllMembersByPhone(student.phone);
-  // const otherLibraryRecords = allMemberRecords.filter(m => m.libraryId !== libraryId);
-  // const isNewUser = !existingMember && otherLibraryRecords.length === 0;
-
+  // Calculate isNewUser at approval time:
+  // Exclude the member record created by THIS booking from the count
+  // so isNewUser reflects whether student existed BEFORE this booking
   const allMemberRecords = await this.memberRepository.findAllMembersByPhone(student.phone);
-// Exclude the member record created by THIS booking request from this library
-const otherRecords = allMemberRecords.filter(
-  m => !(m.libraryId === libraryId && m.bookingId === bookingId),
-);
-const isNewUser = otherRecords.length === 0;
+  const otherRecords = allMemberRecords.filter(
+    m => !(m.libraryId === libraryId && m.bookingId === bookingId),
+  );
+  const isNewUser = otherRecords.length === 0;
 
   if (!existingMember) {
     await this.memberRepository.createMember({
@@ -214,7 +238,7 @@ const isNewUser = otherRecords.length === 0;
       email: null,
       duration,
       libraryId,
-      seatId,
+      seatId,               // ← final resolved seat
       slotId,
       status: memberStatus,
       planAmount,
@@ -230,14 +254,14 @@ const isNewUser = otherRecords.length === 0;
     await this.memberRepository.updateMemberByIdAndLibrary(existingMember.id, libraryId, {
       studentId: student.id,
       bookingId,
-      seatId,
+      seatId,               // ← final resolved seat (overwrites any intermediate change)
       slotId,
       status: memberStatus,
       planAmount,
       startDate,
       endDate,
       paidAt: memberStatus === 'active' ? new Date() : undefined,
-      isNewUser,
+      isNewUser,            // ← correctly calculated at approval time
       updatedAt: new Date(),
     });
   }

@@ -30,6 +30,9 @@ export class LibraryTransferModel {
   newOwnerEmail!: string | null;
 
   @Column()
+  newOwnerPassword!: string;        
+
+  @Column()
   keepLibraryName!: boolean;
 
   @Column()

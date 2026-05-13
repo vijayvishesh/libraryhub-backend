@@ -71,6 +71,7 @@ export class LibraryTransferService {
 
       // 8. Create transfer record with OTPs
       const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+      const hashedPassword = await bcrypt.hash(payload.new_owner.password, PASSWORD_SALT_ROUNDS)
       const transfer = await this.libraryTransferRepository.create({
         libraryId: library.id,
         oldOwnerId: ownerId,
@@ -78,6 +79,7 @@ export class LibraryTransferService {
         newOwnerName: payload.new_owner.name.trim(),
         newOwnerPhone,
         newOwnerEmail: payload.new_owner.email?.trim() ?? null,
+        newOwnerPassword: hashedPassword, 
         keepLibraryName: keepName,
         newLibraryName: keepName ? null : newName!.trim(),
         notifyStudents: payload.library_settings.notify_students,
@@ -132,10 +134,7 @@ export class LibraryTransferService {
       }
 
       // 4. Hash new owner password
-      const hashedPassword = await bcrypt.hash(
-        transfer.newOwnerPhone + '_transfer_' + Date.now(),
-        PASSWORD_SALT_ROUNDS,
-      );
+       const hashedPassword = transfer.newOwnerPassword;
 
       // 5. Create new tenant for new owner
       const finalLibraryName = transfer.keepLibraryName

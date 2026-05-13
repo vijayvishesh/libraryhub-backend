@@ -17,6 +17,7 @@ import {
   BannerData,
   BannerListApiResponse,
   BannerListPayloadData,
+  MembershipAlertData,
 } from './responses/banner.response';
 import { ErrorResponseModel } from './responses/common.reponse';
 
@@ -39,21 +40,33 @@ export class StudentBannerController {
     @QueryParams() query: StudentBannerQueryRequest,
   ): Promise<BannerListApiResponse> {
     try {
+      const studentId = session.user.id;
+
       // Always fetch global banners
       const bannerRecords = await this.bannerService.listActiveBanners();
 
-      // Fetch announcements only if libraryId is provided
-      const announcementRecords = query.libraryId
-        ? await this.bannerService.listActiveAnnouncementsForStudent(
-            session.user.id,
-            query.libraryId,
-          )
-        : [];
+      // Fetch announcements and membership alerts only if libraryId is provided
+      const [announcementRecords, membershipAlerts] = query.libraryId
+        ? await Promise.all([
+            this.bannerService.listActiveAnnouncementsForStudent(studentId, query.libraryId),
+            this.bannerService.getMembershipAlerts(studentId, query.libraryId),
+          ])
+        : [[], []];
 
       return new BannerListApiResponse(
         new BannerListPayloadData(
           bannerRecords.map(r => new BannerData(r)),
           announcementRecords.map(r => new AnnouncementSummaryData(r)),
+          membershipAlerts.map(
+            a =>
+              new MembershipAlertData({
+                type: a.type,
+                title: a.title,
+                message: a.message,
+                endDate: a.endDate,
+                daysRemaining: a.daysRemaining,
+              }),
+          ),
           bannerRecords.length,
         ),
         200,

@@ -57,7 +57,7 @@ export class AdminBannerController {
     try {
       const records = await this.bannerService.listAllBanners();
       return new BannerListApiResponse(
-        new BannerListPayloadData(records.map(r => new BannerData(r)), [], records.length),
+        new BannerListPayloadData(records.map(r => new BannerData(r)), [], [], records.length),
         200,
       );
     } catch (error) {
@@ -85,7 +85,7 @@ export class AdminBannerController {
       throw new InternalServerError('UPDATE_BANNER_FAILED');
     }
   }
-
+  
   @Delete('/:id')
   @Authorized('SUPER_ADMIN')
   @OnUndefined(204)

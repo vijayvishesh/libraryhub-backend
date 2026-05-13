@@ -133,29 +133,25 @@ export class AuthService {
     }
   }
 
-  public async verifyOtpAndLogin(payload: VerifyOtpWithRoleRequest): Promise<AuthData> {
+public async verifyOtpAndLogin(payload: VerifyOtpWithRoleRequest): Promise<AuthData> {
   try {
     const phone = this.normalizePhone(payload.phone);
 
-    // ✅ No role = member OTP login flow
+    // No role = member OTP login / invitation flow
     if (!payload.role) {
       return this.handleMemberOtpVerify(phone, payload.otp);
     }
 
-    // ── existing register + verify flow ──────────────────────────────────
     const normalizedRole = this.normalizeRequestRole(payload.role);
-
     this.validateOtp(payload.otp);
-    await this.ensurePhoneNotRegistered(phone);
 
     if (normalizedRole === 'OWNER') {
+      // OWNER: must be a new signup, block if already exists
+      await this.ensurePhoneNotRegistered(phone);
+
       const pendingOwnerSignup = await this.authRepository.findPendingOwnerSignupByPhone(phone);
-      if (!pendingOwnerSignup) {
-        throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
-      }
-      if (this.isOtpExpired(pendingOwnerSignup.expiresAt)) {
-        throw new UnauthorizedError('OTP_EXPIRED');
-      }
+      if (!pendingOwnerSignup) throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
+      if (this.isOtpExpired(pendingOwnerSignup.expiresAt)) throw new UnauthorizedError('OTP_EXPIRED');
 
       const tenant = await this.authRepository.createTenant({
         name: pendingOwnerSignup.libraryName || pendingOwnerSignup.name,
@@ -163,7 +159,6 @@ export class AuthService {
         isSetupCompleted: false,
         ownerId: '',
       });
-
       const owner = await this.authRepository.createOwner({
         tenantId: tenant.id,
         name: pendingOwnerSignup.name,
@@ -172,20 +167,22 @@ export class AuthService {
         hasCreatedLibrary: false,
         role: 'OWNER',
       });
-
       await this.authRepository.updateTenantOwnerId(tenant.id, owner.id);
       await this.authRepository.deletePendingOwnerSignupByPhone(phone);
       return this.createOwnerAuthData(owner, tenant);
     }
 
-    // STUDENT register verify
+    // STUDENT role: check if already exists → treat as OTP login, not signup
+    const existingStudent = await this.authRepository.findStudentByPhone(phone);
+    if (existingStudent) {
+      // Student exists (self-registered or added by owner) → just log in via OTP
+      return this.handleMemberOtpVerify(phone, payload.otp);
+    }
+
+    // New student signup (came from register flow, no account yet)
     const pendingStudentSignup = await this.authRepository.findPendingStudentSignupByPhone(phone);
-    if (!pendingStudentSignup) {
-      throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
-    }
-    if (this.isOtpExpired(pendingStudentSignup.expiresAt)) {
-      throw new UnauthorizedError('OTP_EXPIRED');
-    }
+    if (!pendingStudentSignup) throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
+    if (this.isOtpExpired(pendingStudentSignup.expiresAt)) throw new UnauthorizedError('OTP_EXPIRED');
 
     const student = await this.authRepository.createStudent({
       name: pendingStudentSignup.name,
@@ -196,7 +193,6 @@ export class AuthService {
       hasJoinedLibrary: false,
       role: 'STUDENT',
     });
-
     await this.authRepository.deletePendingStudentSignupByPhone(phone);
     return this.createStudentAuthData(student);
 
@@ -887,29 +883,32 @@ public async resendOtp(payload: ResendOtpRequest): Promise<number> {
   try {
     const phone = this.normalizePhone(payload.phone);
 
-    if (payload.purpose === 'member-login') {
-      // Phone must exist as a member
-      const members = await this.memberRepository.findAllMembersByPhone(phone);
-      if (!members.length) {
-        throw new UnauthorizedError('MEMBER_NOT_FOUND');
-      }
+if (payload.purpose === 'member-login') {
+  const [members, existingStudent] = await Promise.all([
+    this.memberRepository.findAllMembersByPhone(phone),
+    this.authRepository.findStudentByPhone(phone),
+  ]);
 
-      const existingStudent = await this.authRepository.findStudentByPhone(phone);
-      const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+  // Must be existing student OR member in at least one library
+  if (!existingStudent && !members.length) {
+    throw new UnauthorizedError('USER_NOT_FOUND');
+  }
 
-      // Reuse pending signup slot same as memberOtpLoginSend
-      await this.authRepository.upsertPendingStudentSignup({
-        name: existingStudent?.name ?? members[0].fullName,
-        phone,
-        gender: existingStudent?.gender ?? 'other',
-        password: existingStudent?.password ?? '',
-        otp: STATIC_OTP,
-        expiresAt,
-      });
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+  const name = existingStudent?.name ?? members[0]?.fullName ?? '';
 
-      await this.sendOtpViaWhatsApp(phone, STATIC_OTP);
-      return OTP_EXPIRY_MINUTES * 60;
-    }
+  await this.authRepository.upsertPendingStudentSignup({
+    name,
+    phone,
+    gender: existingStudent?.gender ?? 'other',
+    password: existingStudent?.password ?? '',
+    otp: STATIC_OTP,
+    expiresAt,
+  });
+
+  await this.sendOtpViaWhatsApp(phone, STATIC_OTP);
+  return OTP_EXPIRY_MINUTES * 60;
+}
 
     // ── register resend ───────────────────────────────────────────────────
     if (payload.purpose === 'register') {
@@ -967,6 +966,7 @@ public async resendOtp(payload: ResendOtpRequest): Promise<number> {
 }
 
 
+// AFTER
 public async memberOtpLoginSend(payload: MemberOtpLoginSendRequest): Promise<{
   phone: string;
   expiresIn: number;
@@ -975,20 +975,24 @@ public async memberOtpLoginSend(payload: MemberOtpLoginSendRequest): Promise<{
   try {
     const phone = this.normalizePhone(payload.phone);
 
-    // Must exist as a member in at least one library
-    const members = await this.memberRepository.findAllMembersByPhone(phone);
-    if (!members.length) {
-      throw new UnauthorizedError('MEMBER_NOT_FOUND');
-    }
-
-    // Check if they already have a student account
+    // Check if existing student account
     const existingStudent = await this.authRepository.findStudentByPhone(phone);
+
+    // Check if member in any library
+    const members = await this.memberRepository.findAllMembersByPhone(phone);
+
+    // Must be either an existing student OR a member in at least one library
+    if (!existingStudent && !members.length) {
+      throw new UnauthorizedError('USER_NOT_FOUND');
+    }
 
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-    // Store OTP in pending student signup slot (reuse existing mechanism)
+    // Determine name for pending record
+    const name = existingStudent?.name ?? members[0]?.fullName ?? '';
+
     await this.authRepository.upsertPendingStudentSignup({
-      name: existingStudent?.name ?? members[0].fullName,
+      name,
       phone,
       gender: existingStudent?.gender ?? 'other',
       password: existingStudent?.password ?? '',
@@ -1009,6 +1013,7 @@ public async memberOtpLoginSend(payload: MemberOtpLoginSendRequest): Promise<{
 }
 
 // ✅ extracted member OTP verify logic — called by verifyOtpAndLogin when no role
+// AFTER
 private async handleMemberOtpVerify(phone: string, otp: string): Promise<AuthData> {
   // 1. Validate OTP
   this.validateOtp(otp);
@@ -1022,14 +1027,18 @@ private async handleMemberOtpVerify(phone: string, otp: string): Promise<AuthDat
     throw new UnauthorizedError('OTP_EXPIRED');
   }
 
-  // 3. Member must exist with this phone
-  const members = await this.memberRepository.findAllMembersByPhone(phone);
-  if (!members.length) {
-    throw new UnauthorizedError('MEMBER_NOT_FOUND');
+  // 3. Check members and existing student in parallel
+  const [members, existingStudent] = await Promise.all([
+    this.memberRepository.findAllMembersByPhone(phone),
+    this.authRepository.findStudentByPhone(phone),
+  ]);
+
+  // Must be either existing student OR member in at least one library
+  if (!existingStudent && !members.length) {
+    throw new UnauthorizedError('USER_NOT_FOUND');
   }
 
   // 4. If student account already exists → just log in
-  const existingStudent = await this.authRepository.findStudentByPhone(phone);
   if (existingStudent) {
     await this.authRepository.deletePendingStudentSignupByPhone(phone);
 
@@ -1048,7 +1057,7 @@ private async handleMemberOtpVerify(phone: string, otp: string): Promise<AuthDat
     return this.createStudentAuthData(existingStudent);
   }
 
-  // 5. First-time OTP login → create student account from member data
+  // 5. No student account but has member records → create from member data
   const primaryMember = members[0];
   const tempPassword = await bcrypt.hash(
     `member_otp_${phone}_${Date.now()}`,
@@ -1061,19 +1070,21 @@ private async handleMemberOtpVerify(phone: string, otp: string): Promise<AuthDat
     gender: 'other',
     password: tempPassword,
     isPhoneVerified: true,
-    hasJoinedLibrary: true,
+    hasJoinedLibrary: members.length > 0,
     role: 'STUDENT',
   });
 
   // 6. Link all member records to new student
-  await Promise.all(
-    members.map(m =>
-      this.memberRepository.updateMemberByIdAndLibrary(m.id, m.libraryId, {
-        studentId: student.id,
-        updatedAt: new Date(),
-      }),
-    ),
-  );
+  if (members.length) {
+    await Promise.all(
+      members.map(m =>
+        this.memberRepository.updateMemberByIdAndLibrary(m.id, m.libraryId, {
+          studentId: student.id,
+          updatedAt: new Date(),
+        }),
+      ),
+    );
+  }
 
   await this.authRepository.deletePendingStudentSignupByPhone(phone);
   return this.createStudentAuthData(student);

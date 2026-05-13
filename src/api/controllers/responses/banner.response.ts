@@ -69,6 +69,31 @@ export class AnnouncementSummaryData {
   }
 }
 
+// New: membership alert shown as a card on student screen
+export class MembershipAlertData {
+  @IsString() type!: 'expiring_soon' | 'expired' | 'overdue';
+  @IsString() title!: string;
+  @IsString() message!: string;
+  @IsOptional() @IsString() endDate?: string | null;
+  // positive = days remaining, negative = days overdue
+  @IsNumber() daysRemaining!: number;
+
+  constructor(params?: {
+    type: 'expiring_soon' | 'expired' | 'overdue';
+    title: string;
+    message: string;
+    endDate: string | null;
+    daysRemaining: number;
+  }) {
+    if (!params) return;
+    this.type = params.type;
+    this.title = params.title;
+    this.message = params.message;
+    this.endDate = params.endDate;
+    this.daysRemaining = params.daysRemaining;
+  }
+}
+
 export class BannerApiResponse {
   @IsNumber() responseCode!: number;
   @ValidateNested()
@@ -93,16 +118,23 @@ export class BannerListPayloadData {
   @Type(() => AnnouncementSummaryData)
   announcements!: AnnouncementSummaryData[];
 
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MembershipAlertData)
+  membershipAlerts!: MembershipAlertData[];
+
   @IsNumber() total!: number;
 
   constructor(
     banners?: BannerData[],
     announcements?: AnnouncementSummaryData[],
+    membershipAlerts?: MembershipAlertData[],
     total?: number,
   ) {
-    if (!banners || !announcements || typeof total !== 'number') return;
+    if (!banners || !announcements || !membershipAlerts || typeof total !== 'number') return;
     this.banners = banners;
     this.announcements = announcements;
+    this.membershipAlerts = membershipAlerts;
     this.total = total;
   }
 }

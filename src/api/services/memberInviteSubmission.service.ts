@@ -53,13 +53,19 @@ public async submitForm(
   const existingStudent = await this.authRepository.findStudentByPhone(mobileNo);
   const isNewUser = !existingStudent;
 
-  const existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
-    link.libraryId,
-    mobileNo,
-  );
-  if (existingMember) {
-    throw new HttpError(409, 'PHONE_ALREADY_MEMBER_OF_LIBRARY');
-  }
+// Check if phone belongs to the library owner
+const owner = await this.authRepository.findOwnerById(library.ownerId);
+if (owner && owner.phone === mobileNo) {
+  throw new HttpError(409, 'OWNER_CANNOT_BE_ADDED_AS_MEMBER');
+}
+
+const existingMember = await this.memberRepository.findMemberByLibraryMobileOrAadhar(
+  link.libraryId,
+  mobileNo,
+);
+if (existingMember) {
+  throw new HttpError(409, 'PHONE_ALREADY_MEMBER_OF_LIBRARY');
+}
 
   const isExistingMember = false;
   // const isDuplicate = false;

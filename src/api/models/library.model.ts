@@ -96,7 +96,7 @@ export class LibraryModel {
 
   @Column()
   description!: string;
-
+  
   @Column()
   contactPhone!: string;
 

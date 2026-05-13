@@ -117,6 +117,9 @@ export class OwnerDashboardRecentActivityData {
   @IsString()
   color!: string;
 
+  @IsString()
+  studentId!: string | null;
+
   constructor(params?: {
     id: string;
     name: string;
@@ -124,6 +127,7 @@ export class OwnerDashboardRecentActivityData {
     detail: string;
     time: string;
     color: string;
+    studentId: string | null;
   }) {
     if (!params) {
       return;
@@ -135,6 +139,7 @@ export class OwnerDashboardRecentActivityData {
     this.detail = params.detail;
     this.time = params.time;
     this.color = params.color;
+    this.studentId = params.studentId;
   }
 }
 
