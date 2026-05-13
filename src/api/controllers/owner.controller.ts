@@ -435,7 +435,6 @@ export class OwnerController {
   ): Promise<MemberCreateApiResponse> {
     try {
       const result = await this.memberService.addMember(session.user.id, payload);
-      const member = await this.memberService.getMemberById(session.user.id, result.memberId);
       await this.activityService.logActivity(
         session.user.id,
         'NEW_MEMBER_ADDED',
@@ -444,7 +443,7 @@ export class OwnerController {
           memberName: payload.fullName,
           memberPhone: payload.mobileNo,
           seatId: payload.seatId,
-          studentId: member.studentId ?? null,
+          // studentId: member.studentId ?? null,
         },
       );
 
