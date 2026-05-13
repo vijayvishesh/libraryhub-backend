@@ -49,4 +49,5 @@ export type ListMembersResult = {
 
 export type MemberMsgResponse = {
   msg: string;
+  memberId?: string;
 };

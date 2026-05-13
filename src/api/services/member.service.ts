@@ -77,8 +77,9 @@ export class MemberService {
   public async addMember(ownerId: string, payload: AddMemberRequest): Promise<MemberMsgResponse> {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
+      const member = await this.createMemberForLibrary(library.id, payload);
       await this.createMemberForLibrary(library.id, payload);
-      return { msg: 'Member added successfully' };
+      return { msg: 'Member added successfully', memberId: member.id  };
     } catch (error) {
       if (error instanceof HttpError) throw error;
       throw new InternalServerError('MEMBER_CREATION_FAILED');

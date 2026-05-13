@@ -23,6 +23,7 @@ export type OwnerDashboardRecentActivity = {
   detail: string;
   time: string;
   color: string;
+  studentId: string | null;
 };
 
 export type OwnerDashboardResult = {

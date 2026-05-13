@@ -85,7 +85,7 @@ export class AdminBannerController {
       throw new InternalServerError('UPDATE_BANNER_FAILED');
     }
   }
-
+  
   @Delete('/:id')
   @Authorized('SUPER_ADMIN')
   @OnUndefined(204)

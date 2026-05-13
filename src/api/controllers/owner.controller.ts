@@ -175,6 +175,7 @@ export class OwnerController {
         {
           bookingId: result.id,
           seatId: result.seatId,
+          // studentId: result.studentId ?? null,
         },
       );
 
@@ -232,6 +233,7 @@ export class OwnerController {
                 detail: item.detail,
                 time: item.time,
                 color: item.color,
+                studentId: item.studentId,
               }),
           ),
         }),
@@ -433,7 +435,7 @@ export class OwnerController {
   ): Promise<MemberCreateApiResponse> {
     try {
       const result = await this.memberService.addMember(session.user.id, payload);
-
+      const member = await this.memberService.getMemberById(session.user.id, result.memberId);
       await this.activityService.logActivity(
         session.user.id,
         'NEW_MEMBER_ADDED',
@@ -442,6 +444,7 @@ export class OwnerController {
           memberName: payload.fullName,
           memberPhone: payload.mobileNo,
           seatId: payload.seatId,
+          studentId: member.studentId ?? null,
         },
       );
 
@@ -506,6 +509,7 @@ export class OwnerController {
           memberName: updatedMember.fullName,
           seatId: updatedMember.seatId,
           memberId: updatedMember.id,
+          studentId: updatedMember.studentId ?? null,
         },
       );
 
@@ -548,6 +552,7 @@ export class OwnerController {
         {
           memberName: member.fullName,
           memberId: member.id,
+          studentId: member.studentId ?? null,
           amount: member.planAmount,
           seatId: member.seatId,
         },
@@ -585,6 +590,7 @@ export class OwnerController {
         {
           memberName: member.fullName,
           memberId: member.id,
+          studentId: member.studentId ?? null,
         },
       );
 

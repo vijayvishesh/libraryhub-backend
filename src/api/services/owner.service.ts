@@ -196,12 +196,13 @@ export class OwnerService {
     const baseName = this.extractActivityName(activity);
     const mappedAction = this.mapActivityAction(activity.actionType);
     const detail = this.extractActivityDetail(activity);
-
+    const studentId = activity.metadata?.studentId ?? null;
     return {
       id: activity.id,
       name: baseName,
       action: mappedAction.action,
       detail,
+      studentId,
       time: this.formatTimeAgo(activity.timestamp),
       color: mappedAction.color,
     };
