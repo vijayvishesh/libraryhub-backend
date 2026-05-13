@@ -443,7 +443,6 @@ export class OwnerController {
           memberName: payload.fullName,
           memberPhone: payload.mobileNo,
           seatId: payload.seatId,
-          // studentId: member.studentId ?? null,
         },
       );
 
