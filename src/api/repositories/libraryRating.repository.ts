@@ -57,10 +57,14 @@ export class LibraryRatingRepository {
     rating: number,
     review: string | null,
   ): Promise<LibraryRatingRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const repo = this.getRepo();
     const existing = await repo.findOneById(new ObjectId(id));
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
     existing.rating = rating;
     existing.review = review;
     existing.updatedAt = new Date();
@@ -72,7 +76,9 @@ export class LibraryRatingRepository {
     const ratings = await this.getRepo().find({
       where: { libraryId } as any,
     });
-    if (ratings.length === 0) return { average: 0, count: 0 };
+    if (ratings.length === 0) {
+      return { average: 0, count: 0 };
+    }
     const sum = ratings.reduce((acc, r) => acc + r.rating, 0);
     const average = Math.round((sum / ratings.length) * 10) / 10;
     return { average, count: ratings.length };

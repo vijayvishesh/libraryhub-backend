@@ -21,10 +21,10 @@ class RedisCache {
         tls: {},
         maxRetriesPerRequest: 3,
         commandTimeout: 5000, // 5 seconds timeout for commands
-        retryStrategy: (times) => Math.min(times * 50, 2000),
+        retryStrategy: times => Math.min(times * 50, 2000),
       });
 
-      this.client.on('error', (err) => log.error('Redis Connection Error:', err));
+      this.client.on('error', err => log.error('Redis Connection Error:', err));
       this.client.on('connect', () => log.info('Redis Connected Successfully'));
       this.client.on('ready', () => log.info('Redis Client Ready'));
       this.client.on('close', () => log.warn('Redis Connection Closed'));

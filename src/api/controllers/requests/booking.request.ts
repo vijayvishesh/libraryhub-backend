@@ -58,10 +58,10 @@ export class CreateBookingRequest {
   )
   startDate?: string;
 
-// @IsOptional()
-// @IsInt()
-// @Min(1)
-// duration?: number; // e.g. 1, 7, 15, 1, 2, 3, 6, 12
+  // @IsOptional()
+  // @IsInt()
+  // @Min(1)
+  // duration?: number; // e.g. 1, 7, 15, 1, 2, 3, 6, 12
 }
 
 export class ListMyBookingsQueryRequest {
@@ -100,8 +100,8 @@ export class OwnerFeeCollectionQueryRequest {
 
   @IsOptional()
   @IsString()
-  @IsIn(['today', '3days', '7days', 'month'])
-  expiringRange?: 'today' | '3days' | '7days' | 'month';
+  @IsIn(['today', '3Days', '7Days', 'month'])
+  expiringRange?: 'today' | '3Days' | '7Days' | 'month';
 
   @IsOptional()
   @IsString()

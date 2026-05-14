@@ -561,38 +561,72 @@ export class AuthRepository {
     return getDataSource().getMongoRepository(AuthSessionModel);
   }
   public async updateOwnerPassword(ownerId: string, hashedPassword: string): Promise<void> {
-  const objectId = this.tryParseObjectId(ownerId);
-  if (!objectId) return;
+    const objectId = this.tryParseObjectId(ownerId);
+    if (!objectId) {
+      return;
+    }
 
-  const repo = this.getOwnerRepository();
-  const owner = await repo.findOneById(objectId);
-  if (!owner) return;
+    const repo = this.getOwnerRepository();
+    const owner = await repo.findOneById(objectId);
+    if (!owner) {
+      return;
+    }
 
-  owner.password = hashedPassword;
-  await repo.save(owner);
-}
+    owner.password = hashedPassword;
+    await repo.save(owner);
+  }
 
-public async updateStudentPassword(studentId: string, hashedPassword: string): Promise<void> {
-  const objectId = this.tryParseObjectId(studentId);
-  if (!objectId) return
+  public async updateStudentPassword(studentId: string, hashedPassword: string): Promise<void> {
+    const objectId = this.tryParseObjectId(studentId);
+    if (!objectId) {
+      return;
+    }
 
-  const repo = this.getStudentRepository();
-  const student = await repo.findOneById(objectId);
-  if (!student) return;
+    const repo = this.getStudentRepository();
+    const student = await repo.findOneById(objectId);
+    if (!student) {
+      return;
+    }
 
-  student.password = hashedPassword;
-  await repo.save(student);
-}
-public async savePasswordResetToken(
-  phone: string,
-  role: string,
-  resetToken: string,
-  expiresAt: Date,
-): Promise<void> {
-  // Store in pending signup models temporarily using otp field
-  // For owner:
-  if (role === 'OWNER') {
-    const repo = this.getPendingOwnerSignupRepository();
+    student.password = hashedPassword;
+    await repo.save(student);
+  }
+  public async savePasswordResetToken(
+    phone: string,
+    role: string,
+    resetToken: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    // Store in pending signup models temporarily using otp field
+    // For owner:
+    if (role === 'OWNER') {
+      const repo = this.getPendingOwnerSignupRepository();
+      const existing = await repo.findOneBy({ phone });
+      if (existing) {
+        existing.otp = resetToken;
+        existing.expiresAt = expiresAt;
+        existing.updatedAt = new Date();
+        await repo.save(existing);
+      } else {
+        const now = new Date();
+        const pending = repo.create({
+          name: '',
+          phone,
+          password: '',
+          libraryName: '',
+          city: '',
+          otp: resetToken,
+          expiresAt,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await repo.save(pending);
+      }
+      return;
+    }
+
+    // For student:
+    const repo = this.getPendingStudentSignupRepository();
     const existing = await repo.findOneBy({ phone });
     if (existing) {
       existing.otp = resetToken;
@@ -604,9 +638,8 @@ public async savePasswordResetToken(
       const pending = repo.create({
         name: '',
         phone,
+        gender: 'other',
         password: '',
-        libraryName: '',
-        city: '',
         otp: resetToken,
         expiresAt,
         createdAt: now,
@@ -614,48 +647,31 @@ public async savePasswordResetToken(
       });
       await repo.save(pending);
     }
-    return;
   }
 
-  // For student:
-  const repo = this.getPendingStudentSignupRepository();
-  const existing = await repo.findOneBy({ phone });
-  if (existing) {
-    existing.otp = resetToken;
-    existing.expiresAt = expiresAt;
-    existing.updatedAt = new Date();
-    await repo.save(existing);
-  } else {
-    const now = new Date();
-    const pending = repo.create({
-      name: '',
-      phone,
-      gender: 'other',
-      password: '',
-      otp: resetToken,
-      expiresAt,
-      createdAt: now,
-      updatedAt: now,
-    });
-    await repo.save(pending);
-  }
-}
+  public async findAndValidateResetToken(
+    phone: string,
+    role: string,
+    resetToken: string,
+  ): Promise<boolean> {
+    if (role === 'OWNER') {
+      const pending = await this.getPendingOwnerSignupRepository().findOneBy({ phone });
+      if (!pending || pending.otp !== resetToken) {
+        return false;
+      }
+      if (pending.expiresAt.getTime() < Date.now()) {
+        return false;
+      }
+      return true;
+    }
 
-public async findAndValidateResetToken(
-  phone: string,
-  role: string,
-  resetToken: string,
-): Promise<boolean> {
-  if (role === 'OWNER') {
-    const pending = await this.getPendingOwnerSignupRepository().findOneBy({ phone });
-    if (!pending || pending.otp !== resetToken) return false;
-    if (pending.expiresAt.getTime() < Date.now()) return false;
+    const pending = await this.getPendingStudentSignupRepository().findOneBy({ phone });
+    if (!pending || pending.otp !== resetToken) {
+      return false;
+    }
+    if (pending.expiresAt.getTime() < Date.now()) {
+      return false;
+    }
     return true;
   }
-
-  const pending = await this.getPendingStudentSignupRepository().findOneBy({ phone });
-  if (!pending || pending.otp !== resetToken) return false;
-  if (pending.expiresAt.getTime() < Date.now()) return false;
-  return true;
-}
 }

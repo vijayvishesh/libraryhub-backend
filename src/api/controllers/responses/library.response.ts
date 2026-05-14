@@ -41,7 +41,7 @@ export class LibrarySlotData {
   @IsBoolean()
   isActive!: boolean;
 
-    @IsOptional()
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => LibrarySlotPlanData)
@@ -52,7 +52,6 @@ export class LibrarySlotData {
   @ValidateNested({ each: true })
   @Type(() => LibrarySlotTrialData)
   trials?: LibrarySlotTrialData[];
-
 
   constructor(
     slotType: string,
@@ -72,7 +71,6 @@ export class LibrarySlotData {
     this.isActive = isActive;
     this.plans = plans?.map(p => new LibrarySlotPlanData(p));
     this.trials = trials?.map(t => new LibrarySlotTrialData(t));
-
   }
 }
 
@@ -277,7 +275,7 @@ export class LibrarySetupData {
 
   @IsString()
   description!: string;
-  
+
   @IsOptional()
   @IsString()
   contactPhone!: string;
@@ -506,7 +504,9 @@ export class LibrarySlotPlanData {
   @IsNumber() discountPercent!: number;
 
   constructor(plan?: { duration: string; isActive: boolean; discountPercent: number }) {
-    if (!plan) return;
+    if (!plan) {
+      return;
+    }
     this.duration = plan.duration;
     this.isActive = plan.isActive;
     this.discountPercent = plan.discountPercent;
@@ -518,7 +518,9 @@ export class LibrarySlotTrialData {
   @IsBoolean() isActive!: boolean;
 
   constructor(trial?: { duration: string; isActive: boolean }) {
-    if (!trial) return;
+    if (!trial) {
+      return;
+    }
     this.duration = trial.duration;
     this.isActive = trial.isActive;
   }
@@ -530,7 +532,9 @@ export class LibrarySlotsPayloadData {
   slots!: LibrarySlotData[];
 
   constructor(slots?: LibrarySlotData[]) {
-    if (!slots) return;
+    if (!slots) {
+      return;
+    }
     this.slots = slots;
   }
 }
@@ -542,7 +546,9 @@ export class LibrarySlotsApiResponse {
   data!: LibrarySlotsPayloadData;
 
   constructor(data?: LibrarySlotsPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

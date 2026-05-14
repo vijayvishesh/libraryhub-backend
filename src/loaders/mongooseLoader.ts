@@ -1,9 +1,11 @@
 import { MicroframeworkLoader, MicroframeworkSettings } from 'microframework-w3tec';
 import { connectDatabase, disconnectDatabase } from '../database/config/ormconfig.default';
-import { env } from '../env';
 import { seedSuperAdmins } from '../database/seeds/superAdmin.seed';
+import { env } from '../env';
 
-export const mongooseLoader: MicroframeworkLoader = async (settings: MicroframeworkSettings | undefined) => {
+export const mongooseLoader: MicroframeworkLoader = async (
+  settings: MicroframeworkSettings | undefined,
+) => {
   if (!env.db.enabled) {
     if (settings) {
       settings.setData('mongooseConnection', false);

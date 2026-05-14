@@ -1,30 +1,30 @@
 import { DataSource } from 'typeorm';
 import { ActivityModel } from '../../api/models/activity.model';
+import { AnnouncementModel } from '../../api/models/announcement.model';
+import { AttendanceModel } from '../../api/models/attendance.model';
 import { AuthSessionModel } from '../../api/models/authSession.model';
+import { BannerModel } from '../../api/models/banner.model';
 import { BookingModel } from '../../api/models/booking.model';
+import { FcmTokenModel } from '../../api/models/fcmToken.model';
 import { LibraryModel } from '../../api/models/library.model';
+import { LibraryRatingModel } from '../../api/models/libraryRating.model';
 import { LibrarySeatModel } from '../../api/models/librarySeat.model';
+import { LibraryTransferModel } from '../../api/models/libraryTransfer.model';
 import { MemberModel } from '../../api/models/member.model';
+import { MemberBulkUploadModel } from '../../api/models/memberBulkUpload.model';
+import { MemberInviteLinkModel } from '../../api/models/memberInviteLink.model';
+import { MemberInviteSubmissionModel } from '../../api/models/memberInviteSubmission.model';
+import { MemberPaymentModel } from '../../api/models/memberPayment.model';
+import { NotificationModel } from '../../api/models/notification.model';
 import { PendingOwnerSignupModel } from '../../api/models/pendingOwnerSignup.model';
 import { PendingStudentSignupModel } from '../../api/models/pendingStudentSignup.model';
 import { StudentModel } from '../../api/models/student.model';
+import { StudySessionModel } from '../../api/models/studySession.model';
 import { StudyTimetableModel } from '../../api/models/studyTimetable.model';
+import { SuperAdminModel } from '../../api/models/superAdmin.model';
 import { TenantModel } from '../../api/models/tenant.model';
 import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
-import { AttendanceModel } from '../../api/models/attendance.model';
-import { StudySessionModel } from '../../api/models/studySession.model';
-import { SuperAdminModel } from '../../api/models/superAdmin.model';
-import { AnnouncementModel } from '../../api/models/announcement.model';
-import { NotificationModel } from '../../api/models/notification.model';
-import { FcmTokenModel } from '../../api/models/fcmToken.model';
-import { MemberBulkUploadModel } from '../../api/models/memberBulkUpload.model';
-import { MemberInviteLinkModel } from '../../api/models/memberInviteLink.model';
-import { BannerModel } from '../../api/models/banner.model';
-import { LibraryRatingModel } from '../../api/models/libraryRating.model';
-import { MemberPaymentModel } from '../../api/models/memberPayment.model';
-import { MemberInviteSubmissionModel } from '../../api/models/memberInviteSubmission.model';
-import { LibraryTransferModel } from '../../api/models/libraryTransfer.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -73,7 +73,7 @@ const createDataSource = (): DataSource =>
       LibraryRatingModel,
       MemberPaymentModel,
       MemberInviteSubmissionModel,
-      LibraryTransferModel
+      LibraryTransferModel,
     ],
     synchronize: true,
     logging: false,
@@ -112,7 +112,7 @@ export const connectDatabase = async (): Promise<void> => {
     appDataSource = createDataSource();
     await appDataSource.initialize();
 
-    console.log('✅ MongoDB Connected Successfully');
+    console.error('✅ MongoDB Connected Successfully');
 
     isConnected = true;
     connectionAttempts = 0;
@@ -149,7 +149,7 @@ export const disconnectDatabase = async (): Promise<void> => {
 
   try {
     await appDataSource.destroy();
-    console.log('🔌 MongoDB Disconnected');
+    console.error('MongoDB Disconnected');
     isConnected = false;
     appDataSource = null;
   } catch (error) {

@@ -2,10 +2,7 @@ import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { FcmTokenModel } from '../models/fcmToken.model';
-import {
-  FcmTokenRecord,
-  UpsertFcmTokenInput,
-} from './types/fcmToken.repository.types';
+import { FcmTokenRecord, UpsertFcmTokenInput } from './types/fcmToken.repository.types';
 
 @Service()
 export class FcmTokenRepository {

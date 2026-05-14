@@ -5,9 +5,16 @@ import * as path from 'path';
 import { Readable } from 'stream';
 import { env } from '../../env';
 import { getS3Client } from '../../lib/aws/s3Client';
-import { MasterUploadRepository } from '../repositories/masterUpload.repository';
+// import { MasterUploadRepository } from '../repositories/masterUpload.repository';
 
-export type UploadType = 'iwCategories' | 'productsGroup' | 'benchmarks' | 'targets' | 'pjp' | 'scheme' | 'coDealer';
+export type UploadType =
+  | 'iwCategories'
+  | 'productsGroup'
+  | 'benchmarks'
+  | 'targets'
+  | 'pjp'
+  | 'scheme'
+  | 'coDealer';
 
 export type CategoryRow = {
   name: string;
@@ -74,7 +81,7 @@ export async function processMasterUploadData(
   uploadType: UploadType,
   fileName: string,
   s3Key: string,
-  repository: MasterUploadRepository,
+  // repository: MasterUploadRepository,
 ): Promise<{
   parsed: {
     totalRows: number;
@@ -91,7 +98,7 @@ export async function processMasterUploadData(
       throw new Error('No valid rows found');
     }
 
-    await repository.upsertProductsGroupUpload(parsed.validRows);
+    // await repository.upsertProductsGroupUpload(parsed.validRows);
     await persistProcessedFile(uploadType, fileName, parsed.validRows);
     return { parsed };
   }
@@ -101,14 +108,14 @@ export async function processMasterUploadData(
     throw new Error('No valid rows found');
   }
 
-  await repository.upsertIwCategories(
-    parsed.validRows.map((row) => ({
-      name: row.name,
-      min: row.min,
-      max: row.max,
-      order: row.order,
-    })),
-  );
+  // await repository.upsertIwCategories(
+  //   parsed.validRows.map(row => ({
+  //     name: row.name,
+  //     min: row.min,
+  //     max: row.max,
+  //     order: row.order,
+  //   })),
+  // );
 
   await persistProcessedFile(uploadType, fileName, parsed.validRows);
   return { parsed };
@@ -185,12 +192,21 @@ export function parseCoDealerFile(
     throw new Error('No readable rows found in the uploaded file');
   }
 
-  const requiredHeaders = ['sno', 'dlrname', 'state', 'dealercode', 'partycode', 'region', 'offtake', 'remarks'];
+  const requiredHeaders = [
+    'sno',
+    'dlrname',
+    'state',
+    'dealercode',
+    'partycode',
+    'region',
+    'offtake',
+    'remarks',
+  ];
 
   let headerRowIndex = -1;
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-    const normalized = rows[rowIndex].map((cell) => normalizeHeader(cell || '').replace(/\./g, ''));
-    const hasAll = requiredHeaders.every((header) => normalized.includes(header));
+    const normalized = rows[rowIndex].map(cell => normalizeHeader(cell || '').replace(/\./g, ''));
+    const hasAll = requiredHeaders.every(header => normalized.includes(header));
     if (hasAll) {
       headerRowIndex = rowIndex;
       break;
@@ -202,7 +218,9 @@ export function parseCoDealerFile(
     );
   }
 
-  const normalizedHeaders = rows[headerRowIndex].map((header) => normalizeHeader(header).replace(/\./g, ''));
+  const normalizedHeaders = rows[headerRowIndex].map(header =>
+    normalizeHeader(header).replace(/\./g, ''),
+  );
   const sNoIndex = normalizedHeaders.indexOf('sno');
   const dlrNameIndex = normalizedHeaders.indexOf('dlrname');
   const stateIndex = normalizedHeaders.indexOf('state');
@@ -244,7 +262,14 @@ export function parseCoDealerFile(
     const remarks = cleanCell(row[remarksIndex] || '');
 
     const isBlankRow =
-      !sNoText && !dlrName && !state && !dealerCode && !partyCode && !region && !offtakeText && !remarks;
+      !sNoText &&
+      !dlrName &&
+      !state &&
+      !dealerCode &&
+      !partyCode &&
+      !region &&
+      !offtakeText &&
+      !remarks;
     if (isBlankRow) {
       continue;
     }
@@ -329,10 +354,12 @@ export function parseTargetFile(
     'target',
   ]);
   if (headerRowIndex < 0) {
-    throw new Error('Missing required headers. Needed: dealerCode, locationCode, region, iwCode, iwName, target');
+    throw new Error(
+      'Missing required headers. Needed: dealerCode, locationCode, region, iwCode, iwName, target',
+    );
   }
 
-  const normalizedHeaders = rows[headerRowIndex].map((header) => normalizeHeader(header));
+  const normalizedHeaders = rows[headerRowIndex].map(header => normalizeHeader(header));
   const dealerCodeIndex = normalizedHeaders.indexOf('dealercode');
   const locationCodeIndex = normalizedHeaders.indexOf('locationcode');
   const regionIndex = normalizedHeaders.indexOf('region');
@@ -348,7 +375,9 @@ export function parseTargetFile(
     iwNameIndex < 0 ||
     targetIndex < 0
   ) {
-    throw new Error('Missing required headers. Needed: dealerCode, locationCode, region, iwCode, iwName, target');
+    throw new Error(
+      'Missing required headers. Needed: dealerCode, locationCode, region, iwCode, iwName, target',
+    );
   }
 
   let totalRows = 0;
@@ -437,12 +466,21 @@ export function parsePjpFile(
     throw new Error('No readable rows found in the uploaded file');
   }
 
-  const headerRowIndex = findHeaderRowIndex(rows, ['dealercode', 'locationcode', 'region', 'iwcode', 'iwname', 'pjp']);
+  const headerRowIndex = findHeaderRowIndex(rows, [
+    'dealercode',
+    'locationcode',
+    'region',
+    'iwcode',
+    'iwname',
+    'pjp',
+  ]);
   if (headerRowIndex < 0) {
-    throw new Error('Missing required headers. Needed: dealerCode, locationCode, region, iwCode, iwName, pjp');
+    throw new Error(
+      'Missing required headers. Needed: dealerCode, locationCode, region, iwCode, iwName, pjp',
+    );
   }
 
-  const normalizedHeaders = rows[headerRowIndex].map((header) => normalizeHeader(header));
+  const normalizedHeaders = rows[headerRowIndex].map(header => normalizeHeader(header));
   const dealerCodeIndex = normalizedHeaders.indexOf('dealercode');
   const locationCodeIndex = normalizedHeaders.indexOf('locationcode');
   const regionIndex = normalizedHeaders.indexOf('region');
@@ -458,7 +496,9 @@ export function parsePjpFile(
     iwNameIndex < 0 ||
     pjpIndex < 0
   ) {
-    throw new Error('Missing required headers. Needed: dealerCode, locationCode, region, iwCode, iwName, pjp');
+    throw new Error(
+      'Missing required headers. Needed: dealerCode, locationCode, region, iwCode, iwName, pjp',
+    );
   }
 
   let totalRows = 0;
@@ -547,7 +587,7 @@ export function parseCategoryFile(
     throw new Error('No readable rows found in the uploaded file');
   }
 
-  const normalizedHeaders = rows[0].map((header) => normalizeHeader(header));
+  const normalizedHeaders = rows[0].map(header => normalizeHeader(header));
   const nameIndex = normalizedHeaders.indexOf('name');
   const maxIndex = normalizedHeaders.indexOf('max');
   const minIndex = normalizedHeaders.indexOf('min');
@@ -660,7 +700,7 @@ export function parseProductsGroupFile(
     );
   }
 
-  const normalizedHeaders = rows[headerRowIndex].map((header) => normalizeHeader(header));
+  const normalizedHeaders = rows[headerRowIndex].map(header => normalizeHeader(header));
   const partNumIndex = normalizedHeaders.indexOf('partnum');
   const rootPartNumIndex = normalizedHeaders.indexOf('rootpartnum');
   const groupTypeIndex = normalizedHeaders.indexOf('grouptype');
@@ -695,7 +735,8 @@ export function parseProductsGroupFile(
     const startDateText = cleanCell(row[startDateIndex] || '');
     const partCategory = cleanCell(row[partCategoryIndex] || '');
 
-    const isBlankRow = !partNum && !rootPartNum && !groupType && !partDescription && !startDateText && !partCategory;
+    const isBlankRow =
+      !partNum && !rootPartNum && !groupType && !partDescription && !startDateText && !partCategory;
     if (isBlankRow) {
       continue;
     }
@@ -775,8 +816,13 @@ async function readFromS3(key: string): Promise<Buffer> {
   if (isReadable(body)) {
     return streamToBuffer(body);
   }
-  if (typeof (body as { transformToByteArray?: () => Promise<Uint8Array> })?.transformToByteArray === 'function') {
-    const bytes = await (body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray();
+  if (
+    typeof (body as { transformToByteArray?: () => Promise<Uint8Array> })?.transformToByteArray ===
+    'function'
+  ) {
+    const bytes = await (
+      body as { transformToByteArray: () => Promise<Uint8Array> }
+    ).transformToByteArray();
     return Buffer.from(bytes);
   }
 
@@ -838,13 +884,13 @@ function parseDelimitedRows(content: string, delimiter: string): string[][] {
   currentRow.push(currentCell);
   rows.push(currentRow);
 
-  return rows.map((row) => row.map((cell) => cell.trim()));
+  return rows.map(row => row.map(cell => cell.trim()));
 }
 
 function findHeaderRowIndex(rows: string[][], requiredHeaders: string[]): number {
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-    const normalized = rows[rowIndex].map((cell) => normalizeHeader(cell || ''));
-    const hasAll = requiredHeaders.every((header) => normalized.includes(header));
+    const normalized = rows[rowIndex].map(cell => normalizeHeader(cell || ''));
+    const hasAll = requiredHeaders.every(header => normalized.includes(header));
     if (hasAll) {
       return rowIndex;
     }

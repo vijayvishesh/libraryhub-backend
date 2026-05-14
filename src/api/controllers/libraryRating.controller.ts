@@ -15,13 +15,13 @@ import { Service } from 'typedi';
 import { LibraryRatingService } from '../services/libraryRating.service';
 import { RateLibraryRequest } from './requests/libraryRating.request';
 import { CurrentSessionData } from './responses/auth.response';
+import { ErrorResponseModel } from './responses/common.reponse';
 import {
   LibraryRatingApiResponse,
   LibraryRatingData,
   LibraryRatingSummaryApiResponse,
   LibraryRatingSummaryData,
 } from './responses/libraryRating.response';
-import { ErrorResponseModel } from './responses/common.reponse';
 
 @Service()
 @JsonController('/v1/libraries')
@@ -43,14 +43,12 @@ export class LibraryRatingController {
     @Body() payload: RateLibraryRequest,
   ): Promise<LibraryRatingApiResponse> {
     try {
-      const record = await this.ratingService.rateLibrary(
-        session.user.id,
-        libraryId,
-        payload,
-      );
+      const record = await this.ratingService.rateLibrary(session.user.id, libraryId, payload);
       return new LibraryRatingApiResponse(new LibraryRatingData(record), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('RATE_LIBRARY_FAILED');
     }
   }
@@ -67,7 +65,9 @@ export class LibraryRatingController {
       const summary = await this.ratingService.getLibraryRatingSummary(libraryId);
       return new LibraryRatingSummaryApiResponse(new LibraryRatingSummaryData(summary), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_LIBRARY_RATING_FAILED');
     }
   }

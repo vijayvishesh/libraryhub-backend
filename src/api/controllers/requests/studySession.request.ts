@@ -10,7 +10,7 @@ export class CreateStudySessionRequest {
   @IsString()
   @Matches(TIME_REGEX, { message: 'endTime must be in HH:mm format e.g. 11:00' })
   endTime!: string;
-    @IsInt()
+  @IsInt()
   @Min(1)
   studyDuration!: number; // in minutes, required, sent by user
 

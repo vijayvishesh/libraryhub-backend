@@ -1,14 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsIn,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Matches,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 
 const GENDER_ENUM = ['male', 'female', 'other'] as const;
 const STATUS_ENUM = ['pending', 'approved', 'rejected'] as const;

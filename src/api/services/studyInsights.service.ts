@@ -82,7 +82,9 @@ export class StudyInsightsService {
   }
 
   private calculateDayStreak(sessions: any[]): number {
-    if (sessions.length === 0) return 0;
+    if (sessions.length === 0) {
+      return 0;
+    }
     const studyDays = new Set(sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0]));
     let streak = 0;
     const today = new Date();

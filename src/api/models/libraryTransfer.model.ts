@@ -30,7 +30,7 @@ export class LibraryTransferModel {
   newOwnerEmail!: string | null;
 
   @Column()
-  newOwnerPassword!: string;        
+  newOwnerPassword!: string;
 
   @Column()
   keepLibraryName!: boolean;
@@ -54,7 +54,7 @@ export class LibraryTransferModel {
   status!: LibraryTransferStatus;
 
   @Column()
-  newOwnerId!: string | null;      // set after completion
+  newOwnerId!: string | null; // set after completion
 
   @Column()
   completedAt!: Date | null;

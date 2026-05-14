@@ -11,7 +11,9 @@ export class LibraryRatingData {
   @IsDate() createdAt!: Date;
 
   constructor(params?: LibraryRatingRecord) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.id = params.id;
     this.libraryId = params.libraryId;
     this.studentId = params.studentId;
@@ -28,7 +30,9 @@ export class LibraryRatingApiResponse {
   data!: LibraryRatingData;
 
   constructor(data?: LibraryRatingData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -39,7 +43,9 @@ export class LibraryRatingSummaryData {
   @IsNumber() count!: number;
 
   constructor(params?: { average: number; count: number }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.average = params.average;
     this.count = params.count;
   }
@@ -52,7 +58,9 @@ export class LibraryRatingSummaryApiResponse {
   data!: LibraryRatingSummaryData;
 
   constructor(data?: LibraryRatingSummaryData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

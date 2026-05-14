@@ -19,7 +19,8 @@ interface StoreAuthCacheInput {
 }
 
 const resolveIdTokenExpiry = (expiresIn?: string | number | null): number => {
-  const parsedExpiresIn = typeof expiresIn === 'number' ? expiresIn : Number.parseInt(String(expiresIn ?? ''), 10);
+  const parsedExpiresIn =
+    typeof expiresIn === 'number' ? expiresIn : Number.parseInt(String(expiresIn ?? ''), 10);
 
   if (Number.isFinite(parsedExpiresIn) && parsedExpiresIn > 0) {
     return Date.now() + parsedExpiresIn * 1000;
@@ -44,11 +45,11 @@ export async function storeAuthCache(input: StoreAuthCacheInput): Promise<void> 
       idTokenExpiry: resolveIdTokenExpiry(input.token.expiresIn),
       refreshTokenExpiry: Date.now() + ONE_HOUR_IN_MS,
     },
-    screenPermission: input.screenContext?.screenPermissions || null,
-    authAttributes: input.screenContext?.authAttributes || null,
+    // screenPermission: input.screenContext?.screenPermissions || null,
+    // authAttributes: input.screenContext?.authAttributes || null,
     mspinInfo: input.screenContext?.mspinInfo || null,
     loginUserType: input.screenContext?.mspinInfo?.['designation_code'],
   };
 
-  await Promise.all(normalizedKeys.map((key) => redisCache.set(key, authCachePayload)));
+  await Promise.all(normalizedKeys.map(key => redisCache.set(key, authCachePayload)));
 }

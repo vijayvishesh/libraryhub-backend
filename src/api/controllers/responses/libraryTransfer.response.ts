@@ -15,7 +15,9 @@ export class LibraryTransferData {
   @IsString() createdAt!: string;
 
   constructor(r?: LibraryTransferRecord) {
-    if (!r) return;
+    if (!r) {
+      return;
+    }
     this.id = r.id;
     this.libraryId = r.libraryId;
     this.oldOwnerId = r.oldOwnerId;
@@ -34,7 +36,9 @@ export class LibraryTransferApiResponse {
   @ValidateNested() @Type(() => LibraryTransferData) data!: LibraryTransferData;
 
   constructor(data?: LibraryTransferData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -54,7 +58,9 @@ export class LibraryTransferInitiateData {
     newOwnerOtpSentTo: string;
     expiresAt: Date;
   }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.transferId = params.transferId;
     this.message = params.message;
     this.otpSentTo = params.otpSentTo;
@@ -65,11 +71,14 @@ export class LibraryTransferInitiateData {
 
 export class LibraryTransferInitiateApiResponse {
   @IsNumber() responseCode!: number;
-  @ValidateNested() @Type(() => LibraryTransferInitiateData)
+  @ValidateNested()
+  @Type(() => LibraryTransferInitiateData)
   data!: LibraryTransferInitiateData;
 
   constructor(data?: LibraryTransferInitiateData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

@@ -21,7 +21,6 @@ import {
   ToggleAnnouncementRequest,
   UpdateAnnouncementRequest,
 } from './requests/announcement.request';
-import { CurrentSessionData } from './responses/auth.response';
 import {
   AnnouncementApiResponse,
   AnnouncementData,
@@ -29,6 +28,7 @@ import {
   AnnouncementListPayloadData,
   AnnouncementTargetListApiResponse,
 } from './responses/announcement.response';
+import { CurrentSessionData } from './responses/auth.response';
 import { ErrorResponseModel } from './responses/common.reponse';
 
 @Service()
@@ -39,7 +39,10 @@ export class AnnouncementController {
   // ── GET /targets — list available targets for this library ───────────────
   @Get('/targets')
   @Authorized('OWNER')
-  @OpenAPI({ summary: 'Get available announcement targets for this library', security: [{ bearerAuth: [] }] })
+  @OpenAPI({
+    summary: 'Get available announcement targets for this library',
+    security: [{ bearerAuth: [] }],
+  })
   @ResponseSchema(AnnouncementTargetListApiResponse, { statusCode: 200 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
@@ -51,7 +54,9 @@ export class AnnouncementController {
       const targets = await this.announcementService.getAnnouncementTargets(session.user.id);
       return new AnnouncementTargetListApiResponse(targets, 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_ANNOUNCEMENT_TARGETS_FAILED');
     }
   }
@@ -60,7 +65,10 @@ export class AnnouncementController {
   @Post('/')
   @Authorized('OWNER')
   @HttpCode(201)
-  @OpenAPI({ summary: 'Create and send announcement to targeted members', security: [{ bearerAuth: [] }] })
+  @OpenAPI({
+    summary: 'Create and send announcement to targeted members',
+    security: [{ bearerAuth: [] }],
+  })
   @ResponseSchema(AnnouncementApiResponse, { statusCode: 201 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
@@ -74,7 +82,9 @@ export class AnnouncementController {
       const record = await this.announcementService.createAnnouncement(session.user.id, payload);
       return new AnnouncementApiResponse(new AnnouncementData(record), 201);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('CREATE_ANNOUNCEMENT_FAILED');
     }
   }
@@ -99,7 +109,9 @@ export class AnnouncementController {
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('LIST_ANNOUNCEMENTS_FAILED');
     }
   }
@@ -119,10 +131,16 @@ export class AnnouncementController {
     @Body() payload: UpdateAnnouncementRequest,
   ): Promise<AnnouncementApiResponse> {
     try {
-      const record = await this.announcementService.updateAnnouncement(session.user.id, id, payload);
+      const record = await this.announcementService.updateAnnouncement(
+        session.user.id,
+        id,
+        payload,
+      );
       return new AnnouncementApiResponse(new AnnouncementData(record), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('UPDATE_ANNOUNCEMENT_FAILED');
     }
   }
@@ -148,7 +166,9 @@ export class AnnouncementController {
       );
       return new AnnouncementApiResponse(new AnnouncementData(record), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('TOGGLE_ANNOUNCEMENT_FAILED');
     }
   }
@@ -168,7 +188,9 @@ export class AnnouncementController {
     try {
       await this.announcementService.deleteAnnouncement(session.user.id, id);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('DELETE_ANNOUNCEMENT_FAILED');
     }
   }

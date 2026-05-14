@@ -1,12 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsDate,
-  IsNumber,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from 'class-validator';
+import { IsArray, IsDate, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { AttendanceRecord } from '../../repositories/types/attendance.repository.types';
 
 export class AttendanceData {
@@ -25,7 +18,9 @@ export class AttendanceData {
   @IsDate() toDate?: string;
 
   constructor(params?: AttendanceRecord) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.id = params.id;
     this.studentId = params.studentId;
     this.libraryId = params.libraryId;
@@ -49,7 +44,9 @@ export class AttendanceApiResponse {
   data!: AttendanceData;
 
   constructor(data?: AttendanceData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -61,7 +58,9 @@ export class AttendanceSummaryData {
   @IsNumber() absent!: number;
 
   constructor(params?: { present: number; onBreak: number; absent: number }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.present = params.present;
     this.onBreak = params.onBreak;
     this.absent = params.absent;
@@ -80,12 +79,10 @@ export class TodayAttendanceData {
 
   @IsNumber() total!: number;
 
-  constructor(
-    records?: AttendanceData[],
-    summary?: AttendanceSummaryData,
-    total?: number,
-  ) {
-    if (!records || !summary || typeof total !== 'number') return;
+  constructor(records?: AttendanceData[], summary?: AttendanceSummaryData, total?: number) {
+    if (!records || !summary || typeof total !== 'number') {
+      return;
+    }
     this.records = records;
     this.summary = summary;
     this.total = total;
@@ -99,7 +96,9 @@ export class TodayAttendanceApiResponse {
   data!: TodayAttendanceData;
 
   constructor(data?: TodayAttendanceData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -114,7 +113,9 @@ export class AttendanceHistoryListPayloadData {
   @IsNumber() total!: number;
 
   constructor(records?: AttendanceData[], total?: number) {
-    if (!records || typeof total !== 'number') return;
+    if (!records || typeof total !== 'number') {
+      return;
+    }
     this.records = records;
     this.total = total;
   }
@@ -127,7 +128,9 @@ export class AttendanceHistoryListApiResponse {
   data!: AttendanceHistoryListPayloadData;
 
   constructor(data?: AttendanceHistoryListPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -144,7 +147,14 @@ export class OwnerAttendanceHistoryPayloadData {
   @IsNumber() limit!: number;
 
   constructor(records?: AttendanceData[], total?: number, page?: number, limit?: number) {
-    if (!records || typeof total !== 'number' || typeof page !== 'number' || typeof limit !== 'number') return;
+    if (
+      !records ||
+      typeof total !== 'number' ||
+      typeof page !== 'number' ||
+      typeof limit !== 'number'
+    ) {
+      return;
+    }
     this.records = records;
     this.total = total;
     this.page = page;
@@ -159,7 +169,9 @@ export class OwnerAttendanceHistoryApiResponse {
   data!: OwnerAttendanceHistoryPayloadData;
 
   constructor(data?: OwnerAttendanceHistoryPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -188,15 +200,17 @@ export class StudentAttendanceStatsData {
     currentStreak: number;
     currentDate: string;
   }) {
-    if (!params) return;
-    this.weeklyPresentDays    = params.weeklyPresentDays;
-    this.weeklyWorkingDays    = params.weeklyWorkingDays;
-    this.weeklyPercentage     = params.weeklyPercentage;
-    this.monthlyPresentDays   = params.monthlyPresentDays;
-    this.monthlyWorkingDays   = params.monthlyWorkingDays;
-    this.monthlyPercentage    = params.monthlyPercentage;
-    this.currentStreak        = params.currentStreak;
-    this.currentDate          = params.currentDate;
+    if (!params) {
+      return;
+    }
+    this.weeklyPresentDays = params.weeklyPresentDays;
+    this.weeklyWorkingDays = params.weeklyWorkingDays;
+    this.weeklyPercentage = params.weeklyPercentage;
+    this.monthlyPresentDays = params.monthlyPresentDays;
+    this.monthlyWorkingDays = params.monthlyWorkingDays;
+    this.monthlyPercentage = params.monthlyPercentage;
+    this.currentStreak = params.currentStreak;
+    this.currentDate = params.currentDate;
   }
 }
 
@@ -221,12 +235,14 @@ export class StudentAttendanceByIdPayloadData {
     limit: number;
     stats: StudentAttendanceStatsData;
   }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.records = params.records;
-    this.total   = params.total;
-    this.page    = params.page;
-    this.limit   = params.limit;
-    this.stats   = params.stats;
+    this.total = params.total;
+    this.page = params.page;
+    this.limit = params.limit;
+    this.stats = params.stats;
   }
 }
 
@@ -238,7 +254,9 @@ export class StudentAttendanceByIdApiResponse {
   data!: StudentAttendanceByIdPayloadData;
 
   constructor(data?: StudentAttendanceByIdPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

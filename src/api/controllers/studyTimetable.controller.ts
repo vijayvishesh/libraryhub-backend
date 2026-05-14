@@ -4,29 +4,33 @@ import {
   CurrentUser,
   Delete,
   Get,
+  HttpCode,
   HttpError,
   InternalServerError,
   JsonController,
   OnUndefined,
   Param,
+  Post,
   Put,
   QueryParams,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
+import { StudyTimetableRecord } from '../repositories/types/studyTimetable.repository.types';
 import { StudyTimetableService } from '../services/studyTimetable.service';
-import { StudyTimetableHistoryQuery, UpdateStudyTimetableRequest } from './requests/studyTimetable.request';
+import {
+  CreateStudyTimetableRequest,
+  StudyTimetableHistoryQuery,
+  UpdateStudyTimetableRequest,
+} from './requests/studyTimetable.request';
 import { CurrentSessionData } from './responses/auth.response';
-import { Post, HttpCode } from 'routing-controllers';
-import { CreateStudyTimetableRequest } from './requests/studyTimetable.request';
+import { ErrorResponseModel } from './responses/common.reponse';
 import {
   StudyTimetableApiResponse,
   StudyTimetableData,
   StudyTimetableListApiResponse,
   StudyTimetableListPayloadData,
 } from './responses/studyTimetable.response';
-import { ErrorResponseModel } from './responses/common.reponse';
-import { StudyTimetableRecord } from '../repositories/types/studyTimetable.repository.types';
 
 @Service()
 @JsonController('/v1/students/timetables')
@@ -35,7 +39,10 @@ export class StudyTimetableController {
 
   @Get('/')
   @Authorized('STUDENT')
-  @OpenAPI({ summary: 'List all study timetables for logged-in student', security: [{ bearerAuth: [] }] })
+  @OpenAPI({
+    summary: 'List all study timetables for logged-in student',
+    security: [{ bearerAuth: [] }],
+  })
   @ResponseSchema(StudyTimetableListApiResponse, { statusCode: 200 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
@@ -49,39 +56,43 @@ export class StudyTimetableController {
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('LIST_TIMETABLES_FAILED');
     }
   }
 
-@Get('/history')
-@Authorized('STUDENT')
-@OpenAPI({ summary: 'Get timetable history with date filter', security: [{ bearerAuth: [] }] })
-@ResponseSchema(StudyTimetableListApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async getTimetableHistory(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-  @QueryParams() query: StudyTimetableHistoryQuery,
-): Promise<StudyTimetableListApiResponse> {
-  try {
-    const records = await this.studyTimetableService.getTimetableHistory(
-      session.user.id,
-      query.fromDate,
-      query.toDate,
-    );
-    return new StudyTimetableListApiResponse(
-      new StudyTimetableListPayloadData(
-        records.map(r => new StudyTimetableData(r)),
-        records.length,
-      ),
-      200,
-    );
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('GET_TIMETABLE_HISTORY_FAILED');
+  @Get('/history')
+  @Authorized('STUDENT')
+  @OpenAPI({ summary: 'Get timetable history with date filter', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(StudyTimetableListApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getTimetableHistory(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @QueryParams() query: StudyTimetableHistoryQuery,
+  ): Promise<StudyTimetableListApiResponse> {
+    try {
+      const records = await this.studyTimetableService.getTimetableHistory(
+        session.user.id,
+        query.fromDate,
+        query.toDate,
+      );
+      return new StudyTimetableListApiResponse(
+        new StudyTimetableListPayloadData(
+          records.map(r => new StudyTimetableData(r)),
+          records.length,
+        ),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('GET_TIMETABLE_HISTORY_FAILED');
+    }
   }
-}
 
   @Get('/:id')
   @Authorized('STUDENT')
@@ -98,30 +109,34 @@ public async getTimetableHistory(
       const record = await this.studyTimetableService.getTimetableById(id, session.user.id);
       return new StudyTimetableApiResponse(this.mapTimetableData(record), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_TIMETABLE_FAILED');
     }
   }
   @Post('/')
-@Authorized('STUDENT')
-@HttpCode(201)
-@OpenAPI({ summary: 'Create a new study timetable', security: [{ bearerAuth: [] }] })
-@ResponseSchema(StudyTimetableApiResponse, { statusCode: 201 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async createTimetable(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-  @Body() payload: CreateStudyTimetableRequest,
-): Promise<StudyTimetableApiResponse> {
-  try {
-    const record = await this.studyTimetableService.createTimetable(session.user.id, payload);
-    return new StudyTimetableApiResponse(this.mapTimetableData(record), 201);
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('CREATE_TIMETABLE_FAILED');
+  @Authorized('STUDENT')
+  @HttpCode(201)
+  @OpenAPI({ summary: 'Create a new study timetable', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(StudyTimetableApiResponse, { statusCode: 201 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async createTimetable(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Body() payload: CreateStudyTimetableRequest,
+  ): Promise<StudyTimetableApiResponse> {
+    try {
+      const record = await this.studyTimetableService.createTimetable(session.user.id, payload);
+      return new StudyTimetableApiResponse(this.mapTimetableData(record), 201);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('CREATE_TIMETABLE_FAILED');
+    }
   }
-}
   @Put('/:id')
   @Authorized('STUDENT')
   @OpenAPI({ summary: 'Update a study timetable', security: [{ bearerAuth: [] }] })
@@ -139,7 +154,9 @@ public async createTimetable(
       const record = await this.studyTimetableService.updateTimetable(id, session.user.id, payload);
       return new StudyTimetableApiResponse(this.mapTimetableData(record), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('UPDATE_TIMETABLE_FAILED');
     }
   }
@@ -158,7 +175,9 @@ public async createTimetable(
     try {
       await this.studyTimetableService.deleteTimetable(id, session.user.id);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('DELETE_TIMETABLE_FAILED');
     }
   }
@@ -166,5 +185,4 @@ public async createTimetable(
   private mapTimetableData(record: StudyTimetableRecord): StudyTimetableData {
     return new StudyTimetableData(record);
   }
-
 }

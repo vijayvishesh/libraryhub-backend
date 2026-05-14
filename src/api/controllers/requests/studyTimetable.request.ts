@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -11,15 +12,21 @@ import {
   Matches,
   Max,
   Min,
-  ValidateNested,
   registerDecorator,
+  ValidateNested,
   ValidationArguments,
   ValidationOptions,
 } from 'class-validator';
 import { TimetableDay } from '../../models/studyTimetable.model';
 
 const VALID_DAYS: TimetableDay[] = [
-  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
 ];
 
 function RequiredIfEnabled(validationOptions?: ValidationOptions) {

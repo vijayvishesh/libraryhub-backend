@@ -28,7 +28,7 @@ const start = async (): Promise<void> => {
 
   const log = new Logger(__filename);
   const { initializeFirebase } = await import('./lib/firebase/firebase');
- initializeFirebase();
+  initializeFirebase();
   await bootstrapMicroframework({
     /**
      * Loader is a place where you can configure all your modules during microframework

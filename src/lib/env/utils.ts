@@ -19,7 +19,7 @@ export function getPath(path: string): string {
 }
 
 export function getPaths(paths: string[]): string[] {
-  return paths.map((p) => getPath(p));
+  return paths.map(p => getPath(p));
 }
 
 export function getOsPath(key: string): string {

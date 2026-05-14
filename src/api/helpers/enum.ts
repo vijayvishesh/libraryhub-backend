@@ -1,4 +1,4 @@
-export const enumToArray = (object) => {
+export const enumToArray = object => {
   const res = {};
   for (const name in object) {
     if (Object.prototype.hasOwnProperty.call(object, name)) {
@@ -17,14 +17,14 @@ export const enumToArray = (object) => {
   return res;
 };
 
-const stringIsNumber = (value) => isNaN(Number(value)) === false;
+const stringIsNumber = value => isNaN(Number(value)) === false;
 
 // Turn enum into array
 export const contains = (enumme, q: string) =>
   Object.keys(enumme)
     .filter(stringIsNumber)
-    .map((key) => enumme[key])
-    .filter((f) => {
+    .map(key => enumme[key])
+    .filter(f => {
       if (f.match(new RegExp(q, 'i'))) {
         return f;
       }

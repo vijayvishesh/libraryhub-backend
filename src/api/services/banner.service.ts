@@ -1,14 +1,14 @@
 import { NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
-import { BannerRepository } from '../repositories/banner.repository';
-import { AnnouncementRepository } from '../repositories/announcement.repository';
-import { MemberRepository } from '../repositories/member.repository';
-import { AttendanceRepository } from '../repositories/attendance.repository';
-import { BannerRecord } from '../repositories/types/banner.repository.types';
-import { AnnouncementRecord } from '../repositories/types/announcement.repository.types';
 import { CreateBannerRequest, UpdateBannerRequest } from '../controllers/requests/banner.request';
-import { BannerDurationUnit } from '../models/banner.model';
 import { AnnouncementTarget } from '../models/announcement.model';
+import { BannerDurationUnit } from '../models/banner.model';
+import { AnnouncementRepository } from '../repositories/announcement.repository';
+import { AttendanceRepository } from '../repositories/attendance.repository';
+import { BannerRepository } from '../repositories/banner.repository';
+import { MemberRepository } from '../repositories/member.repository';
+import { AnnouncementRecord } from '../repositories/types/announcement.repository.types';
+import { BannerRecord } from '../repositories/types/banner.repository.types';
 
 export type MembershipAlert = {
   type: 'expiring_soon' | 'expired' | 'overdue';
@@ -28,11 +28,7 @@ export class BannerService {
   ) {}
 
   public async createBanner(input: CreateBannerRequest): Promise<BannerRecord> {
-    const endDate = this.calculateEndDate(
-      input.startDate,
-      input.durationValue,
-      input.durationUnit,
-    );
+    const endDate = this.calculateEndDate(input.startDate, input.durationValue, input.durationUnit);
 
     return this.bannerRepository.create({
       title: input.title,
@@ -60,7 +56,9 @@ export class BannerService {
 
   public async updateBanner(id: string, input: UpdateBannerRequest): Promise<BannerRecord> {
     const existing = await this.bannerRepository.findById(id);
-    if (!existing || existing.deletedAt) throw new NotFoundError('BANNER_NOT_FOUND');
+    if (!existing || existing.deletedAt) {
+      throw new NotFoundError('BANNER_NOT_FOUND');
+    }
 
     const startDate = input.startDate || existing.startDate;
     const durationValue = input.durationValue || existing.durationValue;
@@ -68,13 +66,17 @@ export class BannerService {
     const endDate = this.calculateEndDate(startDate, durationValue, durationUnit);
 
     const updated = await this.bannerRepository.update(id, { ...input, endDate });
-    if (!updated) throw new NotFoundError('BANNER_NOT_FOUND');
+    if (!updated) {
+      throw new NotFoundError('BANNER_NOT_FOUND');
+    }
     return updated;
   }
 
   public async deleteBanner(id: string): Promise<void> {
     const existing = await this.bannerRepository.findById(id);
-    if (!existing || existing.deletedAt) throw new NotFoundError('BANNER_NOT_FOUND');
+    if (!existing || existing.deletedAt) {
+      throw new NotFoundError('BANNER_NOT_FOUND');
+    }
     await this.bannerRepository.softDelete(id);
   }
 
@@ -87,13 +89,13 @@ export class BannerService {
     const now = new Date();
 
     const all = await this.announcementRepository.findByLibrary(libraryId);
-    const active = all.filter(a =>
-      a.isActive &&
-      !a.deletedAt &&
-      (!a.expiresAt || a.expiresAt.getTime() > now.getTime()),
+    const active = all.filter(
+      a => a.isActive && !a.deletedAt && (!a.expiresAt || a.expiresAt.getTime() > now.getTime()),
     );
 
-    if (active.length === 0) return [];
+    if (active.length === 0) {
+      return [];
+    }
 
     const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
       studentId,
@@ -111,9 +113,7 @@ export class BannerService {
     );
     const checkedInToday = !!todayAttendance;
 
-    return active.filter(a =>
-      this.studentMatchesTarget(a.target, member, checkedInToday, today),
-    );
+    return active.filter(a => this.studentMatchesTarget(a.target, member, checkedInToday, today));
   }
 
   // New: build membership alert cards for the student
@@ -127,10 +127,14 @@ export class BannerService {
     );
 
     // No membership in this library — no alerts
-    if (!member) return [];
+    if (!member) {
+      return [];
+    }
 
     // Only alert for active, pending, or expired members
-    if (!['active', 'pending', 'expired'].includes(member.status)) return [];
+    if (!['active', 'pending', 'expired'].includes(member.status)) {
+      return [];
+    }
 
     const today = new Date().toISOString().slice(0, 10);
     const endDate = member.endDate;
@@ -148,7 +152,9 @@ export class BannerService {
       ];
     }
 
-    if (!endDate) return [];
+    if (!endDate) {
+      return [];
+    }
 
     const daysRemaining = this.getDaysDiff(today, endDate);
 
@@ -248,9 +254,13 @@ export class BannerService {
     durationUnit: BannerDurationUnit,
   ): string {
     const date = new Date(startDate);
-    if (durationUnit === 'days') date.setDate(date.getDate() + durationValue);
-    else if (durationUnit === 'months') date.setMonth(date.getMonth() + durationValue);
-    else if (durationUnit === 'years') date.setFullYear(date.getFullYear() + durationValue);
+    if (durationUnit === 'days') {
+      date.setDate(date.getDate() + durationValue);
+    } else if (durationUnit === 'months') {
+      date.setMonth(date.getMonth() + durationValue);
+    } else if (durationUnit === 'years') {
+      date.setFullYear(date.getFullYear() + durationValue);
+    }
     return date.toISOString().split('T')[0];
   }
 }

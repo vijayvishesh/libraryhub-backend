@@ -65,11 +65,16 @@ export class PublicMemberController {
       siteLibraryId: string;
       libraryName: string;
       libraryAddress: string;
-      slots: { slotType: string; name: string; startTime: string; endTime: string; isActive: boolean }[];
+      slots: {
+        slotType: string;
+        name: string;
+        startTime: string;
+        endTime: string;
+        isActive: boolean;
+      }[];
       seats: { seatId: string; label: string; gender: string; isActive: boolean }[];
     };
-  }>
- {
+  }> {
     try {
       const formData = await this.memberService.getInviteLinkFormData(token.trim());
       if (!formData) {

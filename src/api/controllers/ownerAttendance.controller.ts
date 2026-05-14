@@ -10,7 +10,7 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { AttendanceService } from '../services/attendance.service';
-import { CurrentSessionData } from './responses/auth.response';
+import { OwnerAttendanceHistoryQuery } from './requests/attendance.request';
 import {
   AttendanceData,
   AttendanceSummaryData,
@@ -19,8 +19,8 @@ import {
   TodayAttendanceApiResponse,
   TodayAttendanceData,
 } from './responses/attendance.response';
+import { CurrentSessionData } from './responses/auth.response';
 import { ErrorResponseModel } from './responses/common.reponse';
-import { OwnerAttendanceHistoryQuery } from './requests/attendance.request';
 
 @Service()
 @JsonController('/v1/owner/attendance')
@@ -53,36 +53,40 @@ export class OwnerAttendanceController {
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_TODAY_ATTENDANCE_FAILED');
     }
   }
 
   @Get('/history')
-@Authorized('OWNER')
-@OpenAPI({ summary: 'Get attendance history for owner library', security: [{ bearerAuth: [] }] })
-@ResponseSchema(OwnerAttendanceHistoryApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async getAttendanceHistory(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-  @QueryParams() query: OwnerAttendanceHistoryQuery,
-): Promise<OwnerAttendanceHistoryApiResponse> {
-  try {
-    const result = await this.attendanceService.getOwnerAttendanceHistory(session.user.id, query);
-    return new OwnerAttendanceHistoryApiResponse(
-      new OwnerAttendanceHistoryPayloadData(
-        result.records.map(r => new AttendanceData(r)),
-        result.total,
-        result.page,
-        result.limit,
-      ),
-      200,
-    );
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('GET_ATTENDANCE_HISTORY_FAILED');
+  @Authorized('OWNER')
+  @OpenAPI({ summary: 'Get attendance history for owner library', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(OwnerAttendanceHistoryApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getAttendanceHistory(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @QueryParams() query: OwnerAttendanceHistoryQuery,
+  ): Promise<OwnerAttendanceHistoryApiResponse> {
+    try {
+      const result = await this.attendanceService.getOwnerAttendanceHistory(session.user.id, query);
+      return new OwnerAttendanceHistoryApiResponse(
+        new OwnerAttendanceHistoryPayloadData(
+          result.records.map(r => new AttendanceData(r)),
+          result.total,
+          result.page,
+          result.limit,
+        ),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('GET_ATTENDANCE_HISTORY_FAILED');
+    }
   }
-}
 }

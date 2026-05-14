@@ -48,13 +48,13 @@ export class AnnouncementModel {
 
   // ── Expiry — either absolute datetime OR duration ──────
   @Column()
-  expiresAt!: Date | null;          // absolute expiry datetime
+  expiresAt!: Date | null; // absolute expiry datetime
 
   @Column()
-  expiryUnit!: 'hours' | 'days' | null;   // for duration-based
-  
+  expiryUnit!: 'hours' | 'days' | null; // for duration-based
+
   @Column()
-  expiryValue!: number | null;            // e.g. 2 hours / 1 day
+  expiryValue!: number | null; // e.g. 2 hours / 1 day
 
   @Column()
   deletedAt!: Date | null;

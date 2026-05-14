@@ -3,10 +3,7 @@ import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { NotificationModel } from '../models/notification.model';
-import {
-  CreateNotificationInput,
-  NotificationRecord,
-} from './types/notification.repository.types';
+import { CreateNotificationInput, NotificationRecord } from './types/notification.repository.types';
 
 @Service()
 export class NotificationRepository {
@@ -43,7 +40,9 @@ export class NotificationRepository {
   }
 
   public async findById(id: string): Promise<NotificationRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const model = await this.getRepo().findOneById(new ObjectId(id));
     return model ? this.toRecord(model) : null;
   }
@@ -63,10 +62,14 @@ export class NotificationRepository {
   }
 
   public async markAsRead(id: string): Promise<NotificationRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const repo = this.getRepo();
     const existing = await repo.findOneById(new ObjectId(id));
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
     existing.isRead = true;
     existing.updatedAt = new Date();
     const saved = await repo.save(existing);

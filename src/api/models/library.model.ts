@@ -1,9 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
-import {
-  LibraryPaymentMethod,
-  LibrarySlotType,
-} from '../constants/library.constants';
+import { LibraryPaymentMethod, LibrarySlotType } from '../constants/library.constants';
 
 export type LibraryLocation = {
   type: 'Point';
@@ -17,7 +14,7 @@ export type LibrarySlot = {
   endTime: string;
   pricePerMonth: number;
   isActive: boolean;
-  plans?: LibrarySlotPlan[];   
+  plans?: LibrarySlotPlan[];
   trials?: LibrarySlotTrial[];
 };
 
@@ -64,13 +61,13 @@ export type LibraryStats = {
   reviewCount: number;
 };
 export type LibrarySlotPlan = {
-  duration: string;  // '1m', '3m', '6m', '12m'
+  duration: string; // '1m', '3m', '6m', '12m'
   isActive: boolean;
   discountPercent: number;
 };
 
 export type LibrarySlotTrial = {
-  duration: string;  // '1d', '3d', '7d' etc
+  duration: string; // '1d', '3d', '7d' etc
   isActive: boolean;
 };
 
@@ -96,7 +93,7 @@ export class LibraryModel {
 
   @Column()
   description!: string;
-  
+
   @Column()
   contactPhone!: string;
 
@@ -125,7 +122,7 @@ export class LibraryModel {
   seating?: LibrarySeating;
 
   @Column()
- facilities!: string[];
+  facilities!: string[];
 
   @Column()
   slots!: LibrarySlot[];

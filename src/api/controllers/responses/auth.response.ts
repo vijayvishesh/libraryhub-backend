@@ -71,9 +71,9 @@ export class AuthUserData {
     statusFlags?: {
       hasCreatedLibrary?: boolean;
       hasJoinedLibrary?: boolean;
-      email?: string | null;     
-      city?: string | null;      
-      bio?: string | null; 
+      email?: string | null;
+      city?: string | null;
+      bio?: string | null;
     },
   ) {
     this.id = id;
@@ -243,9 +243,15 @@ export class UserProfileData {
     if (createdAt) {
       this.createdAt = createdAt.toISOString();
     }
-    if (user.email !== undefined) this.email = user.email;
-    if (user.city !== undefined) this.city = user.city;
-    if (user.bio !== undefined) this.bio = user.bio;
+    if (user.email !== undefined) {
+      this.email = user.email;
+    }
+    if (user.city !== undefined) {
+      this.city = user.city;
+    }
+    if (user.bio !== undefined) {
+      this.bio = user.bio;
+    }
   }
 }
 
@@ -529,7 +535,6 @@ export class LogoutApiResponse {
     this.responseCode = responseCode;
     this.data = data;
   }
-
 }
 
 export class MemberOtpSendData {
@@ -540,7 +545,7 @@ export class MemberOtpSendData {
   expiresIn!: number;
 
   @IsBoolean()
-  hasAccount!: boolean; 
+  hasAccount!: boolean;
 
   constructor(phone: string, expiresIn: number, hasAccount: boolean) {
     this.phone = phone;
@@ -558,7 +563,9 @@ export class MemberOtpSendApiResponse {
   data!: MemberOtpSendData;
 
   constructor(data?: MemberOtpSendData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

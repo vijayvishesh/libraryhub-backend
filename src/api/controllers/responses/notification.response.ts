@@ -21,7 +21,9 @@ export class NotificationData {
   @IsDate() createdAt!: Date;
 
   constructor(params?: NotificationRecord) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.id = params.id;
     this.studentId = params.studentId;
     this.title = params.title;
@@ -40,7 +42,9 @@ export class NotificationApiResponse {
   data!: NotificationData;
 
   constructor(data?: NotificationData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -56,7 +60,9 @@ export class NotificationListPayloadData {
   @IsNumber() unreadCount!: number;
 
   constructor(notifications?: NotificationData[], total?: number, unreadCount?: number) {
-    if (!notifications || typeof total !== 'number' || typeof unreadCount !== 'number') return;
+    if (!notifications || typeof total !== 'number' || typeof unreadCount !== 'number') {
+      return;
+    }
     this.notifications = notifications;
     this.total = total;
     this.unreadCount = unreadCount;
@@ -70,7 +76,9 @@ export class NotificationListApiResponse {
   data!: NotificationListPayloadData;
 
   constructor(data?: NotificationListPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -80,7 +88,9 @@ export class UnreadCountData {
   @IsNumber() unreadCount!: number;
 
   constructor(unreadCount?: number) {
-    if (typeof unreadCount !== 'number') return;
+    if (typeof unreadCount !== 'number') {
+      return;
+    }
     this.unreadCount = unreadCount;
   }
 }
@@ -92,7 +102,9 @@ export class UnreadCountApiResponse {
   data!: UnreadCountData;
 
   constructor(data?: UnreadCountData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

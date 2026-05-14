@@ -9,7 +9,9 @@ export class SuperAdminData {
   @IsString() role!: string;
 
   constructor(params?: SuperAdminRecord) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.id = params.id;
     this.name = params.name;
     this.email = params.email;
@@ -22,7 +24,9 @@ export class SuperAdminTokenData {
   @IsString() refreshToken!: string;
 
   constructor(accessToken?: string, refreshToken?: string) {
-    if (!accessToken || !refreshToken) return;
+    if (!accessToken || !refreshToken) {
+      return;
+    }
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
   }
@@ -38,7 +42,9 @@ export class SuperAdminAuthData {
   user!: SuperAdminData;
 
   constructor(tokens?: SuperAdminTokenData, user?: SuperAdminData) {
-    if (!tokens || !user) return;
+    if (!tokens || !user) {
+      return;
+    }
     this.tokens = tokens;
     this.user = user;
   }
@@ -51,7 +57,9 @@ export class SuperAdminAuthApiResponse {
   data!: SuperAdminAuthData;
 
   constructor(data?: SuperAdminAuthData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

@@ -31,11 +31,11 @@ const createRedisAdapter = () => {
   const pubClient = createClient({ url: redisUrl });
   const subClient = pubClient.duplicate();
 
-  pubClient.on('error', (error) => console.error('socket redis pub error', error));
-  subClient.on('error', (error) => console.error('socket redis sub error', error));
+  pubClient.on('error', error => console.error('socket redis pub error', error));
+  subClient.on('error', error => console.error('socket redis sub error', error));
 
-  void pubClient.connect().catch((error) => console.error('socket redis pub connect failed', error));
-  void subClient.connect().catch((error) => console.error('socket redis sub connect failed', error));
+  void pubClient.connect().catch(error => console.error('socket redis pub connect failed', error));
+  void subClient.connect().catch(error => console.error('socket redis sub connect failed', error));
 
   return createAdapter(pubClient, subClient);
 };
@@ -63,10 +63,9 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
     io.adapter(createRedisAdapter());
   }
 
-  // eslint-disable-next-line no-console
-  console.log('socket server initialized', { corsOrigin });
+  console.error('socket server initialized', { corsOrigin });
 
-  io.engine.on('connection_error', (error) => {
+  io.engine.on('connection_error', error => {
     console.error('socket connection_error', {
       code: error.code,
       message: error.message,
@@ -75,8 +74,7 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
   });
 
   io.engine.on('initial_headers', (headers, request) => {
-    // eslint-disable-next-line no-console
-    console.log('socket initial_headers', {
+    console.error('socket initial_headers', {
       origin: request.headers.origin,
       host: request.headers.host,
       url: request.url,
@@ -84,11 +82,9 @@ export const initSocketServer = (httpServer: HttpServer): Server => {
   });
 
   io.on('connection', (socket: Socket) => {
-    // eslint-disable-next-line no-console
-    console.log('socket connected', socket.id, 'transport', socket.conn.transport.name);
-    socket.conn.on('upgrade', (transport) => {
-      // eslint-disable-next-line no-console
-      console.log('socket upgraded', socket.id, transport.name);
+    console.error('socket connected', socket.id, 'transport', socket.conn.transport.name);
+    socket.conn.on('upgrade', transport => {
+      console.error('socket upgraded', socket.id, transport.name);
     });
     socket.on('subscribe', (room?: string) => {
       socket.join(room || BROADCAST_ROOM);
@@ -140,7 +136,11 @@ export const broadcastToDceoOverallSubscribers = (payload: unknown) => {
   return { delivered: true, subscribers };
 };
 
-export const broadcastToDceoDailySubscribers = (payload: unknown, dealerCodes: string[], mspins: string[]) => {
+export const broadcastToDceoDailySubscribers = (
+  payload: unknown,
+  dealerCodes: string[],
+  mspins: string[],
+) => {
   const socketServer = getSocketServer();
   const uniqueDealerCodes = [...new Set(dealerCodes.filter(Boolean))];
   const uniqueMspins = [...new Set(mspins.filter(Boolean))];

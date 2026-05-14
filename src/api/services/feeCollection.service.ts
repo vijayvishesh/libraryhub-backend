@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { HttpError, InternalServerError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { getDataSource } from '../../database/config/ormconfig.default';
@@ -21,9 +22,7 @@ export type {
 
 @Service()
 export class FeeCollectionService {
-  constructor(
-    private readonly libraryRepository: LibraryRepository,
-  ) {}
+  constructor(private readonly libraryRepository: LibraryRepository) {}
 
   public async getOwnerFeeCollection(
     ownerId: string,
@@ -85,7 +84,7 @@ export class FeeCollectionService {
 
   private async listExpiringMembers(
     libraryId: string,
-    range: 'today' | '3days' | '7days' | 'month',
+    range: 'today' | '3Days' | '7Days' | 'month',
     page: number,
     limit: number,
   ): Promise<{ members: MemberRecord[]; total: number }> {
@@ -169,22 +168,35 @@ export class FeeCollectionService {
         {
           $facet: {
             today: [
-              { $match: { paidAt: { $gte: startOfToday, $lt: startOfTomorrow }, planAmount: { $gt: 0 } } },
-              // eslint-disable-next-line @typescript-eslint/naming-convention
+              {
+                $match: {
+                  paidAt: { $gte: startOfToday, $lt: startOfTomorrow },
+                  planAmount: { $gt: 0 },
+                },
+              },
+
               { $group: { _id: null, amount: { $sum: '$planAmount' }, count: { $sum: 1 } } },
             ],
             month: [
-              { $match: { paidAt: { $gte: startOfMonth, $lt: startOfTomorrow }, planAmount: { $gt: 0 } } },
-              // eslint-disable-next-line @typescript-eslint/naming-convention
+              {
+                $match: {
+                  paidAt: { $gte: startOfMonth, $lt: startOfTomorrow },
+                  planAmount: { $gt: 0 },
+                },
+              },
+
               { $group: { _id: null, amount: { $sum: '$planAmount' }, count: { $sum: 1 } } },
             ],
-            pending: [
-              { $match: { status: { $in: ['pending', 'expired'] } } },
-              { $count: 'count' },
-            ],
+            pending: [{ $match: { status: { $in: ['pending', 'expired'] } } }, { $count: 'count' }],
             expiring: [
-              { $match: { status: 'active', endDate: { $gte: today, $lte: date7 }, planAmount: { $gt: 0 } } },
-              // eslint-disable-next-line @typescript-eslint/naming-convention
+              {
+                $match: {
+                  status: 'active',
+                  endDate: { $gte: today, $lte: date7 },
+                  planAmount: { $gt: 0 },
+                },
+              },
+
               { $group: { _id: null, amount: { $sum: '$planAmount' }, count: { $sum: 1 } } },
             ],
           },
@@ -204,16 +216,17 @@ export class FeeCollectionService {
     };
   }
 
-  private getExpiringRangeEnd(range: 'today' | '3days' | '7days' | 'month'): string {
+  private getExpiringRangeEnd(range: 'today' | '3Days' | '7Days' | 'month'): string {
     const d = new Date();
-    const daysMap = { today: 0, '3days': 3, '7days': 7, month: 30 };
+    const daysMap = { today: 0, '3Days': 3, '7Days': 7, month: 30 };
     d.setDate(d.getDate() + daysMap[range]);
     return d.toISOString().slice(0, 10);
   }
 
-  private getCollectedDateRange(
-    range: 'today' | 'week' | 'month' | 'lastMonth',
-  ): { start: Date; end: Date } {
+  private getCollectedDateRange(range: 'today' | 'week' | 'month' | 'lastMonth'): {
+    start: Date;
+    end: Date;
+  } {
     const now = new Date();
     const startOfToday = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),

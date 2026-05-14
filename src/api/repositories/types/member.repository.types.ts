@@ -16,7 +16,7 @@ export type CreateMemberInput = {
   paidAt: Date | null;
   notes: string | null;
   isInviteSubmission?: boolean;
-  isNewUser?: boolean; 
+  isNewUser?: boolean;
 };
 
 export type MemberRecord = CreateMemberInput & {
@@ -24,7 +24,7 @@ export type MemberRecord = CreateMemberInput & {
   createdAt: Date;
   updatedAt: Date;
   isInviteSubmission?: boolean;
-  isNewUser?: boolean; 
+  isNewUser?: boolean;
 };
 
 export type UpdateMemberInput = Partial<

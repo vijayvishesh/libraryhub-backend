@@ -22,21 +22,19 @@ import {
   UpdateSubmissionRequest,
 } from './requests/memberInviteSubmission.request';
 import { CurrentSessionData } from './responses/auth.response';
+import { ErrorResponseModel } from './responses/common.reponse';
 import {
   SubmissionApiResponse,
   SubmissionData,
   SubmissionListApiResponse,
   SubmissionListPayloadData,
 } from './responses/memberInviteSubmission.response';
-import { ErrorResponseModel } from './responses/common.reponse';
 
 @Service()
 @JsonController()
 @OpenAPI({ tags: ['Member Invite Submissions'] })
 export class MemberInviteSubmissionController {
-  constructor(
-    private readonly submissionService: MemberInviteSubmissionService,
-  ) {}
+  constructor(private readonly submissionService: MemberInviteSubmissionService) {}
 
   // ── PUBLIC: Student submits form ─────────────────────────────────────────
   @Post('/public/members/invite/:token/submit-v2')
@@ -54,7 +52,9 @@ export class MemberInviteSubmissionController {
       const submission = await this.submissionService.submitForm(token.trim(), payload);
       return new SubmissionApiResponse(new SubmissionData(submission), 201);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('SUBMIT_INVITE_FORM_FAILED');
     }
   }
@@ -82,7 +82,9 @@ export class MemberInviteSubmissionController {
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('LIST_SUBMISSIONS_FAILED');
     }
   }
@@ -110,7 +112,9 @@ export class MemberInviteSubmissionController {
       );
       return new SubmissionApiResponse(new SubmissionData(submission), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('UPDATE_SUBMISSION_FAILED');
     }
   }
@@ -138,7 +142,9 @@ export class MemberInviteSubmissionController {
       );
       return new SubmissionApiResponse(new SubmissionData(submission), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('REVIEW_SUBMISSION_FAILED');
     }
   }
@@ -158,7 +164,9 @@ export class MemberInviteSubmissionController {
       const result = await this.submissionService.bulkReview(session.user.id, payload);
       return { responseCode: 200, data: result };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('BULK_REVIEW_FAILED');
     }
   }
@@ -176,7 +184,9 @@ export class MemberInviteSubmissionController {
       const result = await this.submissionService.approveAll(session.user.id);
       return { responseCode: 200, data: result };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('APPROVE_ALL_FAILED');
     }
   }

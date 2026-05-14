@@ -46,7 +46,7 @@ const resolveSecretIds = (): string[] => {
   }
   return list
     .split(',')
-    .map((value) => value.trim())
+    .map(value => value.trim())
     .filter(Boolean);
 };
 

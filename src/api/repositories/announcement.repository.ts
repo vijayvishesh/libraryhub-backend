@@ -3,10 +3,7 @@ import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { AnnouncementModel } from '../models/announcement.model';
-import {
-  AnnouncementRecord,
-  CreateAnnouncementInput,
-} from './types/announcement.repository.types';
+import { AnnouncementRecord, CreateAnnouncementInput } from './types/announcement.repository.types';
 
 @Service()
 export class AnnouncementRepository {
@@ -35,7 +32,9 @@ export class AnnouncementRepository {
 
   // Auto-deactivate expired announcements before returning
   private resolveIsActive(record: AnnouncementRecord): AnnouncementRecord {
-    if (!record.isActive) return record;
+    if (!record.isActive) {
+      return record;
+    }
     if (record.expiresAt && record.expiresAt.getTime() < Date.now()) {
       return { ...record, isActive: false };
     }
@@ -51,7 +50,9 @@ export class AnnouncementRepository {
   }
 
   public async findById(id: string): Promise<AnnouncementRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const model = await this.getRepo().findOneById(new ObjectId(id));
     return model ? this.resolveIsActive(this.toRecord(model)) : null;
   }
@@ -73,10 +74,14 @@ export class AnnouncementRepository {
     id: string,
     input: Partial<CreateAnnouncementInput>,
   ): Promise<AnnouncementRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const repo = this.getRepo();
     const existing = await repo.findOneById(new ObjectId(id));
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
     Object.assign(existing, input, { updatedAt: new Date() });
     const saved = await repo.save(existing);
     return this.resolveIsActive(this.toRecord(saved));
@@ -84,10 +89,14 @@ export class AnnouncementRepository {
 
   // Toggle active/inactive manually
   public async setActive(id: string, isActive: boolean): Promise<AnnouncementRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const repo = this.getRepo();
     const existing = await repo.findOneById(new ObjectId(id));
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
     existing.isActive = isActive;
     existing.updatedAt = new Date();
     const saved = await repo.save(existing);
@@ -95,10 +104,14 @@ export class AnnouncementRepository {
   }
 
   public async softDelete(id: string): Promise<boolean> {
-    if (!ObjectId.isValid(id)) return false;
+    if (!ObjectId.isValid(id)) {
+      return false;
+    }
     const repo = this.getRepo();
     const existing = await repo.findOneById(new ObjectId(id));
-    if (!existing) return false;
+    if (!existing) {
+      return false;
+    }
     existing.deletedAt = new Date();
     existing.isActive = false;
     existing.updatedAt = new Date();

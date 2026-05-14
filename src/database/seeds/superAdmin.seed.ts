@@ -1,6 +1,6 @@
 import * as bcrypt from 'bcrypt';
-import { getDataSource } from '../config/ormconfig.default';
 import { SuperAdminModel } from '../../api/models/superAdmin.model';
+import { getDataSource } from '../config/ormconfig.default';
 
 const SUPER_ADMINS = [
   {
@@ -20,7 +20,7 @@ export const seedSuperAdmins = async (): Promise<void> => {
       });
 
       if (existing) {
-        console.log(`⏭️ Super admin already exists: ${admin.email}`);
+        console.error(`⏭️ Super admin already exists: ${admin.email}`);
         continue;
       }
 
@@ -37,7 +37,7 @@ export const seedSuperAdmins = async (): Promise<void> => {
       });
 
       await repo.save(model);
-      console.log(`Super admin seeded: ${admin.email}`);
+      console.error(`Super admin seeded: ${admin.email}`);
     }
   } catch (error) {
     console.error('Super admin seed failed:', error);

@@ -1,5 +1,5 @@
 import {
-    Authorized,
+  Authorized,
   Body,
   Delete,
   Get,
@@ -36,14 +36,14 @@ export class AdminBannerController {
   @ResponseSchema(BannerApiResponse, { statusCode: 201 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-  public async createBanner(
-    @Body() payload: CreateBannerRequest,
-  ): Promise<BannerApiResponse> {
+  public async createBanner(@Body() payload: CreateBannerRequest): Promise<BannerApiResponse> {
     try {
       const record = await this.bannerService.createBanner(payload);
       return new BannerApiResponse(new BannerData(record), 201);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('CREATE_BANNER_FAILED');
     }
   }
@@ -57,11 +57,18 @@ export class AdminBannerController {
     try {
       const records = await this.bannerService.listAllBanners();
       return new BannerListApiResponse(
-        new BannerListPayloadData(records.map(r => new BannerData(r)), [], [], records.length),
+        new BannerListPayloadData(
+          records.map(r => new BannerData(r)),
+          [],
+          [],
+          records.length,
+        ),
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('LIST_BANNERS_FAILED');
     }
   }
@@ -81,24 +88,26 @@ export class AdminBannerController {
       const record = await this.bannerService.updateBanner(id, payload);
       return new BannerApiResponse(new BannerData(record), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('UPDATE_BANNER_FAILED');
     }
   }
-  
+
   @Delete('/:id')
   @Authorized('SUPER_ADMIN')
   @OnUndefined(204)
   @OpenAPI({ summary: 'Delete a sponsored banner (super admin only)' })
   @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-  public async deleteBanner(
-    @Param('id') id: string,
-  ): Promise<void> {
+  public async deleteBanner(@Param('id') id: string): Promise<void> {
     try {
       await this.bannerService.deleteBanner(id);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('DELETE_BANNER_FAILED');
     }
   }

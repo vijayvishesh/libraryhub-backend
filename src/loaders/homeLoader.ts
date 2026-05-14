@@ -33,8 +33,10 @@ export const homeLoader: MicroframeworkLoader = (settings: MicroframeworkSetting
     );
 
     if (env.app.routePrefix && env.app.routePrefix !== '/') {
-      expressApp.get(`${env.app.routePrefix}/health`, (_req: express.Request, res: express.Response) =>
-        res.status(200).json(buildApiResponse(200, buildHealthPayload())),
+      expressApp.get(
+        `${env.app.routePrefix}/health`,
+        (_req: express.Request, res: express.Response) =>
+          res.status(200).json(buildApiResponse(200, buildHealthPayload())),
       );
     }
   }

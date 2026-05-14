@@ -1,43 +1,66 @@
 import { NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { getFirebaseMessaging } from '../../lib/firebase/firebase';
-import { AnnouncementRepository } from '../repositories/announcement.repository';
-import { FcmTokenRepository } from '../repositories/fcmToken.repository';
-import { MemberRepository } from '../repositories/member.repository';
-import { NotificationRepository } from '../repositories/notification.repository';
-import { LibraryRepository } from '../repositories/library.repository';
-import { AttendanceRepository } from '../repositories/attendance.repository';
-import { AnnouncementRecord } from '../repositories/types/announcement.repository.types';
-import { AnnouncementTarget } from '../models/announcement.model';
 import {
   AnnouncementExpiryRequest,
   CreateAnnouncementRequest,
   UpdateAnnouncementRequest,
 } from '../controllers/requests/announcement.request';
-import {
-  AnnouncementTargetData,
-} from '../controllers/responses/announcement.response';
+import { AnnouncementTargetData } from '../controllers/responses/announcement.response';
+import { AnnouncementTarget } from '../models/announcement.model';
+import { AnnouncementRepository } from '../repositories/announcement.repository';
+import { AttendanceRepository } from '../repositories/attendance.repository';
+import { FcmTokenRepository } from '../repositories/fcmToken.repository';
+import { LibraryRepository } from '../repositories/library.repository';
+import { MemberRepository } from '../repositories/member.repository';
+import { NotificationRepository } from '../repositories/notification.repository';
+import { AnnouncementRecord } from '../repositories/types/announcement.repository.types';
 
 // Static non-slot targets
 const STATIC_TARGETS: AnnouncementTargetData[] = [
-  new AnnouncementTargetData('all',      'All Active Members', 'members', 'Send to all members with active membership'),
-  new AnnouncementTargetData('absent',   'Absent Today',       'members', 'Active members who have not checked in today'),
-  new AnnouncementTargetData('fee_due',  'Fee Due',            'members', 'Members with pending payment status'),
-  new AnnouncementTargetData('expired',  'Expired Members',    'members', 'Members whose membership has expired'),
-  new AnnouncementTargetData('overdue',  'Overdue',            'members', 'Members who are expired or have pending fees'),
+  new AnnouncementTargetData(
+    'all',
+    'All Active Members',
+    'members',
+    'Send to all members with active membership',
+  ),
+  new AnnouncementTargetData(
+    'absent',
+    'Absent Today',
+    'members',
+    'Active members who have not checked in today',
+  ),
+  new AnnouncementTargetData(
+    'fee_due',
+    'Fee Due',
+    'members',
+    'Members with pending payment status',
+  ),
+  new AnnouncementTargetData(
+    'expired',
+    'Expired Members',
+    'members',
+    'Members whose membership has expired',
+  ),
+  new AnnouncementTargetData(
+    'overdue',
+    'Overdue',
+    'members',
+    'Members who are expired or have pending fees',
+  ),
 ];
 
 // Slot target metadata
 const SLOT_TARGET_META: Record<string, { label: string; description: string }> = {
-  fullday:     { label: 'Full Day Slot',     description: 'Members in the full day slot' },
-  firsthalf:   { label: 'First Half Slot',   description: 'Members in the first half slot' },
-  secondhalf:  { label: 'Second Half Slot',  description: 'Members in the second half slot' },
-  twentyfour:  { label: '24 Hours Slot',     description: 'Members in the 24-hour slot' },
-  halfday:     { label: 'Half Day Slot',     description: 'Members in the half day slot' },
-  evening:     { label: 'Evening Slot',      description: 'Members in the evening slot' },
-  morning:     { label: 'Morning Slot',      description: 'Members in the morning slot' },
-  night:       { label: 'Night Slot',        description: 'Members in the night slot' },
-  custom:      { label: 'Custom Slot',       description: 'Members in the custom slot' },
+  fullday: { label: 'Full Day Slot', description: 'Members in the full day slot' },
+  firsthalf: { label: 'First Half Slot', description: 'Members in the first half slot' },
+  secondhalf: { label: 'Second Half Slot', description: 'Members in the second half slot' },
+  twentyfour: { label: '24 Hours Slot', description: 'Members in the 24-hour slot' },
+  halfday: { label: 'Half Day Slot', description: 'Members in the half day slot' },
+  evening: { label: 'Evening Slot', description: 'Members in the evening slot' },
+  morning: { label: 'Morning Slot', description: 'Members in the morning slot' },
+  night: { label: 'Night Slot', description: 'Members in the night slot' },
+  custom: { label: 'Custom Slot', description: 'Members in the custom slot' },
 };
 
 @Service()
@@ -54,12 +77,12 @@ export class AnnouncementService {
   // ── Get available targets for this library ──────────────────────────────
   public async getAnnouncementTargets(ownerId: string): Promise<AnnouncementTargetData[]> {
     const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
-    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+    if (!library) {
+      throw new NotFoundError('LIBRARY_NOT_FOUND');
+    }
 
     // Get active slot types configured in this library
-    const activeSlotTypes = library.slots
-      .filter(s => s.isActive)
-      .map(s => s.slotType);
+    const activeSlotTypes = library.slots.filter(s => s.isActive).map(s => s.slotType);
 
     const slotTargets = activeSlotTypes
       .filter(slotType => SLOT_TARGET_META[slotType])
@@ -77,7 +100,9 @@ export class AnnouncementService {
     input: CreateAnnouncementRequest,
   ): Promise<AnnouncementRecord> {
     const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
-    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+    if (!library) {
+      throw new NotFoundError('LIBRARY_NOT_FOUND');
+    }
 
     const studentIds = await this.getTargetedStudentIds(library.id, input.target);
     const { expiresAt, expiryUnit, expiryValue } = this.resolveExpiry(input.expiry);
@@ -114,7 +139,9 @@ export class AnnouncementService {
   // ── List announcements ──────────────────────────────────────────────────
   public async listAnnouncements(ownerId: string): Promise<AnnouncementRecord[]> {
     const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
-    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+    if (!library) {
+      throw new NotFoundError('LIBRARY_NOT_FOUND');
+    }
     return this.announcementRepository.findByLibrary(library.id);
   }
 
@@ -125,17 +152,31 @@ export class AnnouncementService {
     input: UpdateAnnouncementRequest,
   ): Promise<AnnouncementRecord> {
     const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
-    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+    if (!library) {
+      throw new NotFoundError('LIBRARY_NOT_FOUND');
+    }
 
     const existing = await this.announcementRepository.findById(id);
-    if (!existing || existing.deletedAt) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
-    if (existing.libraryId !== library.id) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    if (!existing || existing.deletedAt) {
+      throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    }
+    if (existing.libraryId !== library.id) {
+      throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    }
 
     const updatePayload: Partial<typeof existing> = {};
-    if (input.title !== undefined) updatePayload.title = input.title;
-    if (input.message !== undefined) updatePayload.message = input.message;
-    if (input.target !== undefined) updatePayload.target = input.target;
-    if (input.isActive !== undefined) updatePayload.isActive = input.isActive;
+    if (input.title !== undefined) {
+      updatePayload.title = input.title;
+    }
+    if (input.message !== undefined) {
+      updatePayload.message = input.message;
+    }
+    if (input.target !== undefined) {
+      updatePayload.target = input.target;
+    }
+    if (input.isActive !== undefined) {
+      updatePayload.isActive = input.isActive;
+    }
 
     if (input.expiry !== undefined) {
       const { expiresAt, expiryUnit, expiryValue } = this.resolveExpiry(input.expiry);
@@ -145,7 +186,9 @@ export class AnnouncementService {
     }
 
     const updated = await this.announcementRepository.update(id, updatePayload);
-    if (!updated) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    if (!updated) {
+      throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    }
     return updated;
   }
 
@@ -156,25 +199,39 @@ export class AnnouncementService {
     isActive: boolean,
   ): Promise<AnnouncementRecord> {
     const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
-    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+    if (!library) {
+      throw new NotFoundError('LIBRARY_NOT_FOUND');
+    }
 
     const existing = await this.announcementRepository.findById(id);
-    if (!existing || existing.deletedAt) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
-    if (existing.libraryId !== library.id) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    if (!existing || existing.deletedAt) {
+      throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    }
+    if (existing.libraryId !== library.id) {
+      throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    }
 
     const updated = await this.announcementRepository.setActive(id, isActive);
-    if (!updated) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    if (!updated) {
+      throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    }
     return updated;
   }
 
   // ── Delete announcement ─────────────────────────────────────────────────
   public async deleteAnnouncement(ownerId: string, id: string): Promise<void> {
     const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
-    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+    if (!library) {
+      throw new NotFoundError('LIBRARY_NOT_FOUND');
+    }
 
     const existing = await this.announcementRepository.findById(id);
-    if (!existing || existing.deletedAt) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
-    if (existing.libraryId !== library.id) throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    if (!existing || existing.deletedAt) {
+      throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    }
+    if (existing.libraryId !== library.id) {
+      throw new NotFoundError('ANNOUNCEMENT_NOT_FOUND');
+    }
 
     await this.announcementRepository.softDelete(id);
   }
@@ -200,9 +257,10 @@ export class AnnouncementService {
 
     // Duration-based
     if (expiry.unit && expiry.value) {
-      const ms = expiry.unit === 'hours'
-        ? expiry.value * 60 * 60 * 1000
-        : expiry.value * 24 * 60 * 60 * 1000;
+      const ms =
+        expiry.unit === 'hours'
+          ? expiry.value * 60 * 60 * 1000
+          : expiry.value * 24 * 60 * 60 * 1000;
 
       return {
         expiresAt: new Date(Date.now() + ms),
@@ -227,9 +285,7 @@ export class AnnouncementService {
 
     if (target === 'all') {
       // All active members
-      return withStudent
-        .filter(m => m.status === 'active')
-        .map(m => m.studentId as string);
+      return withStudent.filter(m => m.status === 'active').map(m => m.studentId as string);
     }
 
     if (target === 'absent') {
@@ -243,16 +299,12 @@ export class AnnouncementService {
 
     if (target === 'fee_due') {
       // Members with pending payment (status = pending)
-      return withStudent
-        .filter(m => m.status === 'pending')
-        .map(m => m.studentId as string);
+      return withStudent.filter(m => m.status === 'pending').map(m => m.studentId as string);
     }
 
     if (target === 'expired') {
       // Members whose status is expired
-      return withStudent
-        .filter(m => m.status === 'expired')
-        .map(m => m.studentId as string);
+      return withStudent.filter(m => m.status === 'expired').map(m => m.studentId as string);
     }
 
     if (target === 'overdue') {
@@ -269,8 +321,15 @@ export class AnnouncementService {
 
     // Slot-based targets — filter members by slotId matching the target
     const slotTypes = [
-      'fullday','firsthalf','secondhalf','twentyfour',
-      'halfday','evening','morning','night','custom',
+      'fullday',
+      'firsthalf',
+      'secondhalf',
+      'twentyfour',
+      'halfday',
+      'evening',
+      'morning',
+      'night',
+      'custom',
     ];
 
     if (slotTypes.includes(target)) {
@@ -290,7 +349,9 @@ export class AnnouncementService {
   ): Promise<void> {
     try {
       const tokens = await this.fcmTokenRepository.findTokensByStudentIds(studentIds);
-      if (tokens.length === 0) return;
+      if (tokens.length === 0) {
+        return;
+      }
 
       const messaging = getFirebaseMessaging();
       const batchSize = 500;

@@ -1,14 +1,23 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import * as bcrypt from 'bcrypt';
-import { HttpError, InternalServerError, NotFoundError, UnauthorizedError } from 'routing-controllers';
+import {
+  HttpError,
+  InternalServerError,
+  NotFoundError,
+  UnauthorizedError,
+} from 'routing-controllers';
 import { Service } from 'typedi';
+import {
+  InitiateLibraryTransferRequest,
+  VerifyLibraryTransferOtpRequest,
+} from '../controllers/requests/libraryTransfer.request';
+import { LibraryTransferInitiateData } from '../controllers/responses/libraryTransfer.response';
 import { AuthRepository } from '../repositories/auth.repositories';
 import { BookingRepository } from '../repositories/booking.repository';
 import { LibraryRepository } from '../repositories/library.repository';
 import { LibraryTransferRepository } from '../repositories/libraryTransfer.repository';
 import { MemberRepository } from '../repositories/member.repository';
 import { NotificationRepository } from '../repositories/notification.repository';
-import { InitiateLibraryTransferRequest, VerifyLibraryTransferOtpRequest } from '../controllers/requests/libraryTransfer.request';
-import { LibraryTransferInitiateData } from '../controllers/responses/libraryTransfer.response';
 import { LibraryTransferRecord } from '../repositories/types/libraryTransfer.repository.types';
 
 const STATIC_OTP = '555555';
@@ -43,7 +52,9 @@ export class LibraryTransferService {
 
       // 2. Get old owner record
       const oldOwner = await this.authRepository.findOwnerById(ownerId);
-      if (!oldOwner) throw new NotFoundError('OWNER_NOT_FOUND');
+      if (!oldOwner) {
+        throw new NotFoundError('OWNER_NOT_FOUND');
+      }
 
       // 3. Normalize new owner phone
       const newOwnerPhone = this.normalizePhone(payload.new_owner.phone);
@@ -71,7 +82,7 @@ export class LibraryTransferService {
 
       // 8. Create transfer record with OTPs
       const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-      const hashedPassword = await bcrypt.hash(payload.new_owner.password, PASSWORD_SALT_ROUNDS)
+      const hashedPassword = await bcrypt.hash(payload.new_owner.password, PASSWORD_SALT_ROUNDS);
       const transfer = await this.libraryTransferRepository.create({
         libraryId: library.id,
         oldOwnerId: ownerId,
@@ -79,7 +90,7 @@ export class LibraryTransferService {
         newOwnerName: payload.new_owner.name.trim(),
         newOwnerPhone,
         newOwnerEmail: payload.new_owner.email?.trim() ?? null,
-        newOwnerPassword: hashedPassword, 
+        newOwnerPassword: hashedPassword,
         keepLibraryName: keepName,
         newLibraryName: keepName ? null : newName!.trim(),
         notifyStudents: payload.library_settings.notify_students,
@@ -100,7 +111,9 @@ export class LibraryTransferService {
         expiresAt: otpExpiresAt,
       });
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('INITIATE_TRANSFER_FAILED');
     }
   }
@@ -113,12 +126,20 @@ export class LibraryTransferService {
     try {
       // 1. Find the pending transfer
       const library = await this.libraryRepository.findLibraryByOwnerId(ownerId);
-      if (!library || library.deletedAt) throw new NotFoundError('LIBRARY_NOT_FOUND');
-      if (library.id !== payload.library_id) throw new HttpError(403, 'LIBRARY_NOT_YOURS');
+      if (!library || library.deletedAt) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+      if (library.id !== payload.library_id) {
+        throw new HttpError(403, 'LIBRARY_NOT_YOURS');
+      }
 
       const transfer = await this.libraryTransferRepository.findPendingByLibraryId(library.id);
-      if (!transfer) throw new NotFoundError('NO_PENDING_TRANSFER_FOUND');
-      if (transfer.oldOwnerId !== ownerId) throw new HttpError(403, 'TRANSFER_NOT_YOURS');
+      if (!transfer) {
+        throw new NotFoundError('NO_PENDING_TRANSFER_FOUND');
+      }
+      if (transfer.oldOwnerId !== ownerId) {
+        throw new HttpError(403, 'TRANSFER_NOT_YOURS');
+      }
 
       // 2. Check OTP expiry
       if (transfer.otpExpiresAt.getTime() < Date.now()) {
@@ -134,12 +155,10 @@ export class LibraryTransferService {
       }
 
       // 4. Hash new owner password
-       const hashedPassword = transfer.newOwnerPassword;
+      const hashedPassword = transfer.newOwnerPassword;
 
       // 5. Create new tenant for new owner
-      const finalLibraryName = transfer.keepLibraryName
-        ? library.name
-        : transfer.newLibraryName!;
+      const finalLibraryName = transfer.keepLibraryName ? library.name : transfer.newLibraryName!;
 
       const newTenant = await this.authRepository.createTenant({
         name: finalLibraryName,
@@ -183,20 +202,20 @@ export class LibraryTransferService {
 
       // 12. Notify students if requested
       if (transfer.notifyStudents) {
-        await this.notifyStudentsOfTransfer(
-          library.id,
-          finalLibraryName,
-          transfer.newOwnerName,
-        );
+        await this.notifyStudentsOfTransfer(library.id, finalLibraryName, transfer.newOwnerName);
       }
 
       // 13. Mark transfer complete
       const completed = await this.libraryTransferRepository.complete(transfer.id, newOwner.id);
-      if (!completed) throw new InternalServerError('TRANSFER_COMPLETION_FAILED');
+      if (!completed) {
+        throw new InternalServerError('TRANSFER_COMPLETION_FAILED');
+      }
 
       return completed;
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('VERIFY_TRANSFER_FAILED');
     }
   }
@@ -246,7 +265,9 @@ export class LibraryTransferService {
       const members = await this.memberRepository.findAllMembersByLibrary(libraryId);
       const activeMembers = members.filter(m => m.status === 'active' && m.studentId);
 
-      if (activeMembers.length === 0) return;
+      if (activeMembers.length === 0) {
+        return;
+      }
 
       await this.notificationRepository.createMany(
         activeMembers.map(m => ({
@@ -264,15 +285,21 @@ export class LibraryTransferService {
 
   // ── Helper: mask phone for response ────────────────────────────────────
   private maskPhone(phone: string): string {
-    if (phone.length < 4) return '****';
-    return phone.slice(0, 2) + '****' + phone.slice(-2);
+    if (phone.length < 4) {
+      return '****';
+    }
+    return `${phone.slice(0, 2)}****${phone.slice(-2)}`;
   }
 
   // ── Helper: normalize phone ─────────────────────────────────────────────
   private normalizePhone(phone: string): string {
     const trimmed = phone.trim().replace(/\s+/g, '');
-    if (trimmed.startsWith('+91') && trimmed.length === 13) return trimmed.slice(3);
-    if (trimmed.startsWith('91') && trimmed.length === 12) return trimmed.slice(2);
+    if (trimmed.startsWith('+91') && trimmed.length === 13) {
+      return trimmed.slice(3);
+    }
+    if (trimmed.startsWith('91') && trimmed.length === 12) {
+      return trimmed.slice(2);
+    }
     return trimmed;
   }
 

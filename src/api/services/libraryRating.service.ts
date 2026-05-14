@@ -1,10 +1,10 @@
 import { BadRequestError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
-import { LibraryRatingRepository } from '../repositories/libraryRating.repository';
+import { RateLibraryRequest } from '../controllers/requests/libraryRating.request';
 import { LibraryRepository } from '../repositories/library.repository';
+import { LibraryRatingRepository } from '../repositories/libraryRating.repository';
 import { MemberRepository } from '../repositories/member.repository';
 import { LibraryRatingRecord } from '../repositories/types/libraryRating.repository.types';
-import { RateLibraryRequest } from '../controllers/requests/libraryRating.request';
 
 @Service()
 export class LibraryRatingService {
@@ -21,7 +21,9 @@ export class LibraryRatingService {
   ): Promise<LibraryRatingRecord> {
     // Check library exists
     const library = await this.libraryRepository.findLibraryById(libraryId);
-    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+    if (!library) {
+      throw new NotFoundError('LIBRARY_NOT_FOUND');
+    }
 
     // Check student has active membership
     const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
@@ -42,7 +44,9 @@ export class LibraryRatingService {
         input.rating,
         input.review ?? null,
       );
-      if (!updated) throw new NotFoundError('RATING_NOT_FOUND');
+      if (!updated) {
+        throw new NotFoundError('RATING_NOT_FOUND');
+      }
       record = updated;
     } else {
       record = await this.ratingRepository.create({

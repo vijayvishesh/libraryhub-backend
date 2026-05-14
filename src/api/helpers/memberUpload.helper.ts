@@ -97,7 +97,6 @@ export const parseMemberUploadFile = async (
   return parseXLSXFile(file);
 };
 
-
 const parseXLSXFile = async (file: MemberUploadFile): Promise<ParsedMemberUploadRow[]> => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(file.buffer as never);

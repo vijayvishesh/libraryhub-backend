@@ -1,6 +1,9 @@
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable max-lines */
 import { HttpError, InternalServerError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { v4 as uuidv4 } from 'uuid';
+import { LibraryPaymentMethod } from '../constants/library.constants';
 import {
   AddMemberRequest,
   ListMemberPaymentsQueryRequest,
@@ -18,21 +21,20 @@ import {
   parseMemberUploadFile,
   resolveMemberBulkUploadStatus,
 } from '../helpers/memberUpload.helper';
-import { LibraryPaymentMethod } from '../constants/library.constants';
+import { AuthRepository } from '../repositories/auth.repositories';
 import { BookingRepository } from '../repositories/booking.repository';
 import { LibraryRepository } from '../repositories/library.repository';
 import { LibrarySeatRepository } from '../repositories/librarySeat.repository';
-import { MemberInviteLinkRepository } from '../repositories/memberInviteLink.repository';
 import { MemberRepository } from '../repositories/member.repository';
 import { MemberBulkUploadRepository } from '../repositories/memberBulkUpload.repository';
-import { MemberInviteLinkRecord } from '../repositories/types/memberInviteLink.repository.types';
+import { MemberInviteLinkRepository } from '../repositories/memberInviteLink.repository';
+import { MemberInviteSubmissionRepository } from '../repositories/memberInviteSubmission.repository';
+import { MemberPaymentRepository } from '../repositories/memberPayment.repository';
 import { MemberMsgResponse, MemberRecord } from '../repositories/types/member.repository.types';
 import { MemberBulkUploadRecord } from '../repositories/types/memberBulkUpload.repository.types';
-import { MemberPaymentRepository } from '../repositories/memberPayment.repository';
-import { ListMemberPaymentsResult } from '../repositories/types/memberPayment.repository.types';
-import { MemberInviteSubmissionRepository } from '../repositories/memberInviteSubmission.repository';
+import { MemberInviteLinkRecord } from '../repositories/types/memberInviteLink.repository.types';
 import { SubmissionRecord } from '../repositories/types/memberInviteSubmission.repository.types';
-import { AuthRepository } from '../repositories/auth.repositories';
+import { ListMemberPaymentsResult } from '../repositories/types/memberPayment.repository.types';
 
 export type ListMembersResult = {
   members: MemberWithFlags[];
@@ -79,9 +81,11 @@ export class MemberService {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
       // const member = await this.createMemberForLibrary(library.id, payload);
       await this.createMemberForLibrary(library.id, payload);
-      return { msg: 'Member added successfully',  };
+      return { msg: 'Member added successfully' };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('MEMBER_CREATION_FAILED');
     }
   }
@@ -114,7 +118,9 @@ export class MemberService {
         total: result.total,
       };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('LIST_MEMBERS_FAILED');
     }
   }
@@ -126,17 +132,24 @@ export class MemberService {
         memberId.trim(),
         library.id,
       );
-      if (!member) throw new NotFoundError('MEMBER_NOT_FOUND');
+      if (!member) {
+        throw new NotFoundError('MEMBER_NOT_FOUND');
+      }
 
-      const submissionMap = await this.memberInviteSubmissionRepository.findByMemberIds([member.id]);
+      const submissionMap = await this.memberInviteSubmissionRepository.findByMemberIds([
+        member.id,
+      ]);
       return this.mergeInviteFlags(member, submissionMap);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_MEMBER_FAILED');
     }
   }
 
- public async updateMember(
+  /* eslint-disable max-lines-per-function */
+  public async updateMember(
     ownerId: string,
     memberId: string,
     payload: UpdateMemberRequest,
@@ -240,7 +253,9 @@ export class MemberService {
         if (payload.slotId !== undefined && newSlotId !== existingMember.slotId && newSlotId) {
           bookingUpdates.slotType = newSlotId;
           // Fetch library to resolve slot name and times
-          const memberLibrary = await this.libraryRepository.findLibraryById(existingMember.libraryId);
+          const memberLibrary = await this.libraryRepository.findLibraryById(
+            existingMember.libraryId,
+          );
           const slotInfo = memberLibrary?.slots?.find(s => s.slotType === newSlotId);
           if (slotInfo) {
             bookingUpdates.slotName = slotInfo.name;
@@ -284,7 +299,9 @@ export class MemberService {
 
       return updatedMember;
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('UPDATE_MEMBER_FAILED');
     }
   }
@@ -302,7 +319,9 @@ export class MemberService {
 
       return { msg: 'Member removed successfully' };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('DELETE_MEMBER_FAILED');
     }
   }
@@ -336,9 +355,7 @@ export class MemberService {
       const isRenewal = member.status === 'active' || member.status === 'expired';
       const duration = overrideDuration || (isFirstPayment ? member.duration || 1 : 1);
       const newStartDate =
-        isRenewal && member.endDate
-          ? member.endDate
-          : new Date().toISOString().slice(0, 10);
+        isRenewal && member.endDate ? member.endDate : new Date().toISOString().slice(0, 10);
       const newEndDate = this.calculateEndDate(newStartDate, duration);
 
       const monthlyRate =
@@ -374,7 +391,9 @@ export class MemberService {
 
       return updated;
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
     }
   }
@@ -470,7 +489,9 @@ export class MemberService {
         rows: results,
       });
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('MEMBER_BULK_UPLOAD_FAILED');
     }
   }
@@ -492,7 +513,9 @@ export class MemberService {
 
       return { uploads: result.uploads, page, limit, total: result.total };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('LIST_MEMBER_UPLOADS_FAILED');
     }
   }
@@ -514,7 +537,9 @@ export class MemberService {
       const buffer = await buildMemberUploadReport(upload.rows);
       return { filename: `members-upload-report-${upload.id}.xlsx`, buffer };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('DOWNLOAD_MEMBER_UPLOAD_REPORT_FAILED');
     }
   }
@@ -533,7 +558,9 @@ export class MemberService {
         token,
       });
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GENERATE_MEMBER_INVITE_LINK_FAILED');
     }
   }
@@ -542,6 +569,7 @@ export class MemberService {
     try {
       return await this.memberInviteLinkRepository.findValidLinkByToken(token);
     } catch (error) {
+      console.error('Error fetching invite link details:', error);
       throw new InternalServerError('GET_INVITE_LINK_DETAILS_FAILED');
     }
   }
@@ -550,12 +578,20 @@ export class MemberService {
     inviteLink: MemberInviteLinkRecord;
     libraryName: string;
     libraryAddress: string;
-    slots: { slotType: string; name: string; startTime: string; endTime: string; isActive: boolean }[];
+    slots: {
+      slotType: string;
+      name: string;
+      startTime: string;
+      endTime: string;
+      isActive: boolean;
+    }[];
     seats: { seatId: string; label: string; gender: string; isActive: boolean }[];
   } | null> {
     try {
       const inviteLink = await this.memberInviteLinkRepository.findValidLinkByToken(token);
-      if (!inviteLink) return null;
+      if (!inviteLink) {
+        return null;
+      }
 
       const [library, seats] = await Promise.all([
         this.libraryRepository.findLibraryById(inviteLink.libraryId),
@@ -585,43 +621,68 @@ export class MemberService {
         })),
       };
     } catch (error) {
+      console.error('Error fetching invite link details:', error);
       throw new InternalServerError('GET_INVITE_LINK_DETAILS_FAILED');
     }
   }
 
   public async getRenewalReminders(
     ownerId: string,
-    tab: 'today' | '3days' | '7days' | 'month',
+    tab: 'today' | '3Days' | '7Days' | 'month',
   ): Promise<{
     members: MemberRecord[];
-    tabCounts: { today: number; '3days': number; '7days': number; month: number };
+    tabCounts: { today: number; '3Days': number; '7Days': number; month: number };
     totalAtRisk: number;
   }> {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
       const today = new Date().toISOString().slice(0, 10);
-      const d3 = new Date(); d3.setDate(d3.getDate() + 3);
-      const d7 = new Date(); d7.setDate(d7.getDate() + 7);
-      const d30 = new Date(); d30.setDate(d30.getDate() + 30);
+      const d3 = new Date();
+      d3.setDate(d3.getDate() + 3);
+      const d7 = new Date();
+      d7.setDate(d7.getDate() + 7);
+      const d30 = new Date();
+      d30.setDate(d30.getDate() + 30);
       const date3 = d3.toISOString().slice(0, 10);
       const date7 = d7.toISOString().slice(0, 10);
       const date30 = d30.toISOString().slice(0, 10);
 
       const ranges: Record<string, { from: string; to: string }> = {
         today: { from: '1970-01-01', to: today },
-        '3days': { from: today, to: date3 },
-        '7days': { from: today, to: date7 },
+        '3Days': { from: today, to: date3 },
+        '7Days': { from: today, to: date7 },
         month: { from: today, to: date30 },
       };
 
       const [todayMembers, d3Members, d7Members, d30Members] = await Promise.all([
-        this.memberRepository.findMembersExpiringInRange(library.id, ranges.today.from, ranges.today.to),
-        this.memberRepository.findMembersExpiringInRange(library.id, ranges['3days'].from, ranges['3days'].to),
-        this.memberRepository.findMembersExpiringInRange(library.id, ranges['7days'].from, ranges['7days'].to),
-        this.memberRepository.findMembersExpiringInRange(library.id, ranges.month.from, ranges.month.to),
+        this.memberRepository.findMembersExpiringInRange(
+          library.id,
+          ranges.today.from,
+          ranges.today.to,
+        ),
+        this.memberRepository.findMembersExpiringInRange(
+          library.id,
+          ranges['3Days'].from,
+          ranges['3Days'].to,
+        ),
+        this.memberRepository.findMembersExpiringInRange(
+          library.id,
+          ranges['7Days'].from,
+          ranges['7Days'].to,
+        ),
+        this.memberRepository.findMembersExpiringInRange(
+          library.id,
+          ranges.month.from,
+          ranges.month.to,
+        ),
       ]);
 
-      const tabMap = { today: todayMembers, '3days': d3Members, '7days': d7Members, month: d30Members };
+      const tabMap = {
+        today: todayMembers,
+        '3Days': d3Members,
+        '7Days': d7Members,
+        month: d30Members,
+      };
       const members = tabMap[tab];
       const totalAtRisk = d30Members.reduce((sum, m) => sum + (m.planAmount ?? 0), 0);
 
@@ -629,14 +690,16 @@ export class MemberService {
         members,
         tabCounts: {
           today: todayMembers.length,
-          '3days': d3Members.length,
-          '7days': d7Members.length,
+          '3Days': d3Members.length,
+          '7Days': d7Members.length,
           month: d30Members.length,
         },
         totalAtRisk,
       };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_RENEWAL_REMINDERS_FAILED');
     }
   }
@@ -655,7 +718,9 @@ export class MemberService {
       await this.memberInviteLinkRepository.markLinkAsUsed(token, member.id);
       return member;
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('SUBMIT_MEMBER_VIA_INVITE_LINK_FAILED');
     }
   }
@@ -686,11 +751,13 @@ export class MemberService {
 
       return { payments: result.payments, total: result.total };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_MEMBER_PAYMENT_HISTORY_FAILED');
     }
   }
-
+  /* eslint-disable max-lines-per-function */
   private async createMemberForLibrary(
     libraryId: string,
     payload: AddMemberRequest | SubmitMemberViaInviteLinkRequest,
@@ -754,10 +821,7 @@ export class MemberService {
 
     if (!student) {
       const bcrypt = await import('bcrypt');
-      const hashedPassword = await bcrypt.hash(
-        `owner_added_${mobileNo}_${Date.now()}`,
-        10,
-      );
+      const hashedPassword = await bcrypt.hash(`owner_added_${mobileNo}_${Date.now()}`, 10);
       student = await this.authRepository.createStudent({
         name: fullName,
         phone: mobileNo,
@@ -778,9 +842,7 @@ export class MemberService {
     }
 
     // Find slot info for booking record
-    const slotInfo = slotId
-      ? (library.slots ?? []).find(s => s.slotType === slotId)
-      : null;
+    const slotInfo = slotId ? (library.slots ?? []).find(s => s.slotType === slotId) : null;
 
     // Create booking record so student can see their library after login
     const bookingStatus = markPaid ? 'confirmed' : 'pending_payment';
@@ -797,13 +859,11 @@ export class MemberService {
           slotName: slotInfo?.name ?? slotId,
           slotStartTime: slotInfo?.startTime ?? '06:00',
           slotEndTime: slotInfo?.endTime ?? '22:00',
-          seatId: seatId,
+          seatId,
           sectionId: null,
-          paymentMethod: (
-            'paymentMethod' in payload && payload.paymentMethod
-              ? payload.paymentMethod
-              : 'cash'
-          ) as any,
+          paymentMethod: ('paymentMethod' in payload && payload.paymentMethod
+            ? payload.paymentMethod
+            : 'cash') as any,
           amount: planAmount ?? 0,
           duration: payload.duration,
           startDate,

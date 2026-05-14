@@ -3,13 +3,13 @@ import { createHash } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { BadRequestError, InternalServerError, UnauthorizedError } from 'routing-controllers';
 import { Service } from 'typedi';
-import { SuperAdminRepository } from '../repositories/superAdmin.repository';
-import { AuthRepository } from '../repositories/auth.repositories';
-import { SuperAdminRecord } from '../repositories/types/superAdmin.repository.types';
 import {
   CreateSuperAdminRequest,
   SuperAdminLoginRequest,
 } from '../controllers/requests/superAdmin.request';
+import { AuthRepository } from '../repositories/auth.repositories';
+import { SuperAdminRepository } from '../repositories/superAdmin.repository';
+import { SuperAdminRecord } from '../repositories/types/superAdmin.repository.types';
 
 const ACCESS_TOKEN_EXPIRY = '60m';
 const REFRESH_TOKEN_EXPIRY = '7d';

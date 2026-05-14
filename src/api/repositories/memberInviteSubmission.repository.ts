@@ -69,24 +69,29 @@ export class MemberInviteSubmissionRepository {
   }
 
   public async findById(id: string): Promise<SubmissionRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const model = await this.getRepo().findOneById(new ObjectId(id));
     return model ? this.map(model) : null;
   }
 
-  public async findByIdAndLibrary(
-    id: string,
-    libraryId: string,
-  ): Promise<SubmissionRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+  public async findByIdAndLibrary(id: string, libraryId: string): Promise<SubmissionRecord | null> {
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const model = await this.getRepo().findOneById(new ObjectId(id));
-    if (!model || model.libraryId !== libraryId) return null;
+    if (!model || model.libraryId !== libraryId) {
+      return null;
+    }
     return this.map(model);
   }
 
   public async list(query: ListSubmissionsQuery): Promise<ListSubmissionsResult> {
     const where: Record<string, unknown> = { libraryId: query.libraryId };
-    if (query.status) where.status = query.status;
+    if (query.status) {
+      where.status = query.status;
+    }
 
     const [models, total] = await Promise.all([
       this.getRepo().find({
@@ -106,10 +111,14 @@ export class MemberInviteSubmissionRepository {
     libraryId: string,
     input: UpdateSubmissionInput,
   ): Promise<SubmissionRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const repo = this.getRepo();
     const model = await repo.findOneById(new ObjectId(id));
-    if (!model || model.libraryId !== libraryId) return null;
+    if (!model || model.libraryId !== libraryId) {
+      return null;
+    }
 
     Object.assign(model, input, { updatedAt: new Date() });
     const saved = await repo.save(model);
@@ -132,7 +141,9 @@ export class MemberInviteSubmissionRepository {
     await Promise.all(
       objectIds.map(async oid => {
         const model = await repo.findOneById(oid);
-        if (!model || model.libraryId !== libraryId || model.status !== 'pending') return;
+        if (!model || model.libraryId !== libraryId || model.status !== 'pending') {
+          return;
+        }
         model.status = status;
         model.reviewedAt = now;
         model.reviewedBy = reviewedBy;
@@ -155,28 +166,30 @@ export class MemberInviteSubmissionRepository {
     return models.map(m => this.map(m));
   }
 
-public async findByMemberIds(memberIds: string[]): Promise<Map<string, SubmissionRecord>> {
-  if (!memberIds.length) return new Map();
-
-  const validObjectIds = memberIds
-    .filter(id => ObjectId.isValid(id))
-    .map(id => new ObjectId(id));
-
-  if (!validObjectIds.length) return new Map();
-
-  const models = await this.getRepo().find({
-    where: {
-      memberId: { $in: memberIds } as any,
-    } as any,
-  });
-
-  const resultMap = new Map<string, SubmissionRecord>();
-  for (const model of models) {
-    if (model.memberId) {
-      resultMap.set(model.memberId, this.map(model));
+  public async findByMemberIds(memberIds: string[]): Promise<Map<string, SubmissionRecord>> {
+    if (!memberIds.length) {
+      return new Map();
     }
-  }
 
-  return resultMap;
-}
+    const validObjectIds = memberIds.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
+
+    if (!validObjectIds.length) {
+      return new Map();
+    }
+
+    const models = await this.getRepo().find({
+      where: {
+        memberId: { $in: memberIds } as any,
+      } as any,
+    });
+
+    const resultMap = new Map<string, SubmissionRecord>();
+    for (const model of models) {
+      if (model.memberId) {
+        resultMap.set(model.memberId, this.map(model));
+      }
+    }
+
+    return resultMap;
+  }
 }

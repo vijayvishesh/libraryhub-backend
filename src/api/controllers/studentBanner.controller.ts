@@ -72,7 +72,9 @@ export class StudentBannerController {
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_BANNERS_FAILED');
     }
   }

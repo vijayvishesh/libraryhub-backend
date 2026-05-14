@@ -217,7 +217,9 @@ export class MemberRepository {
     if (input.paidAt !== undefined) {
       member.paidAt = input.paidAt;
     }
-    if (input.isNewUser !== undefined) member.isNewUser = input.isNewUser;
+    if (input.isNewUser !== undefined) {
+      member.isNewUser = input.isNewUser;
+    }
 
     member.updatedAt = input.updatedAt || new Date();
     const savedMember = await memberRepository.save(member);
@@ -256,100 +258,95 @@ export class MemberRepository {
     return this.mapMember(member);
   }
 
- // Slot types that block the seat for ALL other slots
-private readonly FULL_BLOCKING_SLOTS = ['fullday', 'twentyfour'];
+  // Slot types that block the seat for ALL other slots
+  private readonly FULL_BLOCKING_SLOTS = ['fullday', 'twentyfour'];
 
-public async findActiveMemberSeatStatus(
-  libraryId: string,
-  slotId?: string,
-  sectionId?: string,
-): Promise<Map<string, 'pending' | 'occupied'>> {
-  const whereFilter: Record<string, unknown> = {
-    libraryId,
-    status: { $in: ['active', 'pending'] },
-    seatId: { $ne: null },
-  };
+  public async findActiveMemberSeatStatus(
+    libraryId: string,
+    slotId?: string,
+    sectionId?: string,
+  ): Promise<Map<string, 'pending' | 'occupied'>> {
+    const whereFilter: Record<string, unknown> = {
+      libraryId,
+      status: { $in: ['active', 'pending'] },
+      seatId: { $ne: null },
+    };
 
-  // Apply the SAME blocking logic as findActiveMemberBySeat
-  if (slotId) {
-    const isNewBookingFullBlocking = this.FULL_BLOCKING_SLOTS.includes(slotId);
-    if (!isNewBookingFullBlocking) {
-      // Time-based slot: blocked by fullday/twentyfour OR same slot
-      (whereFilter as any).$or = [
-        { slotId: { $in: this.FULL_BLOCKING_SLOTS } },
-        { slotId },
-      ];
+    // Apply the SAME blocking logic as findActiveMemberBySeat
+    if (slotId) {
+      const isNewBookingFullBlocking = this.FULL_BLOCKING_SLOTS.includes(slotId);
+      if (!isNewBookingFullBlocking) {
+        // Time-based slot: blocked by fullday/twentyfour OR same slot
+        (whereFilter as any).$or = [{ slotId: { $in: this.FULL_BLOCKING_SLOTS } }, { slotId }];
+      }
+      // If new booking IS fullday/twentyfour: no slotId filter → any active member blocks it
     }
-    // If new booking IS fullday/twentyfour: no slotId filter → any active member blocks it
-  }
 
-  const members = await this.getMemberRepository().find({ where: whereFilter });
+    const members = await this.getMemberRepository().find({ where: whereFilter });
 
-  const statusMap = new Map<string, 'pending' | 'occupied'>();
-  for (const member of members) {
-    if (!member.seatId) {
-      continue;
-    }
-    if (sectionId) {
-      const prefix = `SEC-${sectionId}-`;
-      if (!member.seatId.startsWith(prefix)) {
+    const statusMap = new Map<string, 'pending' | 'occupied'>();
+    for (const member of members) {
+      if (!member.seatId) {
         continue;
       }
+      if (sectionId) {
+        const prefix = `SEC-${sectionId}-`;
+        if (!member.seatId.startsWith(prefix)) {
+          continue;
+        }
+      }
+      statusMap.set(member.seatId, member.status === 'pending' ? 'pending' : 'occupied');
     }
-    statusMap.set(member.seatId, member.status === 'pending' ? 'pending' : 'occupied');
+
+    return statusMap;
   }
 
-  return statusMap;
-}
-
-
-public async findActiveMemberBySeat(
-  libraryId: string,
-  seatId: string,
-  slotId?: string,
-  excludeMemberId?: string,
-): Promise<MemberRecord | null> {
-  const excludeFilter: Record<string, unknown> = {};
-  if (excludeMemberId) {
-    const objectId = this.tryParseObjectId(excludeMemberId);
-    if (objectId) {
-      excludeFilter['_id'] = { $ne: objectId };
+  public async findActiveMemberBySeat(
+    libraryId: string,
+    seatId: string,
+    slotId?: string,
+    excludeMemberId?: string,
+  ): Promise<MemberRecord | null> {
+    const excludeFilter: Record<string, unknown> = {};
+    if (excludeMemberId) {
+      const objectId = this.tryParseObjectId(excludeMemberId);
+      if (objectId) {
+        excludeFilter['_id'] = { $ne: objectId };
+      }
     }
-  }
 
-  const baseFilter: Record<string, unknown> = {
-    libraryId,
-    seatId,
-    status: { $in: ['active', 'pending'] },
-    ...excludeFilter,
-  };
+    const baseFilter: Record<string, unknown> = {
+      libraryId,
+      seatId,
+      status: { $in: ['active', 'pending'] },
+      ...excludeFilter,
+    };
 
-  const isNewBookingFullBlocking =
-    slotId && this.FULL_BLOCKING_SLOTS.includes(slotId);
+    const isNewBookingFullBlocking = slotId && this.FULL_BLOCKING_SLOTS.includes(slotId);
 
-  if (!slotId || isNewBookingFullBlocking) {
-    // Case 1: No slot specified OR new booking is fullday/twentyfour
-    // → check if ANY active member exists for this seat
-    const member = await this.getMemberRepository().findOneBy(baseFilter);
+    if (!slotId || isNewBookingFullBlocking) {
+      // Case 1: No slot specified OR new booking is fullday/twentyfour
+      // → check if ANY active member exists for this seat
+      const member = await this.getMemberRepository().findOneBy(baseFilter);
+      return member ? this.mapMember(member) : null;
+    }
+
+    // Case 2: New booking is a time-based slot
+    // → blocked if existing booking is fullday/twentyfour OR same slot
+    const orConditions = [
+      // existing fullday/twentyfour blocks this seat
+      { slotId: { $in: this.FULL_BLOCKING_SLOTS } },
+      // same slot conflict
+      { slotId },
+    ];
+
+    const member = await this.getMemberRepository().findOneBy({
+      ...baseFilter,
+      $or: orConditions,
+    } as any);
+
     return member ? this.mapMember(member) : null;
   }
-
-  // Case 2: New booking is a time-based slot
-  // → blocked if existing booking is fullday/twentyfour OR same slot
-  const orConditions = [
-    // existing fullday/twentyfour blocks this seat
-    { slotId: { $in: this.FULL_BLOCKING_SLOTS } },
-    // same slot conflict
-    { slotId },
-  ];
-
-  const member = await this.getMemberRepository().findOneBy({
-    ...baseFilter,
-    $or: orConditions,
-  } as any);
-
-  return member ? this.mapMember(member) : null;
-}
 
   private async ensureIndexes(): Promise<void> {
     if (this.indexesEnsured) {
@@ -385,7 +382,12 @@ public async findActiveMemberBySeat(
 
   private async createIndexSafely(
     keys: Record<string, 1 | -1>,
-    options: { name: string; unique?: boolean; sparse?: boolean; partialFilterExpression?: Record<string, unknown> },
+    options: {
+      name: string;
+      unique?: boolean;
+      sparse?: boolean;
+      partialFilterExpression?: Record<string, unknown>;
+    },
   ): Promise<void> {
     try {
       await this.getMemberRepository().createCollectionIndex(keys, options);
@@ -464,17 +466,17 @@ public async findActiveMemberBySeat(
     return getDataSource().getMongoRepository(MemberModel);
   }
   public async findAllMembersByStudentId(studentId: string): Promise<MemberRecord[]> {
-  const members = await this.getMemberRepository().find({
-    where: { studentId } as any,
-  });
-  return members.map(item => this.mapMember(item));
-}
+    const members = await this.getMemberRepository().find({
+      where: { studentId } as any,
+    });
+    return members.map(item => this.mapMember(item));
+  }
 
-public async findAllMembersByPhone(mobileNo: string): Promise<MemberRecord[]> {
-  const members = await this.getMemberRepository().find({
-    where: { mobileNo } as any,
-    order: { createdAt: 'DESC' },
-  });
-  return members.map(item => this.mapMember(item));
-}
+  public async findAllMembersByPhone(mobileNo: string): Promise<MemberRecord[]> {
+    const members = await this.getMemberRepository().find({
+      where: { mobileNo } as any,
+      order: { createdAt: 'DESC' },
+    });
+    return members.map(item => this.mapMember(item));
+  }
 }

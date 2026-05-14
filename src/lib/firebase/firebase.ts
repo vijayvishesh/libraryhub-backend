@@ -4,7 +4,9 @@ import { env } from '../../env';
 let firebaseApp: admin.app.App | null = null;
 
 export const initializeFirebase = (): void => {
-  if (firebaseApp) return;
+  if (firebaseApp) {
+    return;
+  }
 
   firebaseApp = admin.initializeApp({
     credential: admin.credential.cert({
@@ -14,7 +16,7 @@ export const initializeFirebase = (): void => {
     }),
   });
 
-  console.log('✅ Firebase initialized successfully');
+  console.error('✅ Firebase initialized successfully');
 };
 
 export const getFirebaseMessaging = (): admin.messaging.Messaging => {

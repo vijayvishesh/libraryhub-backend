@@ -1,5 +1,13 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
 
 const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -130,7 +138,7 @@ export class VerifyOtpRequest {
 
 export class VerifyOtpWithRoleRequest extends VerifyOtpRequest {
   @Transform(trimString)
-  @IsOptional() 
+  @IsOptional()
   @IsIn([...USER_ROLE_ENUM])
   role?: AuthRequestRole;
 }

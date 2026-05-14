@@ -318,42 +318,52 @@ export class LibraryController {
     }
   }
   @Get('/my/slots')
-@Authorized('OWNER')
-@OpenAPI({ summary: 'Get owner library slots with plans and trials', security: [{ bearerAuth: [] }] })
-@ResponseSchema(LibrarySlotsApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async getMyLibrarySlots(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-): Promise<LibrarySlotsApiResponse> {
-  try {
-    const slots = await this.libraryService.getLibrarySlots(session.user.id);
-    return new LibrarySlotsApiResponse(new LibrarySlotsPayloadData(slots), 200);
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('GET_LIBRARY_SLOTS_FAILED');
+  @Authorized('OWNER')
+  @OpenAPI({
+    summary: 'Get owner library slots with plans and trials',
+    security: [{ bearerAuth: [] }],
+  })
+  @ResponseSchema(LibrarySlotsApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getMyLibrarySlots(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+  ): Promise<LibrarySlotsApiResponse> {
+    try {
+      const slots = await this.libraryService.getLibrarySlots(session.user.id);
+      return new LibrarySlotsApiResponse(new LibrarySlotsPayloadData(slots), 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('GET_LIBRARY_SLOTS_FAILED');
+    }
   }
-}
 
-@Patch('/my/slots')
-@Authorized('OWNER')
-@OpenAPI({ summary: 'Update owner library slots with plans and trials', security: [{ bearerAuth: [] }] })
-@ResponseSchema(LibrarySlotsApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async updateMyLibrarySlots(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-  @Body() payload: UpdateLibrarySlotsRequest,
-): Promise<LibrarySlotsApiResponse> {
-  try {
-    const slots = await this.libraryService.updateLibrarySlots(session.user.id, payload);
-    return new LibrarySlotsApiResponse(new LibrarySlotsPayloadData(slots), 200);
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('UPDATE_LIBRARY_SLOTS_FAILED');
+  @Patch('/my/slots')
+  @Authorized('OWNER')
+  @OpenAPI({
+    summary: 'Update owner library slots with plans and trials',
+    security: [{ bearerAuth: [] }],
+  })
+  @ResponseSchema(LibrarySlotsApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async updateMyLibrarySlots(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Body() payload: UpdateLibrarySlotsRequest,
+  ): Promise<LibrarySlotsApiResponse> {
+    try {
+      const slots = await this.libraryService.updateLibrarySlots(session.user.id, payload);
+      return new LibrarySlotsApiResponse(new LibrarySlotsPayloadData(slots), 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('UPDATE_LIBRARY_SLOTS_FAILED');
+    }
   }
-}
 }

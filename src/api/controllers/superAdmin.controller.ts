@@ -3,7 +3,7 @@ import {
   Body,
   CurrentUser,
   Get,
-//   HttpCode,
+  //   HttpCode,
   HttpError,
   InternalServerError,
   JsonController,
@@ -13,17 +13,17 @@ import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { SuperAdminService } from '../services/superAdmin.service';
 import {
-//   CreateSuperAdminRequest,
+  //   CreateSuperAdminRequest,
   SuperAdminLoginRequest,
 } from './requests/superAdmin.request';
 import { CurrentSessionData } from './responses/auth.response';
+import { ErrorResponseModel } from './responses/common.reponse';
 import {
   SuperAdminAuthApiResponse,
   SuperAdminAuthData,
   SuperAdminData,
   SuperAdminTokenData,
 } from './responses/superAdmin.response';
-import { ErrorResponseModel } from './responses/common.reponse';
 
 @Service()
 @JsonController('/v1/admin')
@@ -35,9 +35,7 @@ export class SuperAdminController {
   @ResponseSchema(SuperAdminAuthApiResponse, { statusCode: 200 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-  public async login(
-    @Body() payload: SuperAdminLoginRequest,
-  ): Promise<SuperAdminAuthApiResponse> {
+  public async login(@Body() payload: SuperAdminLoginRequest): Promise<SuperAdminAuthApiResponse> {
     try {
       const result = await this.superAdminService.login(payload);
       return new SuperAdminAuthApiResponse(
@@ -48,27 +46,29 @@ export class SuperAdminController {
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('SUPER_ADMIN_LOGIN_FAILED');
     }
   }
 
-//   @Post('/register')
-//   @HttpCode(201)
-//   @OpenAPI({ summary: 'Create super admin account (first time setup)' })
-//   @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-//   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-//   public async createSuperAdmin(
-//     @Body() payload: CreateSuperAdminRequest,
-//   ): Promise<{ responseCode: number; message: string }> {
-//     try {
-//       await this.superAdminService.createSuperAdmin(payload);
-//       return { responseCode: 201, message: 'Super admin created successfully' };
-//     } catch (error) {
-//       if (error instanceof HttpError) throw error;
-//       throw new InternalServerError('CREATE_SUPER_ADMIN_FAILED');
-//     }
-//   }
+  //   @Post('/register')
+  //   @HttpCode(201)
+  //   @OpenAPI({ summary: 'Create super admin account (first time setup)' })
+  //   @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  //   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  //   public async createSuperAdmin(
+  //     @Body() payload: CreateSuperAdminRequest,
+  //   ): Promise<{ responseCode: number; message: string }> {
+  //     try {
+  //       await this.superAdminService.createSuperAdmin(payload);
+  //       return { responseCode: 201, message: 'Super admin created successfully' };
+  //     } catch (error) {
+  //       if (error instanceof HttpError) throw error;
+  //       throw new InternalServerError('CREATE_SUPER_ADMIN_FAILED');
+  //     }
+  //   }
 
   @Get('/me')
   @Authorized('SUPER_ADMIN')
@@ -82,7 +82,9 @@ export class SuperAdminController {
       const admin = await this.superAdminService.getAdminById(session.user.id);
       return { responseCode: 200, data: new SuperAdminData(admin ?? undefined) };
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_SUPER_ADMIN_FAILED');
     }
   }

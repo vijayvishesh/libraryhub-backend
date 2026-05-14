@@ -25,11 +25,17 @@ export class NotificationService {
 
   public async markAsRead(id: string, studentId: string): Promise<NotificationRecord> {
     const notification = await this.notificationRepository.findById(id);
-    if (!notification) throw new NotFoundError('NOTIFICATION_NOT_FOUND');
-    if (notification.studentId !== studentId) throw new NotFoundError('NOTIFICATION_NOT_FOUND');
+    if (!notification) {
+      throw new NotFoundError('NOTIFICATION_NOT_FOUND');
+    }
+    if (notification.studentId !== studentId) {
+      throw new NotFoundError('NOTIFICATION_NOT_FOUND');
+    }
 
     const updated = await this.notificationRepository.markAsRead(id);
-    if (!updated) throw new NotFoundError('NOTIFICATION_NOT_FOUND');
+    if (!updated) {
+      throw new NotFoundError('NOTIFICATION_NOT_FOUND');
+    }
     return updated;
   }
 

@@ -63,7 +63,7 @@ export class MemberModel {
 
   @Column()
   updatedAt!: Date;
-  
+
   @Column()
   isInviteSubmission?: boolean;
 

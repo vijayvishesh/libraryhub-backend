@@ -1,5 +1,5 @@
 import { CookieOptions, Request, Response } from 'express';
-import { AuthAttribute, ScreenPermission } from '../../api/controllers/responses/user.response';
+// import { AuthAttribute, ScreenPermission } from '../../api/controllers/responses/user.response';
 import { env } from '../../env';
 
 // 1. Define Cookie Names as Constants to avoid typos across the app
@@ -11,7 +11,8 @@ export const AUTH_COOKIES = {
   SCREEN_CONTEXT: 'screenContext',
 } as const;
 
-const resolveRequest = (req?: Request, res?: Response): Request | undefined => req ?? (res?.req as Request | undefined);
+const resolveRequest = (req?: Request, res?: Response): Request | undefined =>
+  req ?? (res?.req as Request | undefined);
 
 const getRequestProtocol = (req?: Request): string | undefined => {
   const forwarded = req?.headers?.['x-forwarded-proto'];
@@ -88,8 +89,8 @@ export const COOKIE_EXPIRY = {
 };
 
 export interface AuthScreenContext {
-  screenPermissions?: ScreenPermission[];
-  authAttributes?: AuthAttribute[];
+  // screenPermissions?: ScreenPermission[];
+  // authAttributes?: AuthAttribute[];
   mspinInfo?: Record<string, any> | null;
 }
 
@@ -107,7 +108,11 @@ export function setAuthCookie(res: Response, name: string, value: string, req?: 
   });
 }
 
-export function setScreenContextCookie(res: Response, screenContext: AuthScreenContext | null, req?: Request): void {
+export function setScreenContextCookie(
+  res: Response,
+  screenContext: AuthScreenContext | null,
+  req?: Request,
+): void {
   setAuthCookie(res, AUTH_COOKIES.SCREEN_CONTEXT, JSON.stringify(screenContext ?? null), req);
 }
 
@@ -128,7 +133,7 @@ export function clearCookieByName(res: Response, tokenKey: string, req?: Request
 export function clearAuthCookies(res: Response, req?: Request): void {
   const resolvedReq = resolveRequest(req, res);
   const baseCookieOptions = buildBaseCookieOptions(resolvedReq);
-  Object.values(AUTH_COOKIES).forEach((cookieName) => {
+  Object.values(AUTH_COOKIES).forEach(cookieName => {
     // When clearing, options (path, domain) must match the original set options
     res.clearCookie(cookieName, baseCookieOptions);
   });

@@ -8,8 +8,8 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { BannerRecord } from '../../repositories/types/banner.repository.types';
 import { AnnouncementRecord } from '../../repositories/types/announcement.repository.types';
+import { BannerRecord } from '../../repositories/types/banner.repository.types';
 
 export class BannerData {
   @IsString() id!: string;
@@ -28,7 +28,9 @@ export class BannerData {
   @IsDate() updatedAt!: Date;
 
   constructor(params?: BannerRecord) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.id = params.id;
     this.title = params.title;
     this.details = params.details;
@@ -57,7 +59,9 @@ export class AnnouncementSummaryData {
   @IsString() createdAt!: string;
 
   constructor(r?: AnnouncementRecord) {
-    if (!r) return;
+    if (!r) {
+      return;
+    }
     this.id = r.id;
     this.libraryId = r.libraryId;
     this.title = r.title;
@@ -85,7 +89,9 @@ export class MembershipAlertData {
     endDate: string | null;
     daysRemaining: number;
   }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.type = params.type;
     this.title = params.title;
     this.message = params.message;
@@ -101,7 +107,9 @@ export class BannerApiResponse {
   data!: BannerData;
 
   constructor(data?: BannerData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -131,7 +139,9 @@ export class BannerListPayloadData {
     membershipAlerts?: MembershipAlertData[],
     total?: number,
   ) {
-    if (!banners || !announcements || !membershipAlerts || typeof total !== 'number') return;
+    if (!banners || !announcements || !membershipAlerts || typeof total !== 'number') {
+      return;
+    }
     this.banners = banners;
     this.announcements = announcements;
     this.membershipAlerts = membershipAlerts;
@@ -146,7 +156,9 @@ export class BannerListApiResponse {
   data!: BannerListPayloadData;
 
   constructor(data?: BannerListPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

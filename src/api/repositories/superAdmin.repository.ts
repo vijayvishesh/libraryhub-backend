@@ -2,10 +2,7 @@ import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { SuperAdminModel } from '../models/superAdmin.model';
-import {
-  CreateSuperAdminInput,
-  SuperAdminRecord,
-} from './types/superAdmin.repository.types';
+import { CreateSuperAdminInput, SuperAdminRecord } from './types/superAdmin.repository.types';
 
 @Service()
 export class SuperAdminRepository {

@@ -71,90 +71,84 @@ export class BookingRepository {
 
   private readonly FULL_BLOCKING_SLOTS = ['fullday', 'twentyfour'];
 
-public async findActiveSeatBooking(
-  libraryId: string,
-  slotType: string,
-  seatId: string,
-): Promise<BookingRecord | null> {
-  const todayIsoDate = new Date().toISOString().slice(0, 10);
+  public async findActiveSeatBooking(
+    libraryId: string,
+    slotType: string,
+    seatId: string,
+  ): Promise<BookingRecord | null> {
+    const todayIsoDate = new Date().toISOString().slice(0, 10);
 
-  const baseFilter: Record<string, unknown> = {
-    libraryId,
-    seatId,
-    status: { $in: [...ACTIVE_BOOKING_STATUSES] },
-    validUntil: { $gte: todayIsoDate },
-  };
+    const baseFilter: Record<string, unknown> = {
+      libraryId,
+      seatId,
+      status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+      validUntil: { $gte: todayIsoDate },
+    };
 
-  const isNewBookingFullBlocking = this.FULL_BLOCKING_SLOTS.includes(slotType);
+    const isNewBookingFullBlocking = this.FULL_BLOCKING_SLOTS.includes(slotType);
 
-  if (isNewBookingFullBlocking) {
-    // New booking is fullday/twentyfour → blocked if ANY active booking exists
+    if (isNewBookingFullBlocking) {
+      // New booking is fullday/twentyfour → blocked if ANY active booking exists
+      const bookings = await this.getBookingRepository().find({
+        where: baseFilter,
+        order: { createdAt: 'DESC' },
+        take: 1,
+      });
+      return bookings[0] ? this.mapBooking(bookings[0]) : null;
+    }
+
+    // New booking is time-based → blocked if existing is fullday/twentyfour OR same slot
     const bookings = await this.getBookingRepository().find({
-      where: baseFilter,
+      where: {
+        ...baseFilter,
+        $or: [{ slotType: { $in: this.FULL_BLOCKING_SLOTS } }, { slotType }],
+      } as any,
       order: { createdAt: 'DESC' },
       take: 1,
     });
+
     return bookings[0] ? this.mapBooking(bookings[0]) : null;
   }
 
-  // New booking is time-based → blocked if existing is fullday/twentyfour OR same slot
-  const bookings = await this.getBookingRepository().find({
-    where: {
-      ...baseFilter,
-      $or: [
-        { slotType: { $in: this.FULL_BLOCKING_SLOTS } },
-        { slotType },
-      ],
-    } as any,
-    order: { createdAt: 'DESC' },
-    take: 1,
-  });
+  public async findActiveSeatStatusByLibraryAndSlot(
+    libraryId: string,
+    slotType?: string,
+    sectionId?: string,
+  ): Promise<Map<string, 'pending' | 'occupied'>> {
+    const todayIsoDate = new Date().toISOString().slice(0, 10);
+    const whereFilter: Record<string, unknown> = {
+      libraryId,
+      status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+      validUntil: { $gte: todayIsoDate },
+    };
 
-  return bookings[0] ? this.mapBooking(bookings[0]) : null;
-}
-
- public async findActiveSeatStatusByLibraryAndSlot(
-  libraryId: string,
-  slotType?: string,
-  sectionId?: string,
-): Promise<Map<string, 'pending' | 'occupied'>> {
-  const todayIsoDate = new Date().toISOString().slice(0, 10);
-  const whereFilter: Record<string, unknown> = {
-    libraryId,
-    status: { $in: [...ACTIVE_BOOKING_STATUSES] },
-    validUntil: { $gte: todayIsoDate },
-  };
-
-  // Apply the SAME blocking logic as findActiveSeatBooking
-  if (slotType) {
-    const isNewBookingFullBlocking = this.FULL_BLOCKING_SLOTS.includes(slotType);
-    if (!isNewBookingFullBlocking) {
-      // Time-based slot: blocked by fullday/twentyfour OR same slot
-      (whereFilter as any).$or = [
-        { slotType: { $in: this.FULL_BLOCKING_SLOTS } },
-        { slotType },
-      ];
+    // Apply the SAME blocking logic as findActiveSeatBooking
+    if (slotType) {
+      const isNewBookingFullBlocking = this.FULL_BLOCKING_SLOTS.includes(slotType);
+      if (!isNewBookingFullBlocking) {
+        // Time-based slot: blocked by fullday/twentyfour OR same slot
+        (whereFilter as any).$or = [{ slotType: { $in: this.FULL_BLOCKING_SLOTS } }, { slotType }];
+      }
+      // If fullday/twentyfour: no slotType filter → any active booking blocks it
     }
-    // If fullday/twentyfour: no slotType filter → any active booking blocks it
+
+    if (sectionId) {
+      whereFilter.sectionId = sectionId;
+    }
+
+    const bookings = await this.getBookingRepository().find({
+      where: whereFilter,
+    });
+
+    const statusMap = new Map<string, 'pending' | 'occupied'>();
+    for (const booking of bookings) {
+      const isPending =
+        booking.status === 'pending_approval' || booking.status === 'pending_payment';
+      statusMap.set(booking.seatId, isPending ? 'pending' : 'occupied');
+    }
+
+    return statusMap;
   }
-
-  if (sectionId) {
-    whereFilter.sectionId = sectionId;
-  }
-
-  const bookings = await this.getBookingRepository().find({
-    where: whereFilter,
-  });
-
-  const statusMap = new Map<string, 'pending' | 'occupied'>();
-  for (const booking of bookings) {
-    const isPending =
-      booking.status === 'pending_approval' || booking.status === 'pending_payment';
-    statusMap.set(booking.seatId, isPending ? 'pending' : 'occupied');
-  }
-
-  return statusMap;
-}
 
   public async findActiveSeatIdsByLibraryAndSlot(
     libraryId: string,
@@ -503,82 +497,83 @@ public async findActiveSeatBooking(
   }
 
   public async createInviteBooking(input: {
-  libraryId: string;
-  studentId: string;
-  libraryName: string;
-  libraryAddress: string;
-  slotType: string;
-  slotName: string;
-  slotStartTime: string;
-  slotEndTime: string;
-  seatId: string;
-  sectionId: string | null;
-  duration: number;
-  startDate: string;
-  validUntil: string;
-  amount?: number;
-}): Promise<BookingRecord> {
-  return this.createBooking({
-    libraryId: input.libraryId,
-    studentId: input.studentId,
-    libraryName: input.libraryName,
-    libraryAddress: input.libraryAddress,
-    slotType: (input.slotType || 'fullday') as LibrarySlotType,
-    slotName: input.slotName || 'Full Day',
-    slotStartTime: input.slotStartTime || '06:00',
-    slotEndTime: input.slotEndTime || '22:00',
-    seatId: input.seatId,
-    sectionId: input.sectionId,
-    paymentMethod: 'cash' as LibraryPaymentMethod,
-    amount: input.amount ?? 0,
-    duration: input.duration,
-    startDate: input.startDate,
-    validUntil: input.validUntil,
-    status: 'pending_approval',
-    checkedInAt: null,
-    checkedOutAt: null,
-    invoiceNo: `INV-INVITE-${Date.now()}`,
-  });
-}
-public async updateLibraryNameByLibraryId(
-  libraryId: string,
-  newLibraryName: string,
-): Promise<void> {
-  const repo = this.getBookingRepository(); // use your existing getRepo method name
-  const bookings = await repo.find({
-    where: { libraryId } as any,
-  });
-  await Promise.all(
-    bookings.map(async b => {
-      b.libraryName = newLibraryName;
-      await repo.save(b);
-    }),
-  );
-}
-public async updateBookingSeatId(
-  bookingId: string,
-  seatId: string,
-): Promise<void> {
-  const objectId = this.tryParseObjectId(bookingId);
-  if (!objectId) return;
+    libraryId: string;
+    studentId: string;
+    libraryName: string;
+    libraryAddress: string;
+    slotType: string;
+    slotName: string;
+    slotStartTime: string;
+    slotEndTime: string;
+    seatId: string;
+    sectionId: string | null;
+    duration: number;
+    startDate: string;
+    validUntil: string;
+    amount?: number;
+  }): Promise<BookingRecord> {
+    return this.createBooking({
+      libraryId: input.libraryId,
+      studentId: input.studentId,
+      libraryName: input.libraryName,
+      libraryAddress: input.libraryAddress,
+      slotType: (input.slotType || 'fullday') as LibrarySlotType,
+      slotName: input.slotName || 'Full Day',
+      slotStartTime: input.slotStartTime || '06:00',
+      slotEndTime: input.slotEndTime || '22:00',
+      seatId: input.seatId,
+      sectionId: input.sectionId,
+      paymentMethod: 'cash' as LibraryPaymentMethod,
+      amount: input.amount ?? 0,
+      duration: input.duration,
+      startDate: input.startDate,
+      validUntil: input.validUntil,
+      status: 'pending_approval',
+      checkedInAt: null,
+      checkedOutAt: null,
+      invoiceNo: `INV-INVITE-${Date.now()}`,
+    });
+  }
+  public async updateLibraryNameByLibraryId(
+    libraryId: string,
+    newLibraryName: string,
+  ): Promise<void> {
+    const repo = this.getBookingRepository(); // use your existing getRepo method name
+    const bookings = await repo.find({
+      where: { libraryId } as any,
+    });
+    await Promise.all(
+      bookings.map(async b => {
+        b.libraryName = newLibraryName;
+        await repo.save(b);
+      }),
+    );
+  }
+  public async updateBookingSeatId(bookingId: string, seatId: string): Promise<void> {
+    const objectId = this.tryParseObjectId(bookingId);
+    if (!objectId) {
+      return;
+    }
 
-  await this.getBookingRepository().updateOne(
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    { _id: objectId },
-    { $set: { seatId, updatedAt: new Date() } },
-  );
-}
-public async updateBookingFields(
-  bookingId: string,
-  fields: Record<string, unknown>,
-): Promise<void> {
-  const objectId = this.tryParseObjectId(bookingId);
-  if (!objectId) return;
+    await this.getBookingRepository().updateOne(
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      { _id: objectId },
+      { $set: { seatId, updatedAt: new Date() } },
+    );
+  }
+  public async updateBookingFields(
+    bookingId: string,
+    fields: Record<string, unknown>,
+  ): Promise<void> {
+    const objectId = this.tryParseObjectId(bookingId);
+    if (!objectId) {
+      return;
+    }
 
-  await this.getBookingRepository().updateOne(
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    { _id: objectId },
-    { $set: { ...fields, updatedAt: new Date() } },
-  );
-}
+    await this.getBookingRepository().updateOne(
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      { _id: objectId },
+      { $set: { ...fields, updatedAt: new Date() } },
+    );
+  }
 }

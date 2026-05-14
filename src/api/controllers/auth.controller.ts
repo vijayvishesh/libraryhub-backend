@@ -86,23 +86,23 @@ export class AuthController {
   }
 
   @Post('/otp/resend')
-@ResponseSchema(OtpSendApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async resendOtp(@Body() payload: ResendOtpRequest): Promise<OtpSendApiResponse> {
-  try {
-    const expiresIn = await this.authService.resendOtp(payload);
-    return new OtpSendApiResponse(expiresIn, 200);
-  } catch (error) {
-    if (error instanceof HttpError) {
-      throw error;
-    }
+  @ResponseSchema(OtpSendApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async resendOtp(@Body() payload: ResendOtpRequest): Promise<OtpSendApiResponse> {
+    try {
+      const expiresIn = await this.authService.resendOtp(payload);
+      return new OtpSendApiResponse(expiresIn, 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
 
-    throw new InternalServerError('RESEND_OTP_FAILED');
+      throw new InternalServerError('RESEND_OTP_FAILED');
+    }
   }
-}
 
   @Post('/otp/verify')
   @ResponseSchema(AuthApiResponse, { statusCode: 200 })
@@ -222,106 +222,114 @@ public async resendOtp(@Body() payload: ResendOtpRequest): Promise<OtpSendApiRes
   }
 
   @Patch('/change-password')
-@Authorized()
-@OpenAPI({ summary: 'Change current user password', security: [{ bearerAuth: [] }] })
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async changePassword(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-  @Body() payload: ChangePasswordRequest,
-): Promise<{ responseCode: number; message: string }> {
-  try {
-    await this.authService.changePassword(session, payload);
-    return { responseCode: 200, message: 'Password changed successfully' };
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('CHANGE_PASSWORD_FAILED');
+  @Authorized()
+  @OpenAPI({ summary: 'Change current user password', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async changePassword(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Body() payload: ChangePasswordRequest,
+  ): Promise<{ responseCode: number; message: string }> {
+    try {
+      await this.authService.changePassword(session, payload);
+      return { responseCode: 200, message: 'Password changed successfully' };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('CHANGE_PASSWORD_FAILED');
+    }
   }
-}
 
-@Post('/forgot-password')
-@ResponseSchema(OtpSendApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async forgotPassword(
-  @Body() payload: ForgotPasswordRequest,
-): Promise<OtpSendApiResponse> {
-  try {
-    const expiresIn = await this.authService.forgotPassword(payload);
-    return new OtpSendApiResponse(expiresIn, 200);
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('FORGOT_PASSWORD_FAILED');
+  @Post('/forgot-password')
+  @ResponseSchema(OtpSendApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async forgotPassword(@Body() payload: ForgotPasswordRequest): Promise<OtpSendApiResponse> {
+    try {
+      const expiresIn = await this.authService.forgotPassword(payload);
+      return new OtpSendApiResponse(expiresIn, 200);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('FORGOT_PASSWORD_FAILED');
+    }
   }
-}
 
-@Post('/forgot-password/verify')
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async forgotPasswordVerify(
-  @Body() payload: ForgotPasswordVerifyRequest,
-): Promise<{ responseCode: number; data: { resetToken: string } }> {
-  try {
-    const resetToken = await this.authService.forgotPasswordVerify(payload);
-    return { responseCode: 200, data: { resetToken } };
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('FORGOT_PASSWORD_VERIFY_FAILED');
+  @Post('/forgot-password/verify')
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async forgotPasswordVerify(
+    @Body() payload: ForgotPasswordVerifyRequest,
+  ): Promise<{ responseCode: number; data: { resetToken: string } }> {
+    try {
+      const resetToken = await this.authService.forgotPasswordVerify(payload);
+      return { responseCode: 200, data: { resetToken } };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('FORGOT_PASSWORD_VERIFY_FAILED');
+    }
   }
-}
 
-@Post('/forgot-password/reset')
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async resetPassword(
-  @Body() payload: ResetPasswordRequest,
-): Promise<{ responseCode: number; message: string }> {
-  try {
-    await this.authService.resetPassword(payload);
-    return { responseCode: 200, message: 'Password reset successfully' };
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('RESET_PASSWORD_FAILED');
+  @Post('/forgot-password/reset')
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async resetPassword(
+    @Body() payload: ResetPasswordRequest,
+  ): Promise<{ responseCode: number; message: string }> {
+    try {
+      await this.authService.resetPassword(payload);
+      return { responseCode: 200, message: 'Password reset successfully' };
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('RESET_PASSWORD_FAILED');
+    }
   }
-}
-@Post('/member/otp/send')
-@ResponseSchema(MemberOtpSendApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async memberOtpLoginSend(
-  @Body() payload: MemberOtpLoginSendRequest,
-): Promise<MemberOtpSendApiResponse> {
-  try {
-    const result = await this.authService.memberOtpLoginSend(payload);
-    return new MemberOtpSendApiResponse(
-      new MemberOtpSendData(result.phone, result.expiresIn, result.hasAccount),
-      200,
-    );
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('MEMBER_OTP_SEND_FAILED');
+  @Post('/member/otp/send')
+  @ResponseSchema(MemberOtpSendApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async memberOtpLoginSend(
+    @Body() payload: MemberOtpLoginSendRequest,
+  ): Promise<MemberOtpSendApiResponse> {
+    try {
+      const result = await this.authService.memberOtpLoginSend(payload);
+      return new MemberOtpSendApiResponse(
+        new MemberOtpSendData(result.phone, result.expiresIn, result.hasAccount),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('MEMBER_OTP_SEND_FAILED');
+    }
   }
-}
 
-// @Post('/member/otp/verify')
-// @ResponseSchema(AuthApiResponse, { statusCode: 200 })
-// @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
-// @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-// @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-// public async memberOtpLoginVerify(
-//   @Body() payload: MemberOtpLoginVerifyRequest,
-// ): Promise<AuthApiResponse> {
-//   try {
-//     const data = await this.authService.memberOtpLoginVerify(payload);
-//     return new AuthApiResponse(data, 200);
-//   } catch (error) {
-//     if (error instanceof HttpError) throw error;
-//     throw new InternalServerError('MEMBER_OTP_VERIFY_FAILED');
-//   }
-// }
+  // @Post('/member/otp/verify')
+  // @ResponseSchema(AuthApiResponse, { statusCode: 200 })
+  // @ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+  // @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  // @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  // public async memberOtpLoginVerify(
+  //   @Body() payload: MemberOtpLoginVerifyRequest,
+  // ): Promise<AuthApiResponse> {
+  //   try {
+  //     const data = await this.authService.memberOtpLoginVerify(payload);
+  //     return new AuthApiResponse(data, 200);
+  //   } catch (error) {
+  //     if (error instanceof HttpError) throw error;
+  //     throw new InternalServerError('MEMBER_OTP_VERIFY_FAILED');
+  //   }
+  // }
 }

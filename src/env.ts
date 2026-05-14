@@ -99,6 +99,7 @@ export const env = {
   deleteToken: toBool(getOsEnv('DELETE_TOKEN')),
   jwtSecret: getOsEnv('JWT_SECRET'),
   jwtExpiry: getOsEnv('JWT_EXPIRY'),
+  passwordEncryptionKey: getOsEnvOptional('PASSWORD_ENCRYPTION_KEY') || '',
   cookie: {
     secure: toBool(getOsEnvOptional('COOKIE_SECURE') || 'false'),
     httpOnly: toBool(getOsEnvOptional('COOKIE_HTTP_ONLY') || 'true'),

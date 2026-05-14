@@ -1,12 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsDate,
-  IsNumber,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from 'class-validator';
+import { IsArray, IsDate, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { StudySessionRecord } from '../../repositories/types/studySession.repository.types';
 
 export class SessionLibraryData {
@@ -25,7 +18,9 @@ export class SessionLibraryData {
     date?: string;
     status?: string;
   }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.libraryId = params.libraryId;
     this.libraryName = params.libraryName;
     this.seatId = params.seatId;
@@ -54,7 +49,9 @@ export class StudySessionData {
   @IsDate() updatedAt!: Date;
   @IsNumber() studyDuration!: number;
   constructor(params?: StudySessionRecord, library?: SessionLibraryData | null) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.id = params.id;
     this.studentId = params.studentId;
     this.libraryId = params.libraryId;
@@ -78,7 +75,9 @@ export class StudySessionApiResponse {
   data!: StudySessionData;
 
   constructor(data?: StudySessionData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -93,7 +92,9 @@ export class StudySessionListPayloadData {
   @IsNumber() total!: number;
 
   constructor(sessions?: StudySessionData[], total?: number) {
-    if (!sessions || typeof total !== 'number') return;
+    if (!sessions || typeof total !== 'number') {
+      return;
+    }
     this.sessions = sessions;
     this.total = total;
   }
@@ -106,7 +107,9 @@ export class StudySessionListApiResponse {
   data!: StudySessionListPayloadData;
 
   constructor(data?: StudySessionListPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -118,12 +121,10 @@ export class StudySessionStatsData {
   @IsString() totalTimeFormatted!: string;
   @IsNumber() dayStreak!: number;
 
-  constructor(params?: {
-    totalSessions: number;
-    totalMinutes: number;
-    dayStreak: number;
-  }) {
-    if (!params) return;
+  constructor(params?: { totalSessions: number; totalMinutes: number; dayStreak: number }) {
+    if (!params) {
+      return;
+    }
     this.totalSessions = params.totalSessions;
     this.totalMinutes = params.totalMinutes;
     this.totalTimeFormatted = this.formatMinutes(params.totalMinutes);
@@ -131,7 +132,9 @@ export class StudySessionStatsData {
   }
 
   private formatMinutes(minutes: number): string {
-    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 60) {
+      return `${minutes}m`;
+    }
     const hours = Math.floor(minutes / 60);
     const remaining = minutes % 60;
     return remaining > 0 ? `${hours}h ${remaining}m` : `${hours}h`;
@@ -145,7 +148,9 @@ export class StudySessionStatsApiResponse {
   data!: StudySessionStatsData;
 
   constructor(data?: StudySessionStatsData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

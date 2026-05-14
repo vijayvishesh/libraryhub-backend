@@ -15,7 +15,7 @@ type XlsxBuildOptions = {
 };
 
 const applyCenterAlignment = (worksheet: ExcelJS.Worksheet): void => {
-  worksheet.eachRow({ includeEmpty: true }, (row) => {
+  worksheet.eachRow({ includeEmpty: true }, row => {
     row.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 };
@@ -24,7 +24,7 @@ const applyBoldToRow = (row?: ExcelJS.Row): void => {
   if (!row) {
     return;
   }
-  row.eachCell({ includeEmpty: true }, (cell) => {
+  row.eachCell({ includeEmpty: true }, cell => {
     cell.font = { ...(cell.font ?? {}), bold: true };
   });
 };
@@ -59,7 +59,7 @@ export const buildXlsx = async (
     }
   }
 
-  worksheet.columns = columns.map((column) => {
+  worksheet.columns = columns.map(column => {
     const width = Math.min(Math.max((maxColumnWidths.get(column.key) ?? 10) + 2, 10), 60);
     return {
       header: column.header,
@@ -112,7 +112,7 @@ export const buildXlsxWithUpperHeader = async (
     }
   }
 
-  worksheet.columns = columns.map((column) => {
+  worksheet.columns = columns.map(column => {
     const width = Math.min(Math.max((maxColumnWidths.get(column.key) ?? 10) + 2, 10), 60);
     return {
       key: column.key,
@@ -138,9 +138,9 @@ export const buildXlsxWithUpperHeader = async (
       worksheet.mergeCells(1, start, 1, end);
     }
   }
-  const columnKeys = columns.map((column) => column.key);
+  const columnKeys = columns.map(column => column.key);
   for (const row of rows) {
-    worksheet.addRow(columnKeys.map((key) => row[key]));
+    worksheet.addRow(columnKeys.map(key => row[key]));
   }
 
   if (options?.boldLastRow) {
@@ -155,14 +155,22 @@ export const buildXlsxWithUpperHeader = async (
 };
 
 export const sendXlsxDownload = (res: Response, filename: string, buffer: Buffer): Response => {
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   return res.status(200).send(buffer);
 };
 
 export const sanitizeForExcel = (value: unknown): string | number | boolean | Date | null => {
   if (typeof value === 'string') {
-    if (value.startsWith('=') || value.startsWith('+') || value.startsWith('-') || value.startsWith('@')) {
+    if (
+      value.startsWith('=') ||
+      value.startsWith('+') ||
+      value.startsWith('-') ||
+      value.startsWith('@')
+    ) {
       return `'${value}`;
     }
   }

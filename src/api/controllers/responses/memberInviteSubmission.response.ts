@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { SubmissionRecord } from '../../repositories/types/memberInviteSubmission.repository.types';
 
 export class SubmissionData {
@@ -28,7 +35,9 @@ export class SubmissionData {
   @IsBoolean() isDuplicate!: boolean;
 
   constructor(r?: SubmissionRecord) {
-    if (!r) return;
+    if (!r) {
+      return;
+    }
     this.id = r.id;
     this.libraryId = r.libraryId;
     this.fullName = r.fullName;
@@ -59,20 +68,32 @@ export class SubmissionApiResponse {
   @IsNumber() responseCode!: number;
   @ValidateNested() @Type(() => SubmissionData) data!: SubmissionData;
   constructor(data?: SubmissionData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
 }
 
 export class SubmissionListPayloadData {
-  @IsArray() @ValidateNested({ each: true }) @Type(() => SubmissionData) submissions!: SubmissionData[];
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SubmissionData)
+  submissions!: SubmissionData[];
   @IsNumber() total!: number;
   @IsNumber() page!: number;
   @IsNumber() limit!: number;
 
   constructor(submissions?: SubmissionData[], total?: number, page?: number, limit?: number) {
-    if (!submissions || typeof total !== 'number' || typeof page !== 'number' || typeof limit !== 'number') return;
+    if (
+      !submissions ||
+      typeof total !== 'number' ||
+      typeof page !== 'number' ||
+      typeof limit !== 'number'
+    ) {
+      return;
+    }
     this.submissions = submissions;
     this.total = total;
     this.page = page;
@@ -84,7 +105,9 @@ export class SubmissionListApiResponse {
   @IsNumber() responseCode!: number;
   @ValidateNested() @Type(() => SubmissionListPayloadData) data!: SubmissionListPayloadData;
   constructor(data?: SubmissionListPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

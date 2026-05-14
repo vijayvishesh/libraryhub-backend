@@ -57,7 +57,9 @@ export class BannerRepository {
   }
 
   public async findById(id: string): Promise<BannerRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const model = await this.getRepo().findOneById(new ObjectId(id));
     return model ? this.toRecord(model) : null;
   }
@@ -75,24 +77,29 @@ export class BannerRepository {
     return this.toRecord(saved);
   }
 
-  public async update(
-    id: string,
-    input: UpdateBannerInput,
-  ): Promise<BannerRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+  public async update(id: string, input: UpdateBannerInput): Promise<BannerRecord | null> {
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const repo = this.getRepo();
     const existing = await repo.findOneById(new ObjectId(id));
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
     Object.assign(existing, input, { updatedAt: new Date() });
     const saved = await repo.save(existing);
     return this.toRecord(saved);
   }
 
   public async softDelete(id: string): Promise<boolean> {
-    if (!ObjectId.isValid(id)) return false;
+    if (!ObjectId.isValid(id)) {
+      return false;
+    }
     const repo = this.getRepo();
     const existing = await repo.findOneById(new ObjectId(id));
-    if (!existing) return false;
+    if (!existing) {
+      return false;
+    }
     existing.deletedAt = new Date();
     existing.updatedAt = new Date();
     await repo.save(existing);

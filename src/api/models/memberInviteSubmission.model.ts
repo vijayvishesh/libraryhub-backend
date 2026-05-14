@@ -66,7 +66,7 @@ export class MemberInviteSubmissionModel {
   isDuplicate!: boolean;
 
   @Column()
-  bookingId!: string | null; 
+  bookingId!: string | null;
 
   // Staging status
   @Column()

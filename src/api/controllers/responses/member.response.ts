@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsEmail, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 // import { env } from '../../../env';
 
 export class MemberData {
@@ -73,8 +81,8 @@ export class MemberData {
 
   @IsOptional()
   @IsBoolean()
-  isInviteSubmission?: boolean;  
-  
+  isInviteSubmission?: boolean;
+
   @IsBoolean()
   isNewUser!: boolean;
 
@@ -94,7 +102,6 @@ export class MemberData {
 
   @IsBoolean()
   isDuplicate!: boolean;
-
 
   constructor(data?: {
     id: string;
@@ -427,16 +434,17 @@ export class MemberInviteLinkApiResponse {
     this.data = data;
   }
 }
-
 export class RenewalReminderTabCounts {
   @IsNumber()
   today!: number;
 
   @IsNumber()
-  '3days'!: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '3Days'!: number;
 
   @IsNumber()
-  '7days'!: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '7Days'!: number;
 
   @IsNumber()
   month!: number;
@@ -456,10 +464,13 @@ export class RenewalRemindersPayloadData {
 
   constructor(data?: {
     members: MemberData[];
-    tabCounts: { today: number; '3days': number; '7days': number; month: number };
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    tabCounts: { today: number; '3Days': number; '7Days': number; month: number };
     totalAtRisk: number;
   }) {
-    if (!data) return;
+    if (!data) {
+      return;
+    }
     this.members = data.members;
     this.tabCounts = Object.assign(new RenewalReminderTabCounts(), data.tabCounts);
     this.totalAtRisk = data.totalAtRisk;
@@ -475,12 +486,13 @@ export class RenewalRemindersApiResponse {
   data!: RenewalRemindersPayloadData;
 
   constructor(data?: RenewalRemindersPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
 }
-
 
 export class MemberPaymentData {
   @IsString()
@@ -517,7 +529,9 @@ export class MemberPaymentData {
     paidAt: Date;
     createdAt: Date;
   }) {
-    if (!data) return;
+    if (!data) {
+      return;
+    }
     this.id = data.id;
     this.memberId = data.memberId;
     this.amount = data.amount;
@@ -544,18 +558,15 @@ export class MemberPaymentListPayloadData {
   @IsNumber()
   total!: number;
 
-  constructor(
-    payments?: MemberPaymentData[],
-    page?: number,
-    limit?: number,
-    total?: number,
-  ) {
+  constructor(payments?: MemberPaymentData[], page?: number, limit?: number, total?: number) {
     if (
       !payments ||
       typeof page !== 'number' ||
       typeof limit !== 'number' ||
       typeof total !== 'number'
-    ) return;
+    ) {
+      return;
+    }
     this.payments = payments;
     this.page = page;
     this.limit = limit;
@@ -572,7 +583,9 @@ export class MemberPaymentListApiResponse {
   data!: MemberPaymentListPayloadData;
 
   constructor(data?: MemberPaymentListPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

@@ -44,15 +44,14 @@ export class AttendanceRepository {
   }
 
   public async findById(id: string): Promise<AttendanceRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const model = await this.getRepo().findOneById(new ObjectId(id));
     return model ? this.toRecord(model) : null;
   }
 
-  public async findTodayByLibrary(
-    libraryId: string,
-    date: string,
-  ): Promise<AttendanceRecord[]> {
+  public async findTodayByLibrary(libraryId: string, date: string): Promise<AttendanceRecord[]> {
     const models = await this.getRepo().find({
       where: { libraryId, date } as any,
       order: { checkInTime: 'DESC' } as any,
@@ -61,61 +60,71 @@ export class AttendanceRepository {
   }
 
   public async findByStudentWithFilters(
-  studentId: string,
-  fromDate?: string,
-  toDate?: string,
-): Promise<AttendanceRecord[]> {
-  const where: Record<string, unknown> = { studentId };
+    studentId: string,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<AttendanceRecord[]> {
+    const where: Record<string, unknown> = { studentId };
 
-  if (fromDate || toDate) {
-    where.date = {};
-    if (fromDate) (where.date as any).$gte = fromDate;
-    if (toDate) (where.date as any).$lte = toDate;
-  }
+    if (fromDate || toDate) {
+      where.date = {};
+      if (fromDate) {
+        (where.date as any).$gte = fromDate;
+      }
+      if (toDate) {
+        (where.date as any).$lte = toDate;
+      }
+    }
 
-  const models = await this.getRepo().find({
-    where: where as any,
-    order: { createdAt: 'DESC' } as any,
-  });
-  return models.map(m => this.toRecord(m));
-}
-
-public async findByLibraryWithFilters(
-  libraryId: string,
-  fromDate?: string,
-  toDate?: string,
-  status?: string,
-  search?: string,
-  page: number = 1,
-  limit: number = 20,
-): Promise<{ records: AttendanceRecord[]; total: number }> {
-  const where: Record<string, unknown> = { libraryId };
-
-  if (fromDate || toDate) {
-    where.date = {};
-    if (fromDate) (where.date as any).$gte = fromDate;
-    if (toDate) (where.date as any).$lte = toDate;
-  }
-  if (status) where.status = status;
-  if (search) {
-    where.studentName = { $regex: search, $options: 'i' };
-  }
-
-  const [models, total] = await Promise.all([
-    this.getRepo().find({
+    const models = await this.getRepo().find({
       where: where as any,
-      order: { checkInTime: 'DESC' } as any,
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    this.getRepo().count({ where: where as any }),
-  ]);
+      order: { createdAt: 'DESC' } as any,
+    });
+    return models.map(m => this.toRecord(m));
+  }
 
-  return {
-    records: models.map(m => this.toRecord(m)),
-    total,
-  };
-}
+  public async findByLibraryWithFilters(
+    libraryId: string,
+    fromDate?: string,
+    toDate?: string,
+    status?: string,
+    search?: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{ records: AttendanceRecord[]; total: number }> {
+    const where: Record<string, unknown> = { libraryId };
+
+    if (fromDate || toDate) {
+      where.date = {};
+      if (fromDate) {
+        (where.date as any).$gte = fromDate;
+      }
+      if (toDate) {
+        (where.date as any).$lte = toDate;
+      }
+    }
+    if (status) {
+      where.status = status;
+    }
+    if (search) {
+      where.studentName = { $regex: search, $options: 'i' };
+    }
+
+    const [models, total] = await Promise.all([
+      this.getRepo().find({
+        where: where as any,
+        order: { checkInTime: 'DESC' } as any,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.getRepo().count({ where: where as any }),
+    ]);
+
+    return {
+      records: models.map(m => this.toRecord(m)),
+      total,
+    };
+  }
 
   public async create(input: CreateAttendanceInput): Promise<AttendanceRecord> {
     const now = new Date();
@@ -131,14 +140,15 @@ public async findByLibraryWithFilters(
     return this.toRecord(saved);
   }
 
-  public async update(
-    id: string,
-    input: UpdateAttendanceInput,
-  ): Promise<AttendanceRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+  public async update(id: string, input: UpdateAttendanceInput): Promise<AttendanceRecord | null> {
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const repo = this.getRepo();
     const existing = await repo.findOneById(new ObjectId(id));
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
     Object.assign(existing, input, { updatedAt: new Date() });
     const saved = await repo.save(existing);
     return this.toRecord(saved);

@@ -4,7 +4,9 @@ import { initSocketServer } from '../lib/socket/socketServer';
 
 const log = new Logger(__filename);
 
-export const socketLoader: MicroframeworkLoader = (settings: MicroframeworkSettings | undefined) => {
+export const socketLoader: MicroframeworkLoader = (
+  settings: MicroframeworkSettings | undefined,
+) => {
   if (!settings) {
     return;
   }

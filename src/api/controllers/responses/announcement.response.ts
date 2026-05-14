@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { AnnouncementRecord } from '../../repositories/types/announcement.repository.types';
 
 export class AnnouncementData {
@@ -17,7 +24,9 @@ export class AnnouncementData {
   @IsString() updatedAt!: string;
 
   constructor(r?: AnnouncementRecord) {
-    if (!r) return;
+    if (!r) {
+      return;
+    }
     this.id = r.id;
     this.libraryId = r.libraryId;
     this.title = r.title;
@@ -38,19 +47,25 @@ export class AnnouncementApiResponse {
   @ValidateNested() @Type(() => AnnouncementData) data!: AnnouncementData;
 
   constructor(data?: AnnouncementData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
 }
 
 export class AnnouncementListPayloadData {
-  @IsArray() @ValidateNested({ each: true }) @Type(() => AnnouncementData)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AnnouncementData)
   announcements!: AnnouncementData[];
   @IsNumber() total!: number;
 
   constructor(announcements?: AnnouncementData[], total?: number) {
-    if (!announcements || typeof total !== 'number') return;
+    if (!announcements || typeof total !== 'number') {
+      return;
+    }
     this.announcements = announcements;
     this.total = total;
   }
@@ -58,11 +73,14 @@ export class AnnouncementListPayloadData {
 
 export class AnnouncementListApiResponse {
   @IsNumber() responseCode!: number;
-  @ValidateNested() @Type(() => AnnouncementListPayloadData)
+  @ValidateNested()
+  @Type(() => AnnouncementListPayloadData)
   data!: AnnouncementListPayloadData;
 
   constructor(data?: AnnouncementListPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -85,11 +103,15 @@ export class AnnouncementTargetData {
 
 export class AnnouncementTargetListApiResponse {
   @IsNumber() responseCode!: number;
-  @IsArray() @ValidateNested({ each: true }) @Type(() => AnnouncementTargetData)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AnnouncementTargetData)
   data!: AnnouncementTargetData[];
 
   constructor(data?: AnnouncementTargetData[], responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

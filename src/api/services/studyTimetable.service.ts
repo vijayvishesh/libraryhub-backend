@@ -9,18 +9,13 @@ import {
 
 @Service()
 export class StudyTimetableService {
-  constructor(
-    private readonly studyTimetableRepository: StudyTimetableRepository,
-  ) {}
+  constructor(private readonly studyTimetableRepository: StudyTimetableRepository) {}
 
   public async listAllStudentTimetables(studentId: string): Promise<StudyTimetableRecord[]> {
     return this.studyTimetableRepository.findByStudent(studentId);
   }
 
-  public async getTimetableById(
-    id: string,
-    studentId: string,
-  ): Promise<StudyTimetableRecord> {
+  public async getTimetableById(id: string, studentId: string): Promise<StudyTimetableRecord> {
     const record = await this.studyTimetableRepository.findById(id);
 
     if (!record || record.deletedAt) {
@@ -70,10 +65,10 @@ export class StudyTimetableService {
     }
   }
   public async getTimetableHistory(
-  studentId: string,
-  fromDate?: string,
-  toDate?: string,
-): Promise<StudyTimetableRecord[]> {
-  return this.studyTimetableRepository.findByStudentWithDateFilter(studentId, fromDate, toDate);
-}
+    studentId: string,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<StudyTimetableRecord[]> {
+    return this.studyTimetableRepository.findByStudentWithDateFilter(studentId, fromDate, toDate);
+  }
 }

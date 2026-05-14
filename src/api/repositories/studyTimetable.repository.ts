@@ -95,37 +95,33 @@ export class StudyTimetableRepository {
     await repo.save(existing);
     return true;
   }
- public async findByStudentWithDateFilter(
-  studentId: string,
-  fromDate?: string,
-  toDate?: string,
-): Promise<StudyTimetableRecord[]> {
+  public async findByStudentWithDateFilter(
+    studentId: string,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<StudyTimetableRecord[]> {
+    const query: any = {
+      studentId,
+      deletedAt: null,
+    };
 
-  const query: any = {
-    studentId,
-    deletedAt: null,
-  };
+    if (fromDate && toDate) {
+      query.createdAt = {
+        $gte: new Date(`${fromDate}T00:00:00.000Z`),
+        $lte: new Date(`${toDate}T23:59:59.999Z`),
+      };
+    } else if (fromDate) {
+      query.createdAt = {
+        $gte: new Date(`${fromDate}T00:00:00.000Z`),
+      };
+    } else if (toDate) {
+      query.createdAt = {
+        $lte: new Date(`${toDate}T23:59:59.999Z`),
+      };
+    }
 
-  if (fromDate && toDate) {
-    query.createdAt = {
-      $gte: new Date(`${fromDate}T00:00:00.000Z`),
-      $lte: new Date(`${toDate}T23:59:59.999Z`),
-    };
-  } else if (fromDate) {
-    query.createdAt = {
-      $gte: new Date(`${fromDate}T00:00:00.000Z`),
-    };
-  } else if (toDate) {
-    query.createdAt = {
-      $lte: new Date(`${toDate}T23:59:59.999Z`),
-    };
+    const models = await this.getRepo().createCursor(query).sort({ createdAt: -1 }).toArray();
+
+    return models.map(m => this.toRecord(m));
   }
-
-  const models = await this.getRepo()
-    .createCursor(query)
-    .sort({ createdAt: -1 })
-    .toArray();
-
-  return models.map(m => this.toRecord(m));
-}
 }

@@ -46,8 +46,12 @@ export class StudySessionService {
 
   public async getSessionById(id: string, studentId: string): Promise<StudySessionRecord> {
     const record = await this.studySessionRepository.findById(id);
-    if (!record || record.deletedAt) throw new NotFoundError('SESSION_NOT_FOUND');
-    if (record.studentId !== studentId) throw new NotFoundError('SESSION_NOT_FOUND');
+    if (!record || record.deletedAt) {
+      throw new NotFoundError('SESSION_NOT_FOUND');
+    }
+    if (record.studentId !== studentId) {
+      throw new NotFoundError('SESSION_NOT_FOUND');
+    }
     return record;
   }
 
@@ -64,7 +68,9 @@ export class StudySessionService {
         ? new Date(Date.now() + input.revisionReminderDays * 24 * 60 * 60 * 1000)
         : null,
     });
-    if (!updated) throw new NotFoundError('SESSION_NOT_FOUND');
+    if (!updated) {
+      throw new NotFoundError('SESSION_NOT_FOUND');
+    }
     return updated;
   }
 
@@ -91,10 +97,14 @@ export class StudySessionService {
   public async getLibraryDataForSession(
     session: StudySessionRecord,
   ): Promise<SessionLibraryData | null> {
-    if (!session.libraryId) return null;
+    if (!session.libraryId) {
+      return null;
+    }
 
     const library = await this.libraryRepository.findLibraryById(session.libraryId);
-    if (!library) return null;
+    if (!library) {
+      return null;
+    }
 
     // if (session.bookingId) {
     //   const booking = await this.bookingRepository.findBookingById(session.bookingId);
@@ -125,7 +135,9 @@ export class StudySessionService {
   }
 
   private calculateDayStreak(sessions: StudySessionRecord[]): number {
-    if (sessions.length === 0) return 0;
+    if (sessions.length === 0) {
+      return 0;
+    }
     const studyDays = new Set(sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0]));
     let streak = 0;
     const today = new Date();
@@ -143,10 +155,10 @@ export class StudySessionService {
   }
 
   public async getSessionHistory(
-  studentId: string,
-  fromDate?: string,
-  toDate?: string,
-): Promise<StudySessionRecord[]> {
-  return this.studySessionRepository.findByStudentWithDateFilter(studentId, fromDate, toDate);
-}
+    studentId: string,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<StudySessionRecord[]> {
+    return this.studySessionRepository.findByStudentWithDateFilter(studentId, fromDate, toDate);
+  }
 }

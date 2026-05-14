@@ -53,9 +53,7 @@ export class LibraryTransferRepository {
     return this.toRecord(saved);
   }
 
-  public async findPendingByLibraryId(
-    libraryId: string,
-  ): Promise<LibraryTransferRecord | null> {
+  public async findPendingByLibraryId(libraryId: string): Promise<LibraryTransferRecord | null> {
     const model = await this.getRepo().findOne({
       where: { libraryId, status: 'pending_otp' } as any,
       order: { createdAt: 'DESC' } as any,
@@ -64,19 +62,22 @@ export class LibraryTransferRepository {
   }
 
   public async findById(id: string): Promise<LibraryTransferRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const model = await this.getRepo().findOneById(new ObjectId(id));
     return model ? this.toRecord(model) : null;
   }
 
-  public async complete(
-    id: string,
-    newOwnerId: string,
-  ): Promise<LibraryTransferRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
+  public async complete(id: string, newOwnerId: string): Promise<LibraryTransferRecord | null> {
+    if (!ObjectId.isValid(id)) {
+      return null;
+    }
     const repo = this.getRepo();
     const model = await repo.findOneById(new ObjectId(id));
-    if (!model) return null;
+    if (!model) {
+      return null;
+    }
     const now = new Date();
     model.status = 'completed';
     model.newOwnerId = newOwnerId;

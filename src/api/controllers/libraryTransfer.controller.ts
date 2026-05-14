@@ -15,13 +15,12 @@ import {
   VerifyLibraryTransferOtpRequest,
 } from './requests/libraryTransfer.request';
 import { CurrentSessionData } from './responses/auth.response';
+import { ErrorResponseModel } from './responses/common.reponse';
 import {
   LibraryTransferApiResponse,
   LibraryTransferData,
   LibraryTransferInitiateApiResponse,
-//   LibraryTransferInitiateData,
 } from './responses/libraryTransfer.response';
-import { ErrorResponseModel } from './responses/common.reponse';
 
 @Service()
 @JsonController('/v1/library/transfer')
@@ -48,13 +47,12 @@ export class LibraryTransferController {
     @Body() payload: InitiateLibraryTransferRequest,
   ): Promise<LibraryTransferInitiateApiResponse> {
     try {
-      const data = await this.libraryTransferService.initiateTransfer(
-        session.user.id,
-        payload,
-      );
+      const data = await this.libraryTransferService.initiateTransfer(session.user.id, payload);
       return new LibraryTransferInitiateApiResponse(data, 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('INITIATE_TRANSFER_FAILED');
     }
   }
@@ -83,7 +81,9 @@ export class LibraryTransferController {
       );
       return new LibraryTransferApiResponse(new LibraryTransferData(record), 200);
     } catch (error) {
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('VERIFY_TRANSFER_FAILED');
     }
   }

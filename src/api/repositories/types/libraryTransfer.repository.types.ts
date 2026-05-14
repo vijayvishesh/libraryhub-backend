@@ -10,7 +10,7 @@ export type LibraryTransferRecord = {
   newOwnerEmail: string | null;
   keepLibraryName: boolean;
   newLibraryName: string | null;
-  newOwnerPassword: string;  
+  newOwnerPassword: string;
   notifyStudents: boolean;
   oldOwnerOtp: string;
   newOwnerOtp: string;
@@ -31,7 +31,7 @@ export type CreateLibraryTransferInput = {
   newOwnerEmail: string | null;
   keepLibraryName: boolean;
   newLibraryName: string | null;
-  newOwnerPassword: string;   
+  newOwnerPassword: string;
   notifyStudents: boolean;
   oldOwnerOtp: string;
   newOwnerOtp: string;

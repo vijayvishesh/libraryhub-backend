@@ -389,7 +389,7 @@ export class LibraryListQueryRequest {
   @IsOptional()
   @IsString()
   @IsIn(['low_to_high', 'high_to_low'])
-  priceSort?: 'low_to_high' | 'high_to_low'
+  priceSort?: 'low_to_high' | 'high_to_low';
 
   // Rating sort
   @IsOptional()

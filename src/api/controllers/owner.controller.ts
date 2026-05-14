@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { Response } from 'express';
 import * as multer from 'multer';
 import {
@@ -18,8 +19,8 @@ import {
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
-import { sendXlsxDownload } from '../helpers/excel.helper';
 import { runMemberExpiryJob } from '../../loaders/cronLoader';
+import { sendXlsxDownload } from '../helpers/excel.helper';
 import { ActivityService } from '../services/activity.service';
 import { BookingApprovalService } from '../services/bookingApproval.service';
 import { FeeCollectionService } from '../services/feeCollection.service';
@@ -207,7 +208,7 @@ export class OwnerController {
             dashboard.library.name,
             dashboard.library.location,
             dashboard.library.capacity,
-            dashboard.library.libraryId
+            dashboard.library.libraryId,
           ),
           revenue: new OwnerDashboardRevenueData(
             dashboard.revenue.today,
@@ -639,6 +640,7 @@ export class OwnerController {
   @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
   public async syncExpiredMembers(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     @CurrentUser({ required: true }) _session: CurrentSessionData,
   ): Promise<CommonResponse<{ expiredCount: number }>> {
     try {
@@ -651,34 +653,36 @@ export class OwnerController {
       throw new InternalServerError('SYNC_EXPIRED_MEMBERS_FAILED');
     }
   }
-@Get('/members/:memberId/payments')
-@Authorized('OWNER')
-@OpenAPI({ summary: 'Get payment history for a member', security: [{ bearerAuth: [] }] })
-@ResponseSchema(MemberPaymentListApiResponse, { statusCode: 200 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
-@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
-public async getMemberPaymentHistory(
-  @CurrentUser({ required: true }) session: CurrentSessionData,
-  @Param('memberId') memberId: string,
-  @QueryParams() query: ListMemberPaymentsQueryRequest,
-): Promise<MemberPaymentListApiResponse> {
-  try {
-    const result = await this.memberService.getMemberPaymentHistory(
-      session.user.id,
-      memberId,
-      query,
-    );
-    return new MemberPaymentListApiResponse(
-      new MemberPaymentListPayloadData(
-        result.payments.map(p => new MemberPaymentData(p)),
-        result.total,
-      ),
-      200,
-    );
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new InternalServerError('GET_MEMBER_PAYMENT_HISTORY_FAILED');
+  @Get('/members/:memberId/payments')
+  @Authorized('OWNER')
+  @OpenAPI({ summary: 'Get payment history for a member', security: [{ bearerAuth: [] }] })
+  @ResponseSchema(MemberPaymentListApiResponse, { statusCode: 200 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async getMemberPaymentHistory(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('memberId') memberId: string,
+    @QueryParams() query: ListMemberPaymentsQueryRequest,
+  ): Promise<MemberPaymentListApiResponse> {
+    try {
+      const result = await this.memberService.getMemberPaymentHistory(
+        session.user.id,
+        memberId,
+        query,
+      );
+      return new MemberPaymentListApiResponse(
+        new MemberPaymentListPayloadData(
+          result.payments.map(p => new MemberPaymentData(p)),
+          result.total,
+        ),
+        200,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw error;
+      }
+      throw new InternalServerError('GET_MEMBER_PAYMENT_HISTORY_FAILED');
+    }
   }
-}
 }

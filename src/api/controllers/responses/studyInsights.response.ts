@@ -2,11 +2,13 @@ import { Type } from 'class-transformer';
 import { IsArray, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class WeekDayData {
-  @IsString() day!: string;       // Mon, Tue, Wed...
-  @IsNumber() hours!: number;     // 5.2, 7.2...
+  @IsString() day!: string; // Mon, Tue, Wed...
+  @IsNumber() hours!: number; // 5.2, 7.2...
 
   constructor(params?: { day: string; hours: number }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.day = params.day;
     this.hours = params.hours;
   }
@@ -30,7 +32,9 @@ export class RecentSessionData {
     notes: string | null;
     date: string;
   }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.id = params.id;
     this.startTime = params.startTime;
     this.endTime = params.endTime;
@@ -42,21 +46,21 @@ export class RecentSessionData {
 }
 
 export class StudyInsightsData {
-  @IsString() todayHours!: string;         // e.g. "2h 30m"
+  @IsString() todayHours!: string; // e.g. "2h 30m"
   @IsNumber() todayMinutes!: number;
   @IsNumber() dayStreak!: number;
-  @IsString() thisWeekHours!: string;      // e.g. "39.6h"
+  @IsString() thisWeekHours!: string; // e.g. "39.6h"
   @IsNumber() thisWeekMinutes!: number;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => WeekDayData)
-  weekGraph!: WeekDayData[];              // Mon-Sun with daily hours
+  weekGraph!: WeekDayData[]; // Mon-Sun with daily hours
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RecentSessionData)
-  recentSessions!: RecentSessionData[];   // last 5 sessions
+  recentSessions!: RecentSessionData[]; // last 5 sessions
 
   constructor(params?: {
     todayMinutes: number;
@@ -73,7 +77,9 @@ export class StudyInsightsData {
       date: string;
     }[];
   }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.todayMinutes = params.todayMinutes;
     this.todayHours = this.formatMinutes(params.todayMinutes);
     this.dayStreak = params.dayStreak;
@@ -84,7 +90,9 @@ export class StudyInsightsData {
   }
 
   private formatMinutes(minutes: number): string {
-    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 60) {
+      return `${minutes}m`;
+    }
     const hours = Math.floor(minutes / 60);
     const remaining = minutes % 60;
     return remaining > 0 ? `${hours}h ${remaining}m` : `${hours}h`;
@@ -98,7 +106,9 @@ export class StudyInsightsApiResponse {
   data!: StudyInsightsData;
 
   constructor(data?: StudyInsightsData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }

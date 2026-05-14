@@ -35,7 +35,9 @@ export class StudyInsightsController {
       return new StudyInsightsApiResponse(new StudyInsightsData(insights), 200);
     } catch (error) {
       console.error('GET_INSIGHTS_ERROR:', error);
-      if (error instanceof HttpError) throw error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
       throw new InternalServerError('GET_INSIGHTS_FAILED');
     }
   }
