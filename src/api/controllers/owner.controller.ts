@@ -331,9 +331,20 @@ export class OwnerController {
       required: true,
       options: {
         storage: multer.memoryStorage(),
-        limits: {
-          fileSize: 5 * 1024 * 1024,
+        fileFilter: (req: any, file: any, cb: any) => {
+          const allowedMimes = [
+            'text/csv',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/octet-stream',
+          ];
+          if (allowedMimes.includes(file.mimetype) || file.originalname.match(/\.(csv|xlsx|xls)$/i)) {
+            cb(null, true);
+          } else {
+            cb(new Error('INVALID_FILE_TYPE'));
+          }
         },
+        limits: { fileSize: 10 * 1024 * 1024 },
       },
     })
     file: { originalname: string; buffer: Buffer },

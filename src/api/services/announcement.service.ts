@@ -366,7 +366,7 @@ export class AnnouncementService {
         });
       }
     } catch (error) {
-      console.error('FCM push notification failed:', error);
+      console.warn('[AnnouncementService] FCM push notification failed:', error);
     }
   }
 }

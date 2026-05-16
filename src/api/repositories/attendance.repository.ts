@@ -107,7 +107,8 @@ export class AttendanceRepository {
       where.status = status;
     }
     if (search) {
-      where.studentName = { $regex: search, $options: 'i' };
+      const escaped = (search || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      where.studentName = { $regex: escaped, $options: 'i' };
     }
 
     const [models, total] = await Promise.all([

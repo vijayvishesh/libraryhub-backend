@@ -313,9 +313,12 @@ export class LibraryService {
           type: method.type,
           enabled: method.enabled ?? true,
           label: method.label?.trim() || this.getPaymentMethodDefaultLabel(method.type),
+          upiId: method.upiId?.trim() || undefined,
         })) ??
         base?.paymentMethods ??
         this.getDefaultPaymentMethods(),
+      upiId: (payload as any).upiId?.trim() || base?.upiId,
+      upiIdGpay: (payload as any).upiIdGpay?.trim() || base?.upiIdGpay,
       deletedAt: base?.deletedAt ?? null,
     };
   }
@@ -406,7 +409,16 @@ export class LibraryService {
         type: method.type,
         enabled: method.enabled ?? true,
         label: method.label?.trim() || this.getPaymentMethodDefaultLabel(method.type),
+        upiId: method.upiId?.trim() || undefined,
       }));
+    }
+
+    if ('upiId' in payload) {
+      input.upiId = (payload as any).upiId?.trim() || undefined;
+    }
+
+    if ('upiIdGpay' in payload) {
+      input.upiIdGpay = (payload as any).upiIdGpay?.trim() || undefined;
     }
 
     return input;
@@ -481,8 +493,10 @@ export class LibraryService {
         library.stats.reviewCount,
       ),
       paymentMethods: library.paymentMethods.map(
-        method => new LibraryPaymentMethodData(method.type, method.enabled, method.label),
+        method => new LibraryPaymentMethodData(method.type, method.enabled, method.label, method.upiId),
       ),
+      upiId: library.upiId,
+      upiIdGpay: library.upiIdGpay,
       deletedAt: library.deletedAt,
       createdAt: library.createdAt,
       updatedAt: library.updatedAt,

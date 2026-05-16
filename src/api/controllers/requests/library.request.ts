@@ -220,6 +220,10 @@ export class LibraryPaymentMethodRequest {
   @IsString()
   @IsNotEmpty()
   label?: string;
+
+  @IsOptional()
+  @IsString()
+  upiId?: string;
 }
 
 export class LibrarySetupRequest {
@@ -333,6 +337,14 @@ export class LibrarySetupRequest {
   @ValidateNested({ each: true })
   @Type(() => LibraryPaymentMethodRequest)
   paymentMethods?: LibraryPaymentMethodRequest[];
+
+  @IsOptional()
+  @IsString()
+  upiId?: string;
+
+  @IsOptional()
+  @IsString()
+  upiIdGpay?: string;
 }
 
 export class LibraryListQueryRequest {
@@ -495,6 +507,14 @@ export class UpdateLibraryRequest {
   @ValidateNested({ each: true })
   @Type(() => LibraryPaymentMethodRequest)
   paymentMethods?: LibraryPaymentMethodRequest[];
+
+  @IsOptional()
+  @IsString()
+  upiId?: string;
+
+  @IsOptional()
+  @IsString()
+  upiIdGpay?: string;
 }
 
 export class LibrarySlotPlanRequest {

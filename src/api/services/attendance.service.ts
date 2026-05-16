@@ -1,4 +1,4 @@
-import { BadRequestError, NotFoundError } from 'routing-controllers';
+import { BadRequestError, ForbiddenError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { AttendanceRepository } from '../repositories/attendance.repository';
 import { LibraryRepository } from '../repositories/library.repository';
@@ -180,6 +180,7 @@ export class AttendanceService {
       page?: number;
       limit?: number;
     },
+    ownerUserId?: string,
   ): Promise<{
     records: AttendanceRecord[];
     total: number;
@@ -198,6 +199,21 @@ export class AttendanceService {
   }> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+
+    // Ownership check: ensure the student belongs to the requesting owner's library
+    if (ownerUserId) {
+      const ownerLibrary = await this.libraryRepository.findLibraryByOwnerId(ownerUserId);
+      if (!ownerLibrary) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+      const membership = await this.memberRepository.findMemberByStudentIdAndLibrary(
+        studentId,
+        ownerLibrary.id,
+      );
+      if (!membership) {
+        throw new ForbiddenError('STUDENT_NOT_IN_YOUR_LIBRARY');
+      }
+    }
 
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0]; // 'YYYY-MM-DD'

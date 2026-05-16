@@ -58,6 +58,18 @@ export class CreateBookingRequest {
   )
   startDate?: string;
 
+  @IsOptional()
+  @IsString()
+  utrNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  razorpayOrderId?: string;
+
+  @IsOptional()
+  @IsString()
+  razorpayPaymentId?: string;
+
   // @IsOptional()
   // @IsInt()
   // @Min(1)

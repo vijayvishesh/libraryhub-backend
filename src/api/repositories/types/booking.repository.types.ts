@@ -21,6 +21,9 @@ export type CreateBookingInput = {
   checkedInAt: Date | null;
   checkedOutAt: Date | null;
   invoiceNo: string;
+  utrNumber?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
 };
 
 export type BookingRecord = CreateBookingInput & {

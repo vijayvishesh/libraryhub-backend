@@ -256,10 +256,15 @@ export class LibraryPaymentMethodData {
   @IsString()
   label!: string;
 
-  constructor(type: string, enabled: boolean, label: string) {
+  @IsOptional()
+  @IsString()
+  upiId?: string;
+
+  constructor(type: string, enabled: boolean, label: string, upiId?: string) {
     this.type = type;
     this.enabled = enabled;
     this.label = label;
+    if (upiId) this.upiId = upiId;
   }
 }
 
@@ -345,6 +350,14 @@ export class LibrarySetupData {
 
   @IsOptional()
   @IsString()
+  upiId?: string;
+
+  @IsOptional()
+  @IsString()
+  upiIdGpay?: string;
+
+  @IsOptional()
+  @IsString()
   deletedAt?: string;
 
   @IsString()
@@ -380,6 +393,8 @@ export class LibrarySetupData {
     openingHours: string;
     stats: LibraryStatsData;
     paymentMethods: LibraryPaymentMethodData[];
+    upiId?: string;
+    upiIdGpay?: string;
     deletedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -410,6 +425,8 @@ export class LibrarySetupData {
     this.openingHours = params.openingHours;
     this.stats = params.stats;
     this.paymentMethods = params.paymentMethods;
+    this.upiId = params.upiId;
+    this.upiIdGpay = params.upiIdGpay;
     this.deletedAt = params.deletedAt ? params.deletedAt.toISOString() : undefined;
     this.createdAt = params.createdAt.toISOString();
     this.updatedAt = params.updatedAt.toISOString();

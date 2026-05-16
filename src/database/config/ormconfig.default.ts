@@ -15,6 +15,7 @@ import { MemberBulkUploadModel } from '../../api/models/memberBulkUpload.model';
 import { MemberInviteLinkModel } from '../../api/models/memberInviteLink.model';
 import { MemberInviteSubmissionModel } from '../../api/models/memberInviteSubmission.model';
 import { MemberPaymentModel } from '../../api/models/memberPayment.model';
+import { PaymentModel } from '../../api/models/payment.model';
 import { NotificationModel } from '../../api/models/notification.model';
 import { PendingOwnerSignupModel } from '../../api/models/pendingOwnerSignup.model';
 import { PendingStudentSignupModel } from '../../api/models/pendingStudentSignup.model';
@@ -46,8 +47,19 @@ const createDataSource = (): DataSource =>
           tlsInsecure: false,
           retryWrites: true,
           w: 'majority',
+          maxPoolSize: 100,
+          minPoolSize: 10,
+          maxIdleTimeMS: 60000,
+          waitQueueTimeoutMS: 10000,
+          serverSelectionTimeoutMS: 5000,
         }
-      : {},
+      : {
+          maxPoolSize: 100,
+          minPoolSize: 10,
+          maxIdleTimeMS: 60000,
+          waitQueueTimeoutMS: 10000,
+          serverSelectionTimeoutMS: 5000,
+        },
     entities: [
       UserModel,
       TenantModel,
@@ -72,6 +84,7 @@ const createDataSource = (): DataSource =>
       BannerModel,
       LibraryRatingModel,
       MemberPaymentModel,
+      PaymentModel,
       MemberInviteSubmissionModel,
       LibraryTransferModel,
     ],

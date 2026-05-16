@@ -171,17 +171,21 @@ export class AttendanceController {
   @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
   public async getStudentAttendanceById(
-    @CurrentUser({ required: true }) _session: CurrentSessionData,
+    @CurrentUser({ required: true }) session: CurrentSessionData,
     @Param('studentId') studentId: string,
     @QueryParams() query: StudentAttendanceByIdQuery,
   ): Promise<StudentAttendanceByIdApiResponse> {
     try {
-      const result = await this.attendanceService.getStudentAttendanceById(studentId, {
-        fromDate: query.fromDate,
-        toDate: query.toDate,
-        page: query.page,
-        limit: query.limit,
-      });
+      const result = await this.attendanceService.getStudentAttendanceById(
+        studentId,
+        {
+          fromDate: query.fromDate,
+          toDate: query.toDate,
+          page: query.page,
+          limit: query.limit,
+        },
+        session.user.id,
+      );
 
       return new StudentAttendanceByIdApiResponse(
         new StudentAttendanceByIdPayloadData({

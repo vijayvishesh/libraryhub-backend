@@ -22,34 +22,38 @@ export class StudyInsightsService {
       date: string;
     }[];
   }> {
-    const sessions = await this.studySessionRepository.findByStudent(studentId);
+    try {
+      const sessions = await this.studySessionRepository.findByStudent(studentId);
 
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
 
-    // Today minutes
-    const todayMinutes = sessions
-      .filter(s => new Date(s.createdAt).toISOString().split('T')[0] === todayStr)
-      .reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+      // Today minutes
+      const todayMinutes = sessions
+        .filter(s => new Date(s.createdAt).toISOString().split('T')[0] === todayStr)
+        .reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
 
-    // Day streak
-    const dayStreak = this.calculateDayStreak(sessions);
+      // Day streak
+      const dayStreak = this.calculateDayStreak(sessions);
 
-    // This week minutes + graph
-    const { thisWeekMinutes, weekGraph } = this.calculateWeekData(sessions, today);
+      // This week minutes + graph
+      const { thisWeekMinutes, weekGraph } = this.calculateWeekData(sessions, today);
 
-    // Recent 5 sessions
-    const recentSessions = sessions.slice(0, 5).map(s => ({
-      id: s.id,
-      startTime: s.startTime,
-      endTime: s.endTime,
-      studyDuration: s.studyDuration,
-      durationMinutes: s.durationMinutes,
-      notes: s.notes,
-      date: new Date(s.createdAt).toISOString().split('T')[0],
-    }));
+      // Recent 5 sessions
+      const recentSessions = sessions.slice(0, 5).map(s => ({
+        id: s.id,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        studyDuration: s.studyDuration,
+        durationMinutes: s.durationMinutes,
+        notes: s.notes,
+        date: new Date(s.createdAt).toISOString().split('T')[0],
+      }));
 
-    return { todayMinutes, dayStreak, thisWeekMinutes, weekGraph, recentSessions };
+      return { todayMinutes, dayStreak, thisWeekMinutes, weekGraph, recentSessions };
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to get insights');
+    }
   }
 
   private calculateWeekData(

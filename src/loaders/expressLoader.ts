@@ -4,6 +4,13 @@ import * as http from 'http';
 import { MicroframeworkLoader, MicroframeworkSettings } from 'microframework-w3tec';
 import { useExpressServer } from 'routing-controllers';
 import { authorizationChecker, currentUserChecker } from '../api/middlewares/auth.middleware';
+import {
+  generalRateLimiter,
+  loginRateLimiter,
+  otpRateLimiter,
+  otpVerifyRateLimiter,
+} from '../api/middlewares/rateLimiter.middleware';
+import { timeoutMiddleware } from '../api/middlewares/timeout.middleware';
 import { env } from '../env';
 
 export const expressLoader: MicroframeworkLoader = (
@@ -14,6 +21,17 @@ export const expressLoader: MicroframeworkLoader = (
       const expressApp: Application = require('express')();
 
       expressApp.use(cookieParser());
+
+      expressApp.use(timeoutMiddleware(30000));
+
+      expressApp.use('/api/v1/auth/otp/send', otpRateLimiter);
+      expressApp.use('/api/v1/auth/otp/resend', otpRateLimiter);
+      expressApp.use('/api/v1/auth/otp/verify', otpVerifyRateLimiter);
+      expressApp.use('/api/v1/auth/forgot-password', otpRateLimiter);
+      expressApp.use('/api/v1/auth/member/otp/send', otpRateLimiter);
+      expressApp.use('/api/v1/auth/login', loginRateLimiter);
+
+      expressApp.use(generalRateLimiter);
 
       useExpressServer(expressApp, {
         cors: {

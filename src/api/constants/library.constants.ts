@@ -31,7 +31,7 @@ export const LIBRARY_FACILITY_ENUM = [
   'newspaper',
 ] as const;
 
-export const LIBRARY_PAYMENT_METHOD_ENUM = ['upi', 'cash', 'card', 'wallet', 'online'] as const;
+export const LIBRARY_PAYMENT_METHOD_ENUM = ['upi', 'cash', 'card', 'wallet', 'online', 'razorpay', 'phonePe', 'gpay'] as const;
 
 export const LIBRARY_SEATING_MODE_ENUM = ['general', 'section'] as const;
 export const LIBRARY_SEATING_ARRANGEMENT_ENUM = ['open', 'split', 'custom'] as const;

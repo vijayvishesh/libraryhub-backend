@@ -106,6 +106,26 @@ class RedisCache {
     }
   }
 
+  // Atomically set key only if it does not exist (NX). Returns true if lock was acquired.
+  async setNX(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    if (!this.isEnabled || !this.client) {
+      return false;
+    }
+
+    const connected = await this.ensureConnection();
+    if (!connected) {
+      return false;
+    }
+
+    try {
+      const result = await this.client.set(key, value, 'EX', ttlSeconds, 'NX');
+      return result === 'OK';
+    } catch (error) {
+      log.error(`Redis SETNX Error [${key}]:`, error);
+      return false;
+    }
+  }
+
   async delete(key: string): Promise<boolean> {
     if (!this.isEnabled || !this.client) {
       return false;

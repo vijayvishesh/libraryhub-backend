@@ -276,6 +276,24 @@ export class LibraryRepository {
     };
   }
 
+  public async getPaymentMethods(libraryId: string): Promise<any[]> {
+  const objectId = this.tryParseObjectId(libraryId);
+
+  if (!objectId) {
+    return [];
+  }
+
+  const library = await this.getLibraryRepository().findOneById(
+    objectId,
+  );
+
+  if (!library) {
+    return [];
+  }
+
+  return library.paymentMethods ?? [];
+}
+
   private toHexString(value: WithObjectId): string {
     return value.id.toHexString();
   }
@@ -312,6 +330,26 @@ export class LibraryRepository {
     const saved = await repo.save(library);
     return this.mapLibrary(saved);
   }
+  public async findManyByIds(ids: string[]): Promise<LibraryRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const objectIds = ids
+      .map(id => this.tryParseObjectId(id))
+      .filter((oid): oid is ObjectId => oid !== null);
+
+    if (objectIds.length === 0) {
+      return [];
+    }
+
+    const libraries = await this.getLibraryRepository().find({
+      where: { _id: { $in: objectIds } } as any,
+    });
+
+    return libraries.map(library => this.mapLibrary(library));
+  }
+
   public async updateLibraryStats(
     libraryId: string,
     stats: { rating: number; reviewCount: number },
@@ -335,4 +373,5 @@ export class LibraryRepository {
     library.updatedAt = new Date();
     await repo.save(library);
   }
+
 }

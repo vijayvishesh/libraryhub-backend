@@ -59,3 +59,12 @@ start().catch((error: unknown) => {
 
   console.error('Application crashed with non-error payload:', error);
 });
+
+process.on('uncaughtException', (error: Error) => {
+  console.error('[FATAL] Uncaught Exception:', error.message, error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: unknown) => {
+  console.error('[FATAL] Unhandled Rejection:', reason);
+});

@@ -569,7 +569,7 @@ export class MemberService {
     try {
       return await this.memberInviteLinkRepository.findValidLinkByToken(token);
     } catch (error) {
-      console.error('Error fetching invite link details:', error);
+      console.warn('[MemberService] Error fetching invite link details:', error);
       throw new InternalServerError('GET_INVITE_LINK_DETAILS_FAILED');
     }
   }
@@ -621,7 +621,7 @@ export class MemberService {
         })),
       };
     } catch (error) {
-      console.error('Error fetching invite link details:', error);
+      console.warn('[MemberService] Error fetching invite link form data:', error);
       throw new InternalServerError('GET_INVITE_LINK_DETAILS_FAILED');
     }
   }
@@ -876,7 +876,7 @@ export class MemberService {
         bookingId = booking.id;
       }
     } catch (bookingError) {
-      console.error('Failed to create booking for owner-added member:', {
+      console.warn('[MemberService] Failed to create booking for owner-added member:', {
         error: bookingError instanceof Error ? bookingError.message : bookingError,
         seatId,
         slotId,

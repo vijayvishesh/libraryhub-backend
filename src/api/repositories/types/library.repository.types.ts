@@ -36,6 +36,7 @@ export type CreateLibraryPaymentMethodConfigInput = {
   type: LibraryPaymentMethod;
   enabled: boolean;
   label: string;
+  upiId?: string;
 };
 
 export type LibrarySeatingRange = {
@@ -87,6 +88,8 @@ export type CreateLibraryInput = {
   seating?: LibrarySeating;
   photos: CreateLibraryPhotoInput[];
   paymentMethods: CreateLibraryPaymentMethodConfigInput[];
+  upiId?: string;
+  upiIdGpay?: string;
   isActive: boolean;
   isMarketplaceVisible: boolean;
   isOpen: boolean;

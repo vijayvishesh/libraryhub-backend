@@ -75,6 +75,7 @@ export type LibraryPaymentMethodConfig = {
   type: LibraryPaymentMethod;
   enabled: boolean;
   label: string;
+  upiId?: string;
 };
 
 @Entity('libraries')
@@ -132,6 +133,12 @@ export class LibraryModel {
 
   @Column()
   paymentMethods!: LibraryPaymentMethodConfig[];
+
+  @Column()
+  upiId?: string;
+
+  @Column()
+  upiIdGpay?: string;
 
   @Column()
   isActive!: boolean;

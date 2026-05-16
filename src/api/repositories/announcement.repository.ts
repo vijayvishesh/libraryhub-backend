@@ -45,6 +45,7 @@ export class AnnouncementRepository {
     const models = await this.getRepo().find({
       where: { libraryId, deletedAt: null } as any,
       order: { createdAt: 'DESC' } as any,
+      take: 100,
     });
     return models.map(m => this.resolveIsActive(this.toRecord(m)));
   }

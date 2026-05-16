@@ -118,6 +118,7 @@ export class MemberRepository {
     const members = await this.getMemberRepository().find({
       where: { libraryId },
       order: { createdAt: 'DESC' },
+      take: 1000,
     });
 
     return members.map(item => this.mapMember(item));
@@ -468,6 +469,7 @@ export class MemberRepository {
   public async findAllMembersByStudentId(studentId: string): Promise<MemberRecord[]> {
     const members = await this.getMemberRepository().find({
       where: { studentId } as any,
+      take: 1000,
     });
     return members.map(item => this.mapMember(item));
   }
@@ -476,6 +478,7 @@ export class MemberRepository {
     const members = await this.getMemberRepository().find({
       where: { mobileNo } as any,
       order: { createdAt: 'DESC' },
+      take: 1000,
     });
     return members.map(item => this.mapMember(item));
   }

@@ -5,6 +5,7 @@ export type NotificationType = 'announcement' | 'system';
 
 @Entity('notifications')
 @Index('idx_notifications_student_id', ['studentId'])
+@Index('idx_notifications_studentId_isRead', ['studentId', 'isRead'])
 export class NotificationModel {
   @ObjectIdColumn()
   id!: ObjectId;

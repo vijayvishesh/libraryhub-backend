@@ -153,24 +153,32 @@ export class BookingService {
         duration: payload.duration || 1,
         startDate,
         validUntil,
-        status: 'pending_approval',
+        status: payload.paymentMethod === 'razorpay' && payload.razorpayPaymentId ? 'confirmed' : 'pending_approval',
         checkedInAt: null,
         checkedOutAt: null,
         invoiceNo: this.buildInvoiceNo(),
+        utrNumber: payload.utrNumber,
+        razorpayOrderId: payload.razorpayOrderId,
+        razorpayPaymentId: payload.razorpayPaymentId,
       };
 
       const booking = await this.bookingRepository.createBooking(bookingToCreate);
       await this.authRepository.updateStudentHasJoinedLibrary(student.id, true);
-      await this.onBookingCreated(
-        booking.id,
-        student,
-        library,
-        selectedSeat,
-        slot,
-        payload,
-        startDate,
-        validUntil,
-      );
+      try {
+        await this.onBookingCreated(
+          booking.id,
+          student,
+          library,
+          selectedSeat,
+          slot,
+          payload,
+          startDate,
+          validUntil,
+        );
+      } catch (sideEffectErr: any) {
+        // Side effect failure — booking was created successfully, don't rollback
+        console.warn('[BookingService] Post-booking side-effect failed:', sideEffectErr?.message);
+      }
 
       return this.mapBookingResult(booking, library); //  pass library here
     } catch (error) {
@@ -202,7 +210,7 @@ export class BookingService {
         payload.duration || 1,
       );
     } catch (syncError) {
-      console.error('Failed to sync member for booking:', {
+      console.warn('[BookingService] Failed to sync member for booking:', {
         studentId: student.id,
         libraryId: library.id,
         phone: student.phone,
@@ -291,12 +299,12 @@ export class BookingService {
         limit,
       });
 
-      //  only change: fetch library for each booking
-      const bookings = await Promise.all(
-        result.bookings.map(async item => {
-          const library = await this.libraryRepository.findLibraryById(item.libraryId);
-          return this.mapBookingResult(item, library);
-        }),
+      // Batch-fetch all libraries to avoid N+1 queries
+      const libraryIds = [...new Set(result.bookings.map((b: any) => b.libraryId?.toString()).filter(Boolean))];
+      const libraries = await this.libraryRepository.findManyByIds(libraryIds);
+      const libraryMap = new Map(libraries.map((l: any) => [l.id?.toString(), l]));
+      const bookings = result.bookings.map(item =>
+        this.mapBookingResult(item, libraryMap.get(item.libraryId?.toString())),
       );
 
       return {

@@ -15,6 +15,8 @@ export type BookingStatus =
 @Entity('bookings')
 @Index('idx_bookings_student_created_at', ['studentId', 'createdAt'])
 @Index('idx_bookings_library_slot_seat', ['libraryId', 'slotType', 'seatId'])
+@Index('idx_bookings_libraryId_status', ['libraryId', 'status'])
+@Index('idx_bookings_studentId', ['studentId'])
 export class BookingModel {
   @ObjectIdColumn()
   id!: ObjectId;
@@ -75,6 +77,15 @@ export class BookingModel {
 
   @Column()
   invoiceNo!: string;
+
+  @Column()
+  utrNumber?: string;
+
+  @Column()
+  razorpayOrderId?: string;
+
+  @Column()
+  razorpayPaymentId?: string;
 
   @Column()
   createdAt!: Date;

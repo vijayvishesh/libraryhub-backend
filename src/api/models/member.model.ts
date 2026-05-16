@@ -6,6 +6,7 @@ import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
 @Index('idx_members_library_status', ['libraryId', 'status'])
 @Index('idx_members_library_paidAt', ['libraryId', 'paidAt'])
 @Index('idx_members_library_status_endDate', ['libraryId', 'status', 'endDate'])
+@Index('idx_members_studentId', ['studentId'])
 export class MemberModel {
   @ObjectIdColumn()
   id!: ObjectId;
