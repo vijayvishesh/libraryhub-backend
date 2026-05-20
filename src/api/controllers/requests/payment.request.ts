@@ -1,17 +1,17 @@
 import { Type } from 'class-transformer';
 import {
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
-  Min,
-  IsObject,
-  IsInt,
   Max,
+  Min,
 } from 'class-validator';
-import { PAYMENT_STATUS_ENUM } from '../../models/payment.model';
 import { LIBRARY_PAYMENT_METHOD_ENUM } from '../../constants/library.constants';
+import { PAYMENT_STATUS_ENUM } from '../../models/payment.model';
 
 export class CreatePaymentRequest {
   @IsString()
@@ -22,6 +22,11 @@ export class CreatePaymentRequest {
   @IsString()
   @IsNotEmpty()
   bookingId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -115,6 +120,11 @@ export class CreateRazorpayOrderRequest {
   @IsOptional()
   @IsString()
   receipt?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  bookingId?: string;
 }
 
 export class VerifyRazorpayPaymentRequest {

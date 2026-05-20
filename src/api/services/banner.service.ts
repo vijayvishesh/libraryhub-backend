@@ -140,17 +140,39 @@ export class BannerService {
     const endDate = member.endDate;
 
     // pending with no endDate — fee due alert
-    if (member.status === 'pending') {
-      return [
-        {
-          type: 'overdue',
-          title: 'Fee Due',
-          message: 'Your library fee is pending. Please pay to activate your membership.',
-          endDate: endDate ?? null,
-          daysRemaining: 0,
-        },
-      ];
-    }
+   // pending status
+if (member.status === 'pending') {
+  // If no endDate, always show fee due alert
+  if (!endDate) {
+    return [
+      {
+        type: 'overdue',
+        title: 'Fee Due',
+        message: 'Your library fee is pending. Please pay to activate your membership.',
+        endDate: null,
+        daysRemaining: 0,
+      },
+    ];
+  }
+
+  // Calculate actual days remaining
+  const daysRemaining = this.getDaysDiff(today, endDate);
+
+  // Only show alert if 7 days or less remaining
+  if (daysRemaining > 7) {
+    return []; // ✅ more than 7 days left — no alert
+  }
+
+  return [
+    {
+      type: 'overdue',
+      title: 'Fee Due',
+      message: 'Your library fee is pending. Please pay to activate your membership.',
+      endDate,
+      daysRemaining, 
+    },
+  ];
+}
 
     if (!endDate) {
       return [];

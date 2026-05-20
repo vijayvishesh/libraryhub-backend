@@ -277,22 +277,20 @@ export class LibraryRepository {
   }
 
   public async getPaymentMethods(libraryId: string): Promise<any[]> {
-  const objectId = this.tryParseObjectId(libraryId);
+    const objectId = this.tryParseObjectId(libraryId);
 
-  if (!objectId) {
-    return [];
+    if (!objectId) {
+      return [];
+    }
+
+    const library = await this.getLibraryRepository().findOneById(objectId);
+
+    if (!library) {
+      return [];
+    }
+
+    return library.paymentMethods ?? [];
   }
-
-  const library = await this.getLibraryRepository().findOneById(
-    objectId,
-  );
-
-  if (!library) {
-    return [];
-  }
-
-  return library.paymentMethods ?? [];
-}
 
   private toHexString(value: WithObjectId): string {
     return value.id.toHexString();
@@ -373,5 +371,4 @@ export class LibraryRepository {
     library.updatedAt = new Date();
     await repo.save(library);
   }
-
 }

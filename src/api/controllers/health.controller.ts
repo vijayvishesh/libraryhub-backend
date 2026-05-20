@@ -1,6 +1,6 @@
-import { Get, JsonController, Res } from 'routing-controllers';
 import { Response } from 'express';
 import mongoose from 'mongoose';
+import { Get, JsonController, Res } from 'routing-controllers';
 
 @JsonController()
 export class HealthController {

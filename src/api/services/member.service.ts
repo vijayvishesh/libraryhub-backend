@@ -79,9 +79,8 @@ export class MemberService {
   public async addMember(ownerId: string, payload: AddMemberRequest): Promise<MemberMsgResponse> {
     try {
       const library = await this.getOwnerLibraryOrThrow(ownerId);
-      // const member = await this.createMemberForLibrary(library.id, payload);
-      await this.createMemberForLibrary(library.id, payload);
-      return { msg: 'Member added successfully' };
+      const member = await this.createMemberForLibrary(library.id, payload);
+      return { msg: 'Member added successfully', studentId: member?.studentId ?? null };
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;

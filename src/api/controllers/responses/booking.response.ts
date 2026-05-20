@@ -213,6 +213,26 @@ export class LibraryPaymentOptionsApiResponse {
   }
 }
 
+export class TodayAttendanceData {
+  @IsString()
+  checkInTime!: string;
+
+  @IsOptional()
+  @IsString()
+  checkOutTime?: string | null;
+
+  @IsString()
+  status!: string;
+
+  constructor(params?: { checkInTime: string; checkOutTime: string | null; status: string }) {
+    if (!params) return;
+    this.checkInTime = params.checkInTime;
+    this.checkOutTime = params.checkOutTime;
+    this.status = params.status;
+  }
+}
+
+
 export class BookingData {
   @IsString()
   id!: string;
@@ -280,6 +300,25 @@ export class BookingData {
 
   @IsNumber() duration!: number;
 
+  @IsOptional()
+  @IsNumber()
+  todayStudyTime?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TodayAttendanceData)
+  todayAttendance?: TodayAttendanceData;
+
+  @IsOptional()
+  @IsString()
+  libraryStatus?: string;
+
+  @IsOptional()
+  libraryUsage?: {
+    sessions: Array<{ checkInTime: string; checkoutTime: string | null; duration: number }>;
+    totalDuration: number;
+  };
+
   constructor(params?: {
     id: string;
     libraryId: string;
@@ -302,6 +341,13 @@ export class BookingData {
     libraryLatitude: number | null;
     libraryLongitude: number | null;
     duration: number;
+    todayStudyTime?: number;
+    libraryStatus?: string;
+    todayAttendance?: { checkInTime: string; checkOutTime: string | null; status: string };
+    libraryUsage?: {
+      sessions: Array<{ checkInTime: string; checkoutTime: string | null; duration: number }>;
+      totalDuration: number;
+    };
   }) {
     if (!params) {
       return;
@@ -330,6 +376,18 @@ export class BookingData {
     this.latitude = params.libraryLatitude ?? undefined;
     this.longitude = params.libraryLongitude ?? undefined;
     this.duration = params.duration ?? 1;
+    if (params.todayStudyTime) {
+      this.todayStudyTime = params.todayStudyTime;
+    }
+    if (params.libraryStatus) {
+      this.libraryStatus = params.libraryStatus;
+    }
+    if (params.libraryUsage) {
+      this.libraryUsage = params.libraryUsage;
+    }
+    if (params.todayAttendance) {
+      this.todayAttendance = new TodayAttendanceData(params.todayAttendance);
+    }
   }
 }
 

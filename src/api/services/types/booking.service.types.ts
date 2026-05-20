@@ -13,6 +13,18 @@ export type SeatMapResult = {
   seats: SeatMapItem[];
 };
 
+export type AttendanceSession = {
+  checkInTime: string;
+  checkoutTime: string | null;
+  duration: number;
+};
+
+export type TodayAttendance = {
+  checkInTime: string;
+  checkOutTime: string | null;
+  status: string;
+};
+
 export type BookingResult = {
   duration: number;
   id: string;
@@ -35,6 +47,11 @@ export type BookingResult = {
   libraryPincode: string;
   libraryLatitude: number | null;
   libraryLongitude: number | null;
+  studentId: string | null;
+  todayStudyTime?: number; // total minutes from today's study sessions
+   todayAttendance?: TodayAttendance;
+  libraryStatus?: 'CHECKED_IN' | 'CHECKED_OUT';
+  libraryUsage?: { sessions: AttendanceSession[]; totalDuration: number };
 };
 
 export type ListMyBookingsResult = {

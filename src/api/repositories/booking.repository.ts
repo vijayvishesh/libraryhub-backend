@@ -1,4 +1,5 @@
 import { ObjectId } from 'mongodb';
+import { HttpError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
@@ -41,8 +42,16 @@ export class BookingRepository {
       updatedAt: now,
     });
 
-    const savedBooking = await bookingRepository.save(booking);
-    return this.mapBooking(savedBooking);
+    try {
+      const savedBooking = await bookingRepository.save(booking);
+      return this.mapBooking(savedBooking);
+    } catch (err: any) {
+      // MongoDB duplicate key — unique seat+slot index fired
+      if (err?.code === 11000) {
+        throw new HttpError(409, 'SEAT_TAKEN');
+      }
+      throw err;
+    }
   }
 
   public async findActiveStudentBookingInLibrary(
@@ -394,6 +403,33 @@ export class BookingRepository {
     return this.mapBooking(booking);
   }
 
+  // Mark expired active bookings for a seat as checked_out so they no longer
+  // hold the partial unique index slot before a new booking is inserted.
+  public async expireOldSeatBookings(
+    libraryId: string,
+    seatId: string,
+    slotType: string,
+  ): Promise<void> {
+    const todayIsoDate = new Date().toISOString().slice(0, 10);
+    const repo = this.getBookingRepository();
+
+    const isFullBlocking = this.FULL_BLOCKING_SLOTS.includes(slotType);
+    const slotFilter = isFullBlocking
+      ? {}
+      : { $or: [{ slotType: { $in: this.FULL_BLOCKING_SLOTS } }, { slotType }] };
+
+    await repo.updateMany(
+      {
+        libraryId,
+        seatId,
+        status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+        validUntil: { $lt: todayIsoDate },
+        ...slotFilter,
+      } as any,
+      { $set: { status: 'checked_out', updatedAt: new Date() } },
+    );
+  }
+
   private async ensureIndexes(): Promise<void> {
     if (this.indexesEnsured) {
       return;
@@ -406,6 +442,19 @@ export class BookingRepository {
     await this.createIndexSafely(
       { libraryId: 1, slotType: 1, seatId: 1, status: 1, validUntil: 1 },
       { name: 'idx_bookings_library_slot_seat_active' },
+    );
+    // Partial unique index — prevents two active bookings for the same seat+slot.
+    // Only applies to documents whose status is active, so expired/cancelled
+    // bookings don't block future re-booking of the same seat.
+    await this.createIndexSafely(
+      { libraryId: 1, seatId: 1, slotType: 1 },
+      {
+        name: 'idx_bookings_seat_slot_unique_active',
+        unique: true,
+        partialFilterExpression: {
+          status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+        },
+      },
     );
     await this.createIndexSafely(
       { libraryId: 1, slotType: 1, sectionId: 1, status: 1, validUntil: 1 },
@@ -421,7 +470,7 @@ export class BookingRepository {
 
   private async createIndexSafely(
     keys: Record<string, 1 | -1>,
-    options: { name: string; unique?: boolean },
+    options: { name: string; unique?: boolean; partialFilterExpression?: Record<string, unknown> },
   ): Promise<void> {
     try {
       await this.getBookingRepository().createCollectionIndex(keys, options);

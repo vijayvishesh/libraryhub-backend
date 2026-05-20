@@ -264,7 +264,9 @@ export class LibraryPaymentMethodData {
     this.type = type;
     this.enabled = enabled;
     this.label = label;
-    if (upiId) this.upiId = upiId;
+    if (upiId) {
+      this.upiId = upiId;
+    }
   }
 }
 

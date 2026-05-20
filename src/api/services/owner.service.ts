@@ -1,6 +1,7 @@
 import { HttpError, InternalServerError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { getDataSource } from '../../database/config/ormconfig.default';
+import redisCache from '../../lib/redis/db.redis';
 import { ActivityActionType } from '../constants/activity.constants';
 import { MemberModel } from '../models/member.model';
 import { LibraryRepository } from '../repositories/library.repository';
@@ -26,6 +27,12 @@ export class OwnerService {
 
   public async getDashboard(ownerId: string): Promise<OwnerDashboardResult> {
     try {
+      const cacheKey = `owner:dashboard:${ownerId}`;
+      const cached = await redisCache.get<OwnerDashboardResult>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const library = await this.getOwnerLibraryOrThrow(ownerId);
       const seatMap = await this.bookingService.getLibrarySeatMap(library.id);
       const occupiedSeatCount = seatMap.seats.filter(s => s.seatStatus === 'occupied').length;
@@ -39,7 +46,7 @@ export class OwnerService {
         this.getRecentActivity(ownerId),
       ]);
 
-      return {
+      const result: OwnerDashboardResult = {
         library: {
           name: library.name,
           location: this.formatLibraryLocation(library),
@@ -56,6 +63,9 @@ export class OwnerService {
         alerts,
         recentActivity,
       };
+
+      await redisCache.set(cacheKey, result, 300);
+      return result;
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;

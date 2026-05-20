@@ -41,14 +41,28 @@ export class PaymentRepository {
     return payment ? this.map(payment) : null;
   }
 
+  public async findByIdempotencyKey(key: string): Promise<PaymentRecord | null> {
+    const repo = this.getRepo();
+    const payment = await repo.findOne({ where: { idempotencyKey: key } });
+    return payment ? this.map(payment) : null;
+  }
+
   public async list(query: ListPaymentsQuery): Promise<ListPaymentsResult> {
     const repo = this.getRepo();
 
     const where: Record<string, unknown> = {};
-    if (query.userId) where['userId'] = query.userId;
-    if (query.libraryId) where['libraryId'] = query.libraryId;
-    if (query.paymentStatus) where['paymentStatus'] = query.paymentStatus;
-    if (query.paymentMethod) where['paymentMethod'] = query.paymentMethod;
+    if (query.userId) {
+      where['userId'] = query.userId;
+    }
+    if (query.libraryId) {
+      where['libraryId'] = query.libraryId;
+    }
+    if (query.paymentStatus) {
+      where['paymentStatus'] = query.paymentStatus;
+    }
+    if (query.paymentMethod) {
+      where['paymentMethod'] = query.paymentMethod;
+    }
 
     const [payments, total] = await Promise.all([
       repo.find({
@@ -63,7 +77,10 @@ export class PaymentRepository {
     return { payments: payments.map(p => this.map(p)), total };
   }
 
-  public async updateStatus(id: string, input: UpdatePaymentStatusInput): Promise<PaymentRecord | null> {
+  public async updateStatus(
+    id: string,
+    input: UpdatePaymentStatusInput,
+  ): Promise<PaymentRecord | null> {
     const repo = this.getRepo();
     try {
       const oid = new ObjectId(id);
@@ -108,6 +125,7 @@ export class PaymentRepository {
       paymentStatus: payment.paymentStatus as PaymentStatus,
       description: payment.description,
       metadata: payment.metadata,
+      idempotencyKey: payment.idempotencyKey,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
     };

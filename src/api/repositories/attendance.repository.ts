@@ -43,6 +43,18 @@ export class AttendanceRepository {
     return model ? this.toRecord(model) : null;
   }
 
+  public async findAllByStudentAndDate(
+    studentId: string,
+    libraryId: string,
+    date: string,
+  ): Promise<AttendanceRecord[]> {
+    const models = await this.getRepo().find({
+      where: { studentId, libraryId, date } as any,
+      order: { checkInTime: 'ASC' } as any,
+    });
+    return models.map(m => this.toRecord(m));
+  }
+
   public async findById(id: string): Promise<AttendanceRecord | null> {
     if (!ObjectId.isValid(id)) {
       return null;

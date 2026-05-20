@@ -13,8 +13,8 @@ import {
   QueryParams,
 } from 'routing-controllers';
 import { Service } from 'typedi';
+import { PaymentRecord } from '../repositories/types/payment.repository.types';
 import { PaymentService } from '../services/payment.service';
-import { CurrentSessionData } from './responses/auth.response';
 import {
   CreatePaymentRequest,
   CreateRazorpayOrderRequest,
@@ -22,6 +22,7 @@ import {
   UpdatePaymentStatusRequest,
   VerifyRazorpayPaymentRequest,
 } from './requests/payment.request';
+import { CurrentSessionData } from './responses/auth.response';
 import {
   DeletePaymentApiResponse,
   ListPaymentsApiResponse,
@@ -31,7 +32,6 @@ import {
   RazorpayOrderApiResponse,
   RazorpayOrderData,
 } from './responses/payment.response';
-import { PaymentRecord } from '../repositories/types/payment.repository.types';
 
 @Service()
 @JsonController('/v1/payments')
@@ -78,6 +78,7 @@ export class PaymentController {
       paymentStatus: body.paymentStatus,
       description: body.description,
       metadata: body.metadata,
+      idempotencyKey: body.idempotencyKey,
     });
     return new PaymentApiResponse(this.mapPayment(payment), 201);
   }
@@ -110,7 +111,7 @@ export class PaymentController {
     @QueryParams() query: ListPaymentsQueryRequest,
   ): Promise<ListPaymentsApiResponse> {
     const result = await this.paymentService.listPayments({
-      userId: session.user.id,
+      // userId: session.user.id,
       libraryId: query.libraryId,
       paymentStatus: query.paymentStatus as any,
       paymentMethod: query.paymentMethod,
@@ -118,7 +119,10 @@ export class PaymentController {
       limit: query.limit,
     });
     const meta = new PaymentPaginationMeta(query.page || 1, query.limit || 20, result.total);
-    return new ListPaymentsApiResponse(result.payments.map(p => this.mapPayment(p)), meta);
+    return new ListPaymentsApiResponse(
+      result.payments.map(p => this.mapPayment(p)),
+      meta,
+    );
   }
 
   /**
@@ -215,17 +219,25 @@ export class PaymentController {
   @Post('/razorpay/create-order')
   @Authorized('STUDENT')
   public async createRazorpayOrder(
-    @CurrentUser({ required: true }) _session: CurrentSessionData,
+    @CurrentUser({ required: true }) session: CurrentSessionData,
     @Body() body: CreateRazorpayOrderRequest,
   ): Promise<RazorpayOrderApiResponse> {
     try {
       const amountInPaise = Math.round(body.amount * 100);
       const receipt = body.receipt || `rcpt_${Date.now()}`;
-      const result = await this.paymentService.createRazorpayOrder(amountInPaise, receipt);
+      const result = await this.paymentService.createRazorpayOrder(
+        amountInPaise,
+        receipt,
+        body.bookingId,
+        session.user.id,
+      );
       return new RazorpayOrderApiResponse(
         new RazorpayOrderData(result.orderId, result.amount, result.currency, result.keyId),
       );
     } catch (err: any) {
+      if ((err as any)?.httpCode === 403) {
+        throw err;
+      }
       throw new BadRequestError(err?.message || 'CREATE_ORDER_FAILED');
     }
   }

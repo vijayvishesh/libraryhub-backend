@@ -11,6 +11,7 @@ export type CreatePaymentPayload = {
   paymentStatus?: PaymentStatus;
   description?: string;
   metadata?: Record<string, unknown>;
+  idempotencyKey?: string;
 };
 
 export type UpdatePaymentStatusPayload = {

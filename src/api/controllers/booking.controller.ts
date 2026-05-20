@@ -131,6 +131,10 @@ export class BookingController {
       libraryLatitude: params.libraryLatitude,
       libraryLongitude: params.libraryLongitude,
       duration: params.duration,
+      todayStudyTime: params.todayStudyTime,
+      todayAttendance: params.todayAttendance, 
+      libraryStatus: params.libraryStatus,
+      libraryUsage: params.libraryUsage,
     });
   }
 }

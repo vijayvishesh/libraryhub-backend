@@ -24,7 +24,9 @@ export class PaymentMethodData {
   upiId?: string | null;
 
   constructor(data?: any) {
-    if (!data) return;
+    if (!data) {
+      return;
+    }
 
     this.type = data.type;
     this.enabled = data.enabled;
@@ -76,7 +78,6 @@ export class PaymentData {
 
   @IsOptional()
   paymentMethods?: PaymentMethodData[];
-  
 
   @IsString()
   createdAt!: string;
@@ -101,7 +102,9 @@ export class PaymentData {
     createdAt: Date;
     updatedAt: Date;
   }) {
-    if (!params) return;
+    if (!params) {
+      return;
+    }
     this.id = params.id;
     this.userId = params.userId;
     this.libraryId = params.libraryId;
@@ -114,9 +117,7 @@ export class PaymentData {
     this.paymentStatus = params.paymentStatus;
     this.description = params.description;
     this.metadata = params.metadata;
-    this.paymentMethods = params.paymentMethods?.map(
-      (p: any) => new PaymentMethodData(p),
-    );
+    this.paymentMethods = params.paymentMethods?.map((p: any) => new PaymentMethodData(p));
     this.createdAt = params.createdAt.toISOString();
     this.updatedAt = params.updatedAt.toISOString();
   }
@@ -131,7 +132,9 @@ export class PaymentApiResponse {
   data!: PaymentData;
 
   constructor(data?: PaymentData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') return;
+    if (!data || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -180,7 +183,9 @@ export class ListPaymentsApiResponse {
   data!: ListPaymentsData;
 
   constructor(payments?: PaymentData[], meta?: PaymentPaginationMeta, responseCode = 200) {
-    if (!payments || !meta || typeof responseCode !== 'number') return;
+    if (!payments || !meta || typeof responseCode !== 'number') {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = new ListPaymentsData(payments, meta);
   }
@@ -205,7 +210,9 @@ export class RazorpayOrderApiResponse {
   @ValidateNested() @Type(() => RazorpayOrderData) data!: RazorpayOrderData;
 
   constructor(data?: RazorpayOrderData, responseCode = 200) {
-    if (!data) return;
+    if (!data) {
+      return;
+    }
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -220,6 +227,3 @@ export class DeletePaymentApiResponse {
     this.data = { deleted };
   }
 }
-
-
-

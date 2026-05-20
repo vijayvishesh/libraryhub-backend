@@ -12,14 +12,18 @@ import {
   SeatStatus,
 } from '../helpers/seatMap.helper';
 import { AuthRepository } from '../repositories/auth.repositories';
+import { AttendanceRepository } from '../repositories/attendance.repository';
+import { AttendanceRecord } from '../repositories/types/attendance.repository.types';
 import { BookingRepository } from '../repositories/booking.repository';
 import { LibraryRepository } from '../repositories/library.repository';
 import { MemberRepository } from '../repositories/member.repository';
+import { StudySessionRepository } from '../repositories/studySession.repository';
 import { CreateBookingInput } from '../repositories/types/booking.repository.types';
 import { LibraryRecord } from '../repositories/types/library.repository.types';
 import { LibrarySeatRecord } from '../repositories/types/librarySeat.repository.types';
 import { LibrarySeatService } from './librarySeat.service';
 import {
+  AttendanceSession,
   BookingResult,
   ListMyBookingsResult,
   PaymentMethodOption,
@@ -36,6 +40,8 @@ export class BookingService {
     private readonly bookingRepository: BookingRepository,
     private readonly librarySeatService: LibrarySeatService,
     private readonly memberRepository: MemberRepository,
+    private readonly attendanceRepository: AttendanceRepository,
+    private readonly studySessionRepository: StudySessionRepository,
   ) {}
 
   public async getLibrarySeatMap(
@@ -136,6 +142,14 @@ export class BookingService {
         throw new HttpError(409, 'SEAT_TAKEN');
       }
 
+      // Retire any expired-but-still-active bookings for this seat before
+      // inserting, so the partial unique index doesn't block re-booking.
+      await this.bookingRepository.expireOldSeatBookings(
+        library.id,
+        selectedSeat.id,
+        slot.slotType,
+      );
+
       const validUntil = this.addDaysIsoDate(startDate, (payload.duration || 1) * 30);
       const bookingToCreate: CreateBookingInput = {
         libraryId: library.id,
@@ -153,7 +167,10 @@ export class BookingService {
         duration: payload.duration || 1,
         startDate,
         validUntil,
-        status: payload.paymentMethod === 'razorpay' && payload.razorpayPaymentId ? 'confirmed' : 'pending_approval',
+        status:
+          payload.paymentMethod === 'razorpay' && payload.razorpayPaymentId
+            ? 'confirmed'
+            : 'pending_approval',
         checkedInAt: null,
         checkedOutAt: null,
         invoiceNo: this.buildInvoiceNo(),
@@ -300,12 +317,50 @@ export class BookingService {
       });
 
       // Batch-fetch all libraries to avoid N+1 queries
-      const libraryIds = [...new Set(result.bookings.map((b: any) => b.libraryId?.toString()).filter(Boolean))];
+      const libraryIds = [
+        ...new Set(result.bookings.map((b: any) => b.libraryId?.toString()).filter(Boolean)),
+      ];
       const libraries = await this.libraryRepository.findManyByIds(libraryIds);
       const libraryMap = new Map(libraries.map((l: any) => [l.id?.toString(), l]));
-      const bookings = result.bookings.map(item =>
-        this.mapBookingResult(item, libraryMap.get(item.libraryId?.toString())),
-      );
+
+      // Fetch today's study minutes (from sessions) and attendance data in parallel
+      const today = new Date().toISOString().slice(0, 10);
+      const confirmedLibraryIds = [
+        ...new Set(
+          result.bookings
+            .filter((b: any) => b.status === 'confirmed')
+            .map((b: any) => b.libraryId?.toString())
+            .filter(Boolean),
+        ),
+      ];
+
+      const [todayStudyTime, attendanceMap] = await Promise.all([
+        this.studySessionRepository.sumTodayDurationMinutes(studentId.trim()),
+        (async () => {
+          const map = new Map<string, AttendanceRecord[]>();
+          await Promise.all(
+            confirmedLibraryIds.map(async (libId: string) => {
+              const records = await this.attendanceRepository.findAllByStudentAndDate(
+                studentId.trim(),
+                libId,
+                today,
+              );
+              map.set(libId, records);
+            }),
+          );
+          return map;
+        })(),
+      ]);
+
+      const bookings = result.bookings.map(item => {
+        const base = this.mapBookingResult(item, libraryMap.get(item.libraryId?.toString()));
+        if (item.status === 'confirmed') {
+          const records = attendanceMap.get(item.libraryId?.toString()) ?? [];
+          const attendanceFields = records.length > 0 ? this.computeAttendanceFields(records) : {};
+          return { ...base, todayStudyTime, ...attendanceFields };
+        }
+        return base;
+      });
 
       return {
         bookings,
@@ -328,9 +383,32 @@ export class BookingService {
         throw new NotFoundError('BOOKING_NOT_FOUND');
       }
 
-      // only change: fetch library and pass to mapBookingResult
       const library = await this.libraryRepository.findLibraryById(booking.libraryId);
-      return this.mapBookingResult(booking, library);
+      const base = this.mapBookingResult(booking, library);
+
+      if (booking.status === 'confirmed') {
+        const today = new Date().toISOString().slice(0, 10);
+        const [todayStudyTime, records] = await Promise.all([
+          this.studySessionRepository.sumTodayDurationMinutes(studentId.trim()),
+          this.attendanceRepository.findAllByStudentAndDate(studentId.trim(), booking.libraryId, today),
+        ]);
+        const attendanceFields = records.length > 0 ? this.computeAttendanceFields(records) : {};
+        const latestRecord = records[records.length - 1];
+        const todayAttendance = latestRecord
+          ? {
+            checkInTime: new Date(latestRecord.checkInTime).toISOString(),
+            checkOutTime: latestRecord.checkOutTime
+              ? new Date(latestRecord.checkOutTime).toISOString()
+              : null,
+            status: latestRecord.status, // 'checked_in' | 'checked_out'
+          }
+          : undefined;
+
+        return { ...base, todayStudyTime, todayAttendance, ...attendanceFields };
+
+      }
+
+      return base;
     } catch (error) {
       this.rethrowBookingError(error, 'GET_MY_BOOKING_FAILED');
     }
@@ -516,6 +594,7 @@ export class BookingService {
       libraryLatitude: library?.location?.coordinates?.[1] ?? null,
       libraryLongitude: library?.location?.coordinates?.[0] ?? null,
       duration: booking.duration,
+      studentId: null,
     };
   }
 
@@ -545,6 +624,31 @@ export class BookingService {
     if (parsedDate.toISOString().slice(0, 10) !== isoDate) {
       throw new HttpError(400, 'INVALID_START_DATE');
     }
+  }
+
+  private computeAttendanceFields(records: AttendanceRecord[]): {
+    libraryStatus: 'CHECKED_IN' | 'CHECKED_OUT';
+    libraryUsage: { sessions: AttendanceSession[]; totalDuration: number };
+  } {
+    const now = new Date();
+    let totalSeconds = 0;
+
+    const sessions: AttendanceSession[] = records.map(r => {
+      const checkIn = new Date(r.checkInTime);
+      const checkOut = r.checkOutTime ? new Date(r.checkOutTime) : now;
+      const duration = Math.max(0, Math.floor((checkOut.getTime() - checkIn.getTime()) / 1000));
+      totalSeconds += duration;
+      return {
+        checkInTime: checkIn.toISOString(),
+        checkoutTime: r.checkOutTime ? new Date(r.checkOutTime).toISOString() : null,
+        duration,
+      };
+    });
+
+    return {
+      libraryStatus: records.some(r => r.status === 'checked_in') ? 'CHECKED_IN' : 'CHECKED_OUT',
+      libraryUsage: { sessions, totalDuration: totalSeconds },
+    };
   }
 
   private rethrowBookingError(error: unknown, defaultMessage: string): never {

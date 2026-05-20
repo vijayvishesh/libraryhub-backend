@@ -27,6 +27,7 @@ export class StudySessionRepository {
       notes: model.notes,
       revisionReminderDays: model.revisionReminderDays,
       revisionReminderDate: model.revisionReminderDate,
+      reminderSent: model.reminderSent ?? false,
       deletedAt: model.deletedAt,
       createdAt: model.createdAt,
       updatedAt: model.updatedAt,
@@ -54,12 +55,39 @@ export class StudySessionRepository {
     const repo = this.getRepo();
     const model = repo.create({
       ...input,
+      reminderSent: false,
       deletedAt: null,
       createdAt: now,
       updatedAt: now,
     });
     const saved = await repo.save(model);
     return this.toRecord(saved);
+  }
+
+  public async findDueRevisionReminders(): Promise<StudySessionRecord[]> {
+    const now = new Date();
+    const models = await this.getRepo().find({
+      where: {
+        deletedAt: null,
+        reminderSent: { $ne: true } as any,
+        revisionReminderDate: { $ne: null, $lte: now } as any,
+      } as any,
+    });
+    return models.map(m => this.toRecord(m));
+  }
+
+  public async markReminderSent(id: string): Promise<void> {
+    if (!ObjectId.isValid(id)) {
+      return;
+    }
+    const repo = this.getRepo();
+    const existing = await repo.findOneById(new ObjectId(id));
+    if (!existing) {
+      return;
+    }
+    existing.reminderSent = true;
+    existing.updatedAt = new Date();
+    await repo.save(existing);
   }
 
   public async update(
@@ -77,6 +105,12 @@ export class StudySessionRepository {
     Object.assign(existing, input, { updatedAt: new Date() });
     const saved = await repo.save(existing);
     return this.toRecord(saved);
+  }
+
+  public async sumTodayDurationMinutes(studentId: string): Promise<number> {
+    const today = new Date().toISOString().slice(0, 10);
+    const sessions = await this.findByStudentWithDateFilter(studentId, today, today);
+    return sessions.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0);
   }
 
   public async softDelete(id: string): Promise<boolean> {

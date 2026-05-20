@@ -37,6 +37,9 @@ export class StudySessionModel {
   revisionReminderDate!: Date | null;
 
   @Column()
+  reminderSent!: boolean;
+
+  @Column()
   deletedAt!: Date | null;
 
   @Column()

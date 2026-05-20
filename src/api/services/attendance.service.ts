@@ -4,6 +4,7 @@ import { AttendanceRepository } from '../repositories/attendance.repository';
 import { LibraryRepository } from '../repositories/library.repository';
 import { MemberRepository } from '../repositories/member.repository';
 import { AttendanceRecord } from '../repositories/types/attendance.repository.types';
+import { ActivityService } from './activity.service';
 
 @Service()
 export class AttendanceService {
@@ -11,6 +12,7 @@ export class AttendanceService {
     private readonly attendanceRepository: AttendanceRepository,
     private readonly memberRepository: MemberRepository,
     private readonly libraryRepository: LibraryRepository,
+    private readonly activityService: ActivityService,
   ) {}
 
   public async checkIn(studentId: string, libraryId: string): Promise<AttendanceRecord> {
@@ -26,7 +28,7 @@ export class AttendanceService {
 
     const today = new Date().toISOString().split('T')[0];
 
-    return this.attendanceRepository.create({
+    const record = await this.attendanceRepository.create({
       studentId,
       libraryId,
       membershipId: member.id,
@@ -35,6 +37,29 @@ export class AttendanceService {
       date: today,
       checkInTime: new Date(),
     });
+
+    // Log to owner's dashboard activity feed (fire-and-forget)
+    this.libraryRepository
+      .findLibraryById(libraryId)
+      .then(library => {
+        if (library?.ownerId) {
+          this.activityService.logActivity(
+            library.ownerId,
+            'CHECKED_STUDENT',
+            `${member.fullName} checked in`,
+            {
+              memberName: member.fullName,
+              seatId: member.seatId ?? undefined,
+              studentId,
+            },
+          );
+        }
+      })
+      .catch(() => {
+        /* non-critical */
+      });
+
+    return record;
   }
 
   public async checkOut(id: string, studentId: string): Promise<AttendanceRecord> {

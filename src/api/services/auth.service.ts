@@ -44,7 +44,7 @@ import {
   StudentRecord,
 } from '../repositories/types/auth.repository.types';
 
-const ACCESS_TOKEN_EXPIRY = '60m';
+const ACCESS_TOKEN_EXPIRY = '7d';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const PASSWORD_SALT_ROUNDS = 10;

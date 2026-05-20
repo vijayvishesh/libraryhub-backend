@@ -1,5 +1,5 @@
-import { PaymentStatus } from '../../models/payment.model';
 import { LibraryPaymentMethod } from '../../constants/library.constants';
+import { PaymentStatus } from '../../models/payment.model';
 
 export type CreatePaymentInput = {
   userId: string;
@@ -13,6 +13,7 @@ export type CreatePaymentInput = {
   paymentStatus: PaymentStatus;
   description?: string;
   metadata?: Record<string, unknown>;
+  idempotencyKey?: string;
 };
 
 export type UpdatePaymentStatusInput = {
@@ -23,6 +24,7 @@ export type UpdatePaymentStatusInput = {
 
 export type PaymentRecord = CreatePaymentInput & {
   id: string;
+  idempotencyKey?: string;
   createdAt: Date;
   updatedAt: Date;
 };

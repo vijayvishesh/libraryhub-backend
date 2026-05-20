@@ -1,5 +1,6 @@
 import { HttpError, InternalServerError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
+import redisCache from '../../lib/redis/db.redis';
 import {
   LibraryListQueryRequest,
   LibrarySetupRequest,
@@ -96,6 +97,12 @@ export class LibraryService {
 
   public async getLibraryById(libraryId: string): Promise<LibrarySetupData> {
     try {
+      const cacheKey = `lib:detail:${libraryId}`;
+      const cached = await redisCache.get<LibrarySetupData>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const library = await this.libraryRepository.findLibraryById(libraryId.trim());
       if (!library || library.deletedAt) {
         throw new NotFoundError('LIBRARY_NOT_FOUND');
@@ -105,7 +112,9 @@ export class LibraryService {
         throw new NotFoundError('LIBRARY_NOT_FOUND');
       }
 
-      return this.mapLibrarySetupData(library);
+      const result = this.mapLibrarySetupData(library);
+      await redisCache.set(cacheKey, result, 300);
+      return result;
     } catch (error) {
       this.rethrowLibraryError(error, 'GET_LIBRARY_BY_ID_FAILED');
     }
@@ -213,6 +222,7 @@ export class LibraryService {
         }
       }
 
+      await redisCache.delete(`lib:detail:${library.id}`);
       return this.mapLibrarySetupData(updated);
     } catch (error) {
       this.rethrowLibraryError(error, 'LIBRARY_UPDATE_FAILED');
@@ -230,6 +240,8 @@ export class LibraryService {
       if (!deleted) {
         throw new InternalServerError('LIBRARY_DELETE_FAILED');
       }
+
+      await redisCache.delete(`lib:detail:${library.id}`);
     } catch (error) {
       this.rethrowLibraryError(error, 'LIBRARY_DELETE_FAILED');
     }
@@ -493,7 +505,8 @@ export class LibraryService {
         library.stats.reviewCount,
       ),
       paymentMethods: library.paymentMethods.map(
-        method => new LibraryPaymentMethodData(method.type, method.enabled, method.label, method.upiId),
+        method =>
+          new LibraryPaymentMethodData(method.type, method.enabled, method.label, method.upiId),
       ),
       upiId: library.upiId,
       upiIdGpay: library.upiIdGpay,

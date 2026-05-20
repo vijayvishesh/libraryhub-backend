@@ -142,6 +142,7 @@ export class OwnerController {
           bookingId: result.id,
           seatId: result.seatId,
           amount: result.amount,
+          studentId: result.studentId ?? null,
         },
       );
 
@@ -176,7 +177,7 @@ export class OwnerController {
         {
           bookingId: result.id,
           seatId: result.seatId,
-          // studentId: result.studentId ?? null,
+          studentId: result.studentId ?? null,
         },
       );
 
@@ -338,7 +339,10 @@ export class OwnerController {
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'application/octet-stream',
           ];
-          if (allowedMimes.includes(file.mimetype) || file.originalname.match(/\.(csv|xlsx|xls)$/i)) {
+          if (
+            allowedMimes.includes(file.mimetype) ||
+            file.originalname.match(/\.(csv|xlsx|xls)$/i)
+          ) {
             cb(null, true);
           } else {
             cb(new Error('INVALID_FILE_TYPE'));
@@ -455,6 +459,7 @@ export class OwnerController {
           memberName: payload.fullName,
           memberPhone: payload.mobileNo,
           seatId: payload.seatId,
+          studentId: result.studentId ?? null,
         },
       );
 

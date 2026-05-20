@@ -108,7 +108,7 @@ export class BookingApprovalService {
         bookingId,
       );
 
-      return this.mapBookingResult(updated, library);
+      return this.mapBookingResult({ ...updated, studentId: booking.studentId }, library);
     } catch (error) {
       this.rethrowError(error, 'APPROVE_BOOKING_FAILED');
     }
@@ -146,7 +146,7 @@ export class BookingApprovalService {
         bookingId,
       );
 
-      return this.mapBookingResult(updated, library);
+      return this.mapBookingResult({ ...updated, studentId: booking.studentId }, library);
     } catch (error) {
       this.rethrowError(error, 'REJECT_BOOKING_FAILED');
     }
@@ -327,6 +327,7 @@ export class BookingApprovalService {
       invoiceNo: string;
       libraryAddress: string;
       duration: number;
+      studentId?: string | null;
     },
     library?: LibraryRecord | null,
   ): BookingResult {
@@ -352,6 +353,7 @@ export class BookingApprovalService {
       libraryLatitude: library?.location?.coordinates?.[1] ?? null,
       libraryLongitude: library?.location?.coordinates?.[0] ?? null,
       duration: booking.duration,
+      studentId: booking.studentId ?? null,
     };
   }
 
