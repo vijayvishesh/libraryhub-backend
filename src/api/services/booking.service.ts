@@ -29,6 +29,7 @@ import {
   PaymentMethodOption,
   SeatMapResult,
 } from './types/booking.service.types';
+import { sendOwnerBookingRequestPush } from '../../loaders/cronLoader';
 
 export type { BookingResult, ListMyBookingsResult, PaymentMethodOption, SeatMapResult };
 
@@ -234,6 +235,11 @@ export class BookingService {
         error: syncError instanceof Error ? syncError.message : syncError,
       });
     }
+
+    try {
+    await sendOwnerBookingRequestPush(library.ownerId, student.name, library.name);
+  } catch {
+  }
   }
 
   private async syncMemberForBooking(

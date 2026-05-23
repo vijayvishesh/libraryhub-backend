@@ -37,6 +37,7 @@ import {
 } from '../controllers/responses/auth.response';
 import { ConflictError } from '../errors/conflict.error';
 import { AuthRepository } from '../repositories/auth.repositories';
+import { FcmTokenRepository } from '../repositories/fcmToken.repository'; // ✅ ADDED
 import { MemberRepository } from '../repositories/member.repository';
 import {
   AuthOwnerRecord,
@@ -74,6 +75,7 @@ export class AuthService {
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly memberRepository: MemberRepository,
+    private readonly fcmTokenRepository: FcmTokenRepository, // ✅ ADDED
   ) {}
 
   public async register(payload: RegisterRequest): Promise<AuthRegisterData> {
@@ -145,7 +147,7 @@ export class AuthService {
 
       // No role = member OTP login / invitation flow
       if (!payload.role) {
-        return this.handleMemberOtpVerify(phone, payload.otp);
+        return this.handleMemberOtpVerify(phone, payload.otp, payload.fcmToken, payload.deviceType); // ✅ UPDATED
       }
 
       const normalizedRole = this.normalizeRequestRole(payload.role);
@@ -185,8 +187,8 @@ export class AuthService {
       // STUDENT role: check if already exists → treat as OTP login, not signup
       const existingStudent = await this.authRepository.findStudentByPhone(phone);
       if (existingStudent) {
-        // Student exists (self-registered or added by owner) → just log in via OTP
-        return this.handleMemberOtpVerify(phone, payload.otp);
+        // Student exists → just log in via OTP
+        return this.handleMemberOtpVerify(phone, payload.otp, payload.fcmToken, payload.deviceType); // ✅ UPDATED
       }
 
       // New student signup (came from register flow, no account yet)
@@ -208,6 +210,21 @@ export class AuthService {
         role: 'STUDENT',
       });
       await this.authRepository.deletePendingStudentSignupByPhone(phone);
+
+      // ✅ ADDED — save FCM token for new student signup
+      if (payload.fcmToken && payload.deviceType) {
+        try {
+          await this.fcmTokenRepository.upsert({
+            studentId: student.id,
+            token: payload.fcmToken,
+            deviceType: payload.deviceType,
+          });
+          console.log('✅ FCM token saved for new signup student:', student.id);
+        } catch (fcmError) {
+          console.warn('FCM token save failed during signup:', fcmError);
+        }
+      }
+
       return this.createStudentAuthData(student);
     } catch (error) {
       this.rethrowAuthError(error, 'VERIFY_OTP_FAILED');
@@ -246,6 +263,22 @@ export class AuthService {
       const isPasswordValid = await bcrypt.compare(payload.password, student.password);
       if (!isPasswordValid) {
         throw new UnauthorizedError('INVALID_PASSWORD');
+      }
+
+      // ✅ ADDED — save FCM token after successful student password login
+      if (payload.fcmToken && payload.deviceType) {
+        try {
+          await this.fcmTokenRepository.upsert({
+            studentId: student.id,
+            token: payload.fcmToken,
+            deviceType: payload.deviceType,
+          });
+          console.log('✅ FCM token saved for student login:', student.id);
+        } catch (fcmError) {
+          console.warn('FCM token save failed during login:', fcmError);
+        }
+      } else {
+        console.log('⚠️ No fcmToken in login payload for student:', student.id);
       }
 
       return this.createStudentAuthData(student);
@@ -644,7 +677,7 @@ export class AuthService {
       typeof payload.name === 'string' &&
       typeof payload.phone === 'string' &&
       (gender === 'male' || gender === 'female' || gender === 'other') &&
-      (role === 'OWNER' || role === 'STUDENT' || role === 'SUPER_ADMIN') && // ← changed
+      (role === 'OWNER' || role === 'STUDENT' || role === 'SUPER_ADMIN') &&
       (tokenType === 'access' || tokenType === 'refresh') &&
       tokenType === expectedType
     );
@@ -819,6 +852,7 @@ export class AuthService {
       this.rethrowAuthError(error, 'CHANGE_PASSWORD_FAILED');
     }
   }
+
   public async forgotPassword(payload: ForgotPasswordRequest): Promise<number> {
     try {
       const phone = this.normalizePhone(payload.phone);
@@ -866,7 +900,6 @@ export class AuthService {
         throw new UnauthorizedError('INVALID_OR_EXPIRED_OTP');
       }
 
-      // Generate a reset token — reuse JWT signing
       const jwtSecret = process.env.JWT_SECRET;
       if (!jwtSecret) {
         throw new InternalServerError('JWT_SECRET_MISCONFIGURED');
@@ -926,6 +959,7 @@ export class AuthService {
       this.rethrowAuthError(error, 'RESET_PASSWORD_FAILED');
     }
   }
+
   public async resendOtp(payload: ResendOtpRequest): Promise<number> {
     try {
       const phone = this.normalizePhone(payload.phone);
@@ -936,7 +970,6 @@ export class AuthService {
           this.authRepository.findStudentByPhone(phone),
         ]);
 
-        // Must be existing student OR member in at least one library
         if (!existingStudent && !members.length) {
           throw new UnauthorizedError('USER_NOT_FOUND');
         }
@@ -957,7 +990,6 @@ export class AuthService {
         return OTP_EXPIRY_MINUTES * 60;
       }
 
-      // ── register resend ───────────────────────────────────────────────────
       if (payload.purpose === 'register') {
         const normalizedRole = this.normalizeRequestRole(payload.role!);
 
@@ -976,7 +1008,6 @@ export class AuthService {
           return OTP_EXPIRY_MINUTES * 60;
         }
 
-        // STUDENT register resend
         const pendingStudent = await this.authRepository.findPendingStudentSignupByPhone(phone);
         if (!pendingStudent) {
           throw new UnauthorizedError('NO_PENDING_SIGNUP_FOUND');
@@ -991,7 +1022,6 @@ export class AuthService {
         return OTP_EXPIRY_MINUTES * 60;
       }
 
-      // ── forgot-password resend ────────────────────────────────────────────
       const normalizedRole = this.normalizeRequestRole(payload.role!);
 
       if (normalizedRole === 'OWNER') {
@@ -1020,7 +1050,6 @@ export class AuthService {
     }
   }
 
-  // AFTER
   public async memberOtpLoginSend(payload: MemberOtpLoginSendRequest): Promise<{
     phone: string;
     expiresIn: number;
@@ -1029,20 +1058,14 @@ export class AuthService {
     try {
       const phone = this.normalizePhone(payload.phone);
 
-      // Check if existing student account
       const existingStudent = await this.authRepository.findStudentByPhone(phone);
-
-      // Check if member in any library
       const members = await this.memberRepository.findAllMembersByPhone(phone);
 
-      // Must be either an existing student OR a member in at least one library
       if (!existingStudent && !members.length) {
         throw new UnauthorizedError('USER_NOT_FOUND');
       }
 
       const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-
-      // Determine name for pending record
       const name = existingStudent?.name ?? members[0]?.fullName ?? '';
 
       await this.authRepository.upsertPendingStudentSignup({
@@ -1066,9 +1089,13 @@ export class AuthService {
     }
   }
 
-  // ✅ extracted member OTP verify logic — called by verifyOtpAndLogin when no role
-  // AFTER
-  private async handleMemberOtpVerify(phone: string, otp: string): Promise<AuthData> {
+  // ✅ UPDATED — accepts fcmToken and deviceType to save after OTP login
+  private async handleMemberOtpVerify(
+    phone: string,
+    otp: string,
+    fcmToken?: string,
+    deviceType?: string,
+  ): Promise<AuthData> {
     // 1. Validate OTP
     this.validateOtp(otp);
 
@@ -1087,7 +1114,6 @@ export class AuthService {
       this.authRepository.findStudentByPhone(phone),
     ]);
 
-    // Must be either existing student OR member in at least one library
     if (!existingStudent && !members.length) {
       throw new UnauthorizedError('USER_NOT_FOUND');
     }
@@ -1108,6 +1134,21 @@ export class AuthService {
           ),
         );
       }
+
+      // ✅ ADDED — save FCM token for existing student OTP login
+      if (fcmToken && deviceType) {
+        try {
+          await this.fcmTokenRepository.upsert({
+            studentId: existingStudent.id,
+            token: fcmToken,
+            deviceType,
+          });
+          console.log('✅ FCM token saved for OTP login (existing student):', existingStudent.id);
+        } catch (fcmError) {
+          console.warn('FCM token save failed during OTP login:', fcmError);
+        }
+      }
+
       return this.createStudentAuthData(existingStudent);
     }
 
@@ -1141,6 +1182,21 @@ export class AuthService {
     }
 
     await this.authRepository.deletePendingStudentSignupByPhone(phone);
+
+    // ✅ ADDED — save FCM token for new student created from member OTP login
+    if (fcmToken && deviceType) {
+      try {
+        await this.fcmTokenRepository.upsert({
+          studentId: student.id,
+          token: fcmToken,
+          deviceType,
+        });
+        console.log('✅ FCM token saved for OTP login (new student from member):', student.id);
+      } catch (fcmError) {
+        console.warn('FCM token save failed during member OTP login:', fcmError);
+      }
+    }
+
     return this.createStudentAuthData(student);
   }
 }

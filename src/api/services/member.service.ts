@@ -35,6 +35,7 @@ import { MemberBulkUploadRecord } from '../repositories/types/memberBulkUpload.r
 import { MemberInviteLinkRecord } from '../repositories/types/memberInviteLink.repository.types';
 import { SubmissionRecord } from '../repositories/types/memberInviteSubmission.repository.types';
 import { ListMemberPaymentsResult } from '../repositories/types/memberPayment.repository.types';
+import { sendStudentBookingStatusPush } from '../../loaders/cronLoader';
 
 export type ListMembersResult = {
   members: MemberWithFlags[];
@@ -388,7 +389,20 @@ export class MemberService {
         );
       }
 
-      return updated;
+      if (member.studentId && member.bookingId) {
+        try {
+          await sendStudentBookingStatusPush(
+            member.studentId,
+            'approved',
+            library.name,
+            member.bookingId,
+          );
+        } catch {
+          // non-critical
+        }
+      }
+      
+       return updated;
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;

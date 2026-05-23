@@ -342,31 +342,91 @@ export class AnnouncementService {
   }
 
   // ── FCM push notifications ──────────────────────────────────────────────
-  private async sendPushNotifications(
-    studentIds: string[],
-    title: string,
-    message: string,
-  ): Promise<void> {
-    try {
-      const tokens = await this.fcmTokenRepository.findTokensByStudentIds(studentIds);
-      if (tokens.length === 0) {
-        return;
-      }
+  // private async sendPushNotifications(
+  //   studentIds: string[],
+  //   title: string,
+  //   message: string,
+  // ): Promise<void> {
+  //   try {
+  //     const tokens = await this.fcmTokenRepository.findTokensByStudentIds(studentIds);
+  //     if (tokens.length === 0) {
+  //       return;
+  //     }
 
-      const messaging = getFirebaseMessaging();
-      const batchSize = 500;
+  //     const messaging = getFirebaseMessaging();
+  //     const batchSize = 500;
 
-      for (let i = 0; i < tokens.length; i += batchSize) {
-        const batch = tokens.slice(i, i + batchSize);
-        await messaging.sendEachForMulticast({
-          tokens: batch,
-          notification: { title, body: message },
-          android: { priority: 'high' },
-          apns: { payload: { aps: { sound: 'default' } } },
+  //     for (let i = 0; i < tokens.length; i += batchSize) {
+  //       const batch = tokens.slice(i, i + batchSize);
+  //       await messaging.sendEachForMulticast({
+  //         tokens: batch,
+  //         notification: { title, body: message },
+  //         android: { priority: 'high' },
+  //         apns: { payload: { aps: { sound: 'default' } } },
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.warn('[AnnouncementService] FCM push notification failed:', error);
+  //   }
+  // }
+
+private async sendPushNotifications(
+  studentIds: string[],
+  title: string,
+  message: string,
+): Promise<void> {
+  try {
+    const tokens = await this.fcmTokenRepository.findTokensByStudentIds(studentIds);
+    if (tokens.length === 0) return;
+
+    const messaging = getFirebaseMessaging();
+    const batchSize = 500;
+
+    for (let i = 0; i < tokens.length; i += batchSize) {
+      const batch = tokens.slice(i, i + batchSize);
+
+      const response = await messaging.sendEachForMulticast({
+        tokens: batch,
+        notification: { title, body: message },
+        android: { priority: 'high' },
+        apns: { payload: { aps: { sound: 'default' } } },
+      });
+
+      console.log(
+        `📤 FCM batch result: ${response.successCount} success, ${response.failureCount} failures`,
+      );
+
+      // Auto-delete invalid/stale tokens
+      if (response.failureCount > 0) {
+        const tokensToDelete: string[] = [];
+
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            const code = resp.error?.code ?? '';
+            console.warn(`❌ FCM failed [${batch[idx].slice(0, 20)}...]: ${code}`);
+
+            // These codes mean the token is permanently invalid — delete it
+            const deadTokenCodes = [
+              'messaging/invalid-registration-token',
+              'messaging/registration-token-not-registered',
+              'messaging/third-party-auth-error',
+              'messaging/invalid-argument',
+            ];
+
+            if (deadTokenCodes.includes(code)) {
+              tokensToDelete.push(batch[idx]);
+            }
+          }
         });
+
+        if (tokensToDelete.length > 0) {
+          console.log(`🗑️ Deleting ${tokensToDelete.length} invalid FCM token(s)`);
+          await this.fcmTokenRepository.deleteByTokens(tokensToDelete);
+        }
       }
-    } catch (error) {
-      console.warn('[AnnouncementService] FCM push notification failed:', error);
     }
+  } catch (error) {
+    console.warn('[AnnouncementService] FCM push notification failed:', error);
   }
+}
 }

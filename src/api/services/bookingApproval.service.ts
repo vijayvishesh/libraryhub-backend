@@ -294,6 +294,9 @@ export class BookingApprovalService {
       ]);
 
       const tokens = await this.fcmTokenRepository.findTokensByStudentIds([studentId]);
+      console.log('🔔 StudentId:', studentId);
+    console.log('🔔 Tokens found:', tokens);
+    console.log('🔔 Token count:', tokens.length);
       if (tokens.length > 0) {
         const messaging = getFirebaseMessaging();
         await messaging.sendEachForMulticast({

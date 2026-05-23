@@ -104,6 +104,16 @@ export class LoginRequest {
   @IsNotEmpty()
   @IsIn([...USER_ROLE_ENUM])
   role!: AuthRequestRole;
+
+  // ✅ ADDED — FCM token sent by frontend at login time
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
+
+  // ✅ ADDED — device type sent by frontend at login time
+  @IsOptional()
+  @IsIn(['android', 'ios', 'web'])
+  deviceType?: string;
 }
 
 export class SendOtpRequest {
@@ -141,6 +151,16 @@ export class VerifyOtpWithRoleRequest extends VerifyOtpRequest {
   @IsOptional()
   @IsIn([...USER_ROLE_ENUM])
   role?: AuthRequestRole;
+
+  // ✅ ADDED — FCM token sent by frontend at OTP verify / signup time
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
+
+  // ✅ ADDED — device type sent by frontend at OTP verify / signup time
+  @IsOptional()
+  @IsIn(['android', 'ios', 'web'])
+  deviceType?: string;
 }
 
 export class RegisterStudentRequest {
@@ -310,19 +330,3 @@ export class MemberOtpLoginSendRequest {
   })
   phone!: string;
 }
-
-// export class MemberOtpLoginVerifyRequest {
-//   @Transform(trimString)
-//   @IsNotEmpty()
-//   @Matches(PHONE_REGEX, {
-//     message: 'phone must be a valid Indian mobile number',
-//   })
-//   phone!: string;
-
-//   @Transform(trimString)
-//   @IsNotEmpty()
-//   @Matches(/^[0-9]{4,6}$/, {
-//     message: 'otp must be a valid 4 to 6 digit number',
-//   })
-//   otp!: string;
-// }

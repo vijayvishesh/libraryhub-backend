@@ -12,6 +12,8 @@ import {
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
+import { FcmTokenModel } from '../models/fcmToken.model';
+import { getDataSource } from '../../database/config/ormconfig.default';
 import { NotificationService } from '../services/notification.service';
 import { RegisterFcmTokenRequest } from './requests/fcmToken.request';
 import { CurrentSessionData } from './responses/auth.response';
@@ -30,8 +32,9 @@ import {
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
+  // ── Updated: now handles both STUDENT and OWNER tokens ──────────────────
   @Post('/fcm-token')
-  @Authorized('STUDENT')
+  @Authorized() // no role — both student and owner can call this
   @OpenAPI({
     summary: 'Register FCM device token for push notifications',
     security: [{ bearerAuth: [] }],
@@ -44,7 +47,35 @@ export class NotificationController {
     @Body() payload: RegisterFcmTokenRequest,
   ): Promise<{ responseCode: number; message: string }> {
     try {
-      await this.notificationService.registerFcmToken(session.user.id, payload);
+      const fcmRepo = getDataSource().getMongoRepository(FcmTokenModel);
+      const now = new Date();
+      const existing = await fcmRepo.findOne({ where: { token: payload.token } as any });
+
+      if (session.user.role === 'OWNER') {
+        // Owner token — store ownerId, clear studentId
+        if (existing) {
+          existing.ownerId = session.user.id;
+          existing.studentId = null;
+          existing.deviceType = payload.deviceType;
+          existing.updatedAt = now;
+          await fcmRepo.save(existing);
+        } else {
+          await fcmRepo.save(
+            fcmRepo.create({
+              ownerId: session.user.id,
+              studentId: null,
+              token: payload.token,
+              deviceType: payload.deviceType,
+              createdAt: now,
+              updatedAt: now,
+            }),
+          );
+        }
+      } else {
+        // Student token — existing flow via NotificationService
+        await this.notificationService.registerFcmToken(session.user.id, payload);
+      }
+
       return { responseCode: 200, message: 'FCM token registered successfully' };
     } catch (error) {
       if (error instanceof HttpError) {
@@ -53,6 +84,8 @@ export class NotificationController {
       throw new InternalServerError('REGISTER_FCM_TOKEN_FAILED');
     }
   }
+
+  // ── All below unchanged ──────────────────────────────────────────────────
 
   @Get('/')
   @Authorized('STUDENT')
@@ -74,9 +107,7 @@ export class NotificationController {
         200,
       );
     } catch (error) {
-      if (error instanceof HttpError) {
-        throw error;
-      }
+      if (error instanceof HttpError) throw error;
       throw new InternalServerError('LIST_NOTIFICATIONS_FAILED');
     }
   }
@@ -94,9 +125,7 @@ export class NotificationController {
       const count = await this.notificationService.getUnreadCount(session.user.id);
       return new UnreadCountApiResponse(new UnreadCountData(count), 200);
     } catch (error) {
-      if (error instanceof HttpError) {
-        throw error;
-      }
+      if (error instanceof HttpError) throw error;
       throw new InternalServerError('GET_UNREAD_COUNT_FAILED');
     }
   }
@@ -116,9 +145,7 @@ export class NotificationController {
       const record = await this.notificationService.markAsRead(id, session.user.id);
       return new NotificationApiResponse(new NotificationData(record), 200);
     } catch (error) {
-      if (error instanceof HttpError) {
-        throw error;
-      }
+      if (error instanceof HttpError) throw error;
       throw new InternalServerError('MARK_AS_READ_FAILED');
     }
   }
@@ -135,9 +162,7 @@ export class NotificationController {
       await this.notificationService.markAllAsRead(session.user.id);
       return { responseCode: 200, message: 'All notifications marked as read' };
     } catch (error) {
-      if (error instanceof HttpError) {
-        throw error;
-      }
+      if (error instanceof HttpError) throw error;
       throw new InternalServerError('MARK_ALL_AS_READ_FAILED');
     }
   }
