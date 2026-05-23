@@ -118,6 +118,7 @@ async function sendFcmToOwners(
   }
 }
 
+// Replace existing saveInAppNotifications
 async function saveInAppNotifications(
   studentIds: string[],
   title: string,
@@ -132,6 +133,7 @@ async function saveInAppNotifications(
     const docs = studentIds.map(studentId =>
       notifRepo.create({
         studentId,
+        ownerId: null,         // ← add this
         title,
         message,
         type,
@@ -142,6 +144,34 @@ async function saveInAppNotifications(
       }),
     );
     await notifRepo.save(docs);
+  } catch {
+    // non-critical
+  }
+}
+
+async function saveOwnerNotification(
+  ownerId: string,
+  title: string,
+  message: string,
+  type: NotificationType,
+  referenceId: string,
+): Promise<void> {
+  try {
+    const notifRepo = getDataSource().getMongoRepository(NotificationModel);
+    const now = new Date();
+    await notifRepo.save(
+      notifRepo.create({
+        studentId: null,
+        ownerId,
+        title,
+        message,
+        type,
+        referenceId,
+        isRead: false,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
   } catch {
     // non-critical
   }
@@ -169,6 +199,14 @@ function hhmm(date: Date, offsetMinutes = 0): string {
 export async function runMemberExpiryJob(): Promise<number> {
   const today = new Date().toISOString().slice(0, 10);
   const memberRepo = getDataSource().getMongoRepository(MemberModel);
+  const libraryRepo = getDataSource().getMongoRepository(LibraryModel);
+
+  // Find before updating so we have member details
+  const toExpire = await memberRepo.find({
+    where: { status: 'active', endDate: { $lt: today } } as any,
+  });
+
+  if (toExpire.length === 0) return 0;
 
   const result = await memberRepo.updateMany(
     { status: 'active', endDate: { $lt: today } },
@@ -177,6 +215,35 @@ export async function runMemberExpiryJob(): Promise<number> {
 
   if (result.modifiedCount > 0) {
     log.info(`Cron: Expired ${result.modifiedCount} members`);
+
+    // Notify each library owner
+    // Group by libraryId to avoid N+1 library lookups
+    const byLibrary = new Map<string, typeof toExpire>();
+    for (const m of toExpire) {
+      const list = byLibrary.get(m.libraryId) ?? [];
+      list.push(m);
+      byLibrary.set(m.libraryId, list);
+    }
+
+    for (const [libraryId, members] of byLibrary) {
+      try {
+        const library = await libraryRepo.findOne({
+          where: { _id: libraryId } as any,
+        });
+        if (!library) continue;
+
+        for (const member of members) {
+          await sendOwnerMemberExpiredNotification(
+            library.ownerId,
+            member.fullName,
+            library.name,
+            (member.id || (member as any)._id).toHexString(),
+          );
+        }
+      } catch {
+        // non-critical
+      }
+    }
   }
 
   return result.modifiedCount;
@@ -218,6 +285,25 @@ export async function runRevisionReminderJob(): Promise<void> {
   if (due.length > 0) {
     log.info(`Cron: Sent ${due.length} revision reminder(s)`);
   }
+}
+
+export async function sendStudentBookingStatusPush(
+  studentId: string,
+  status: 'approved' | 'rejected',
+  libraryName: string,
+  bookingId: string,
+): Promise<void> {
+  const isApproved = status === 'approved';
+  const title = isApproved ? '✅ Booking Approved!' : '❌ Booking Rejected';
+  const body = isApproved
+    ? `Your membership at ${libraryName} has been approved. Welcome!`
+    : `Your membership at ${libraryName} was not approved. Contact the library for details.`;
+
+  await sendFcmToStudents([studentId], title, body);
+  await saveInAppNotifications([studentId], title, body,
+    isApproved ? 'booking_approved' : 'booking_rejected',
+    bookingId,
+  );
 }
 
 // ── Timetable reminders (unchanged logic, updated notification type) ──────────
@@ -557,31 +643,26 @@ export async function sendOwnerBookingRequestPush(
   ownerId: string,
   studentName: string,
   libraryName: string,
+  bookingId: string,   // ← add this param
 ): Promise<void> {
-  await sendFcmToOwners(
-    [ownerId],
-    '🔔 New Membership Request',
-    `${studentName} has requested to join ${libraryName}. Tap to review.`,
-  );
+  const title = '🔔 New Membership Request';
+  const body = `${studentName} has requested to join ${libraryName}. Tap to review.`;
+  await sendFcmToOwners([ownerId], title, body);
+  await saveOwnerNotification(ownerId, title, body, 'booking_request', bookingId);
 }
 
-export async function sendStudentBookingStatusPush(
-  studentId: string,
-  status: 'approved' | 'rejected',
+// Add this new export for member expiry owner notifications
+// Called from runMemberExpiryJob when members are expired
+export async function sendOwnerMemberExpiredNotification(
+  ownerId: string,
+  memberName: string,
   libraryName: string,
-  bookingId: string,
+  memberId: string,
 ): Promise<void> {
-  const isApproved = status === 'approved';
-  const title = isApproved ? '✅ Booking Approved!' : '❌ Booking Rejected';
-  const body = isApproved
-    ? `Your membership at ${libraryName} has been approved. Welcome!`
-    : `Your membership at ${libraryName} was not approved. Contact the library for details.`;
-
-  await sendFcmToStudents([studentId], title, body);
-  await saveInAppNotifications([studentId], title, body,
-    isApproved ? 'booking_approved' : 'booking_rejected',
-    bookingId,
-  );
+  const title = '⚠️ Member Subscription Expired';
+  const body = `${memberName}'s subscription at ${libraryName} has expired.`;
+  await sendFcmToOwners([ownerId], title, body);
+  await saveOwnerNotification(ownerId, title, body, 'member_expired', memberId);
 }
 
 // ── Cron loader ───────────────────────────────────────────────────────────────

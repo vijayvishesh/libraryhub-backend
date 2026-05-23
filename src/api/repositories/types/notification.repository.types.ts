@@ -2,7 +2,8 @@ import { NotificationType } from '../../models/notification.model';
 
 export type NotificationRecord = {
   id: string;
-  studentId: string;
+  studentId: string | null;
+  ownerId: string | null;
   title: string;
   message: string;
   type: NotificationType;
@@ -13,9 +14,10 @@ export type NotificationRecord = {
 };
 
 export type CreateNotificationInput = {
-  studentId: string;
+  studentId?: string | null;
+  ownerId?: string | null;
   title: string;
   message: string;
   type: NotificationType;
-  referenceId: string | null;
+  referenceId?: string | null;
 };

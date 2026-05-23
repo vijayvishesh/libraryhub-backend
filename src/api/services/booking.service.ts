@@ -237,7 +237,7 @@ export class BookingService {
     }
 
     try {
-    await sendOwnerBookingRequestPush(library.ownerId, student.name, library.name);
+    await sendOwnerBookingRequestPush(library.ownerId, student.name, library.name,  bookingId);
   } catch {
   }
   }

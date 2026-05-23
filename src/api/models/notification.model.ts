@@ -13,17 +13,25 @@ export type NotificationType =
   | 'slot_starting'
   | 'slot_not_checked_in'
   | 'timetable_reminder'
-  | 'revision_reminder';
+  | 'revision_reminder'
+  | 'member_expired';
+
+export type NotificationAudience = 'student' | 'owner';
 
 @Entity('notifications')
 @Index('idx_notifications_student_id', ['studentId'])
+@Index('idx_notifications_owner_id', ['ownerId'])
 @Index('idx_notifications_studentId_isRead', ['studentId', 'isRead'])
+@Index('idx_notifications_ownerId_isRead', ['ownerId', 'isRead'])
 export class NotificationModel {
   @ObjectIdColumn()
   id!: ObjectId;
 
   @Column()
-  studentId!: string;
+  studentId!: string | null;
+
+  @Column()
+  ownerId!: string | null; 
 
   @Column()
   title!: string;
