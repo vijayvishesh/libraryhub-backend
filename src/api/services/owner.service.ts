@@ -28,10 +28,11 @@ export class OwnerService {
   public async getDashboard(ownerId: string): Promise<OwnerDashboardResult> {
     try {
       const cacheKey = `owner:dashboard:${ownerId}`;
-      const cached = await redisCache.get<OwnerDashboardResult>(cacheKey);
-      if (cached) {
-        return cached;
-      }
+      await redisCache.delete(cacheKey)
+      // const cached = await redisCache.get<OwnerDashboardResult>(cacheKey);
+      // if (cached) {
+      //   return cached;
+      // }
 
       const library = await this.getOwnerLibraryOrThrow(ownerId);
       const seatMap = await this.bookingService.getLibrarySeatMap(library.id);
@@ -170,32 +171,43 @@ export class OwnerService {
     };
   }
 
-  private async getAlertStats(libraryId: string): Promise<OwnerDashboardAlerts> {
-    const now = this.startOfDay(new Date());
-    const nowIso = now.toISOString().slice(0, 10);
-    const expiringWindow = new Date(now);
-    expiringWindow.setUTCDate(expiringWindow.getUTCDate() + 7);
-    const expiringIso = expiringWindow.toISOString().slice(0, 10);
+private async getAlertStats(libraryId: string): Promise<OwnerDashboardAlerts> {
+  const now = this.startOfDay(new Date());
+  const nowIso = now.toISOString().slice(0, 10);
+  const expiringWindow = new Date(now);
+  expiringWindow.setUTCDate(expiringWindow.getUTCDate() + 7);
+  const expiringIso = expiringWindow.toISOString().slice(0, 10);
 
-    const memberRepo = getDataSource().getMongoRepository(MemberModel);
-    const [overdueCount, expiringSoonCount] = await Promise.all([
-      memberRepo.count({
-        where: { libraryId, status: { $in: ['expired'] } as any },
-      }),
-      memberRepo.count({
-        where: {
-          libraryId,
-          status: 'active',
-          endDate: { $gte: nowIso, $lte: expiringIso },
-        } as any,
-      }),
-    ]);
+  console.log('[getAlertStats] libraryId:', libraryId);
+  console.log('[getAlertStats] todayIso:', nowIso);
+  console.log('[getAlertStats] expiringIso:', expiringIso);
 
-    return {
-      overdue: overdueCount,
-      expiringSoon: expiringSoonCount,
-    };
-  }
+  const memberRepo = getDataSource().getMongoRepository(MemberModel);
+  const collection = memberRepo.manager.getMongoRepository(MemberModel);
+
+  const [overdueCount, expiringSoonCount] = await Promise.all([
+    collection.countDocuments({
+      libraryId,
+      $or: [
+        { status: 'expired' },
+        { status: 'active', endDate: { $lte: nowIso } },
+      ],
+    }),
+    collection.countDocuments({
+      libraryId,
+      status: 'active',
+      endDate: { $gte: nowIso, $lte: expiringIso },
+    }),
+  ]);
+
+  console.log('[getAlertStats] overdueCount:', overdueCount);
+  console.log('[getAlertStats] expiringSoonCount:', expiringSoonCount);
+
+  return {
+    overdue: overdueCount,
+    expiringSoon: expiringSoonCount,
+  };
+}
 
   private async getRecentActivity(ownerId: string): Promise<OwnerDashboardRecentActivity[]> {
     const activities = await this.activityService.listRecentActivities(ownerId.trim(), 3);

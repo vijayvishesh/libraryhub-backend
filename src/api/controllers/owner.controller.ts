@@ -722,4 +722,39 @@ export class OwnerController {
 //   await this.libraryService.updateLibraryPhotos(session.user.id, payload.photos);
 //   return new LibraryActionApiResponse('Photos updated successfully');
 // }
+
+@Patch('/members/:memberId/inactivate')
+@Authorized('OWNER')
+@OpenAPI({ security: [{ bearerAuth: [] }] })
+@ResponseSchema(MemberActionApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async deactivateMember(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @Param('memberId') memberId: string,
+): Promise<MemberActionApiResponse> {
+  try {
+    const result = await this.memberService.deactivateMember(session.user.id, memberId);
+
+    await this.activityService.logActivity(
+      session.user.id,
+      'MEMBER_UPDATED',
+      `Member deactivated: ${result.fullName}`,
+      {
+        memberName: result.fullName,
+        memberId: result.id,
+        studentId: result.studentId ?? null,
+      },
+    );
+
+    return new MemberActionApiResponse('MEMBER_DEACTIVATED', 200);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw error;
+    }
+
+    throw new InternalServerError('DEACTIVATE_MEMBER_FAILED');
+  }
+}
 }

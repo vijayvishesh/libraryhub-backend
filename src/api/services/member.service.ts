@@ -975,4 +975,45 @@ export class MemberService {
 // ): Promise<void> {
 //   await this.authRepository.updateStudent(studentId, { avatarUrl });
 // }
+
+public async deactivateMember(
+  ownerId: string,
+  memberId: string,
+): Promise<MemberRecord> {
+  try {
+    const library = await this.getOwnerLibraryOrThrow(ownerId);
+    const member = await this.memberRepository.findMemberByIdAndLibrary(
+      memberId.trim(),
+      library.id,
+    );
+
+    if (!member) {
+      throw new NotFoundError('MEMBER_NOT_FOUND');
+    }
+
+    if (member.status === 'inactive') {
+      throw new HttpError(409, 'MEMBER_ALREADY_INACTIVE');
+    }
+
+    const updated = await this.memberRepository.updateMemberByIdAndLibrary(
+      member.id,
+      library.id,
+      {
+        status: 'inactive',
+        updatedAt: new Date(),
+      },
+    );
+
+    if (!updated) {
+      throw new InternalServerError('DEACTIVATE_MEMBER_FAILED');
+    }
+
+    return updated;
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    throw new InternalServerError('DEACTIVATE_MEMBER_FAILED');
+  }
+}
 }
