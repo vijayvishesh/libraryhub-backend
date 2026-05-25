@@ -17,6 +17,7 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { AuthRepository } from '../repositories/auth.repositories';
+import { LibraryRepository } from '../repositories/library.repository';
 import { UploadService } from '../services/upload.service';
 import { DeleteUploadRequest, GeneratePresignedUrlRequest } from './requests/upload.request';
 import {
@@ -37,6 +38,7 @@ export class UploadController {
   constructor(
     private readonly uploadService: UploadService,
     private readonly authRepository: AuthRepository,
+    private readonly libraryRepository: LibraryRepository, // ✅ ADD THIS
   ) {}
 
   @Post('/presigned')
@@ -107,7 +109,6 @@ export class UploadController {
         folder,
       );
 
-      // Save the public fileUrl directly to user record
       await this.saveFileUrlToUser(session, folder, result.fileUrl);
 
       return new UploadFileApiResponse(
@@ -140,7 +141,6 @@ export class UploadController {
     }
   }
 
-  // Store full public URL directly — no signed URLs needed
   private async saveFileUrlToUser(
     session: CurrentSessionData,
     folder: string,
@@ -150,13 +150,34 @@ export class UploadController {
       const role = session.user.role;
       const userId = session.user.id;
 
+      // ✅ Student avatar
       if (folder === 'avatars' && role === 'STUDENT') {
         await this.authRepository.updateStudentProfile(userId, { avatarUrl: fileUrl });
         return;
       }
 
+      // ✅ Owner logo/avatar
       if (folder === 'logos' && role === 'OWNER') {
         await this.authRepository.updateOwnerProfile(userId, { avatarUrl: fileUrl });
+        return;
+      }
+
+      // ✅ Library photos — append new photo to library's photos array in MongoDB
+      if (folder === 'library-photos' && role === 'OWNER') {
+        const library = await this.libraryRepository.findLibraryByOwnerId(userId);
+        if (!library) return;
+
+        const existingPhotos = library.photos ?? [];
+        const newPhoto = {
+          url: fileUrl,
+          publicId: null,
+          order: existingPhotos.length, // append at end
+          uploadedAt: new Date(),
+        };
+
+        await this.libraryRepository.partialUpdateLibrary(library.id, {
+          photos: [...existingPhotos, newPhoto],
+        });
         return;
       }
     } catch {

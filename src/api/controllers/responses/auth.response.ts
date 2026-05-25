@@ -2,7 +2,7 @@ import { Type } from 'class-transformer';
 import { IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 export { ErrorData } from './common.reponse';
 
-const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
+// const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 
 const toOpenApiRole = (role: string): string => {
   const normalizedRole = role.trim().toUpperCase();
@@ -173,11 +173,11 @@ export class TokenPairData {
   constructor(
     accessToken: string,
     refreshToken: string,
-    expiresIn = DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
+    // expiresIn = DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
   ) {
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
-    this.expiresIn = expiresIn;
+    // this.expiresIn = expiresIn;
   }
 }
 

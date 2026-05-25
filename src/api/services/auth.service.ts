@@ -45,9 +45,9 @@ import {
   StudentRecord,
 } from '../repositories/types/auth.repository.types';
 
-const ACCESS_TOKEN_EXPIRY = '7d';
-const REFRESH_TOKEN_EXPIRY = '7d';
-const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+const ACCESS_TOKEN_EXPIRY = '365d';   // ← long-lived; session lives until logout
+const REFRESH_TOKEN_EXPIRY = '365d';  // ← same: no forced expiry
+const REFRESH_TOKEN_EXPIRY_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
 const PASSWORD_SALT_ROUNDS = 10;
 const OTP_EXPIRY_MINUTES = 10;
 const STATIC_OTP = '555555';
@@ -251,7 +251,6 @@ export class AuthService {
           throw new UnauthorizedError('TENANT_NOT_FOUND');
         }
 
-        // ✅ ADDED — save FCM token for owner login
         if (payload.fcmToken && payload.deviceType) {
           try {
             await this.fcmTokenRepository.upsertOwner({
@@ -390,17 +389,24 @@ export class AuthService {
     }
   }
 
+  // ✅ FIXED — logout never fails; token is optional; revokes session only when valid token provided
   public async logout(payload: LogoutRequest): Promise<LogoutData> {
     try {
-      const refreshToken = payload.refreshToken.trim();
-      const tokenPayload = this.verifyToken(refreshToken, 'refresh');
-      const session = await this.getValidSession(tokenPayload);
+      const refreshToken = payload.refreshToken?.trim();
 
-      if (session.refreshTokenHash !== this.hashToken(refreshToken)) {
-        throw new UnauthorizedError('INVALID_OR_EXPIRED_TOKEN');
+      if (refreshToken) {
+        try {
+          const tokenPayload = this.verifyToken(refreshToken, 'refresh');
+          const session = await this.getValidSession(tokenPayload);
+
+          if (session.refreshTokenHash === this.hashToken(refreshToken)) {
+            await this.authRepository.revokeAuthSession(session.id);
+          }
+        } catch {
+          // Token invalid/expired — still succeed; user is logged out on client side
+        }
       }
 
-      await this.authRepository.revokeAuthSession(session.id);
       return new LogoutData('Logged out successfully');
     } catch (error) {
       this.rethrowAuthError(error, 'LOGOUT_FAILED');
@@ -437,7 +443,7 @@ export class AuthService {
         return new CurrentSessionData(
           new AuthUserData(owner.id, owner.name, owner.phone, DEFAULT_OWNER_GENDER, owner.role, {
             hasCreatedLibrary: owner.hasCreatedLibrary,
-          avatarUrl: owner.avatarUrl ?? null,
+            avatarUrl: owner.avatarUrl ?? null,
           }),
           new AuthTenantData(tenant.id, tenant.name, tenant.city, tenant.isSetupCompleted),
         );
@@ -454,7 +460,7 @@ export class AuthService {
           email: student.email,
           city: student.city,
           bio: student.bio,
-         avatarUrl: student.avatarUrl ?? null,
+          avatarUrl: student.avatarUrl ?? null,
         }),
       );
     } catch (error) {
@@ -526,7 +532,7 @@ export class AuthService {
       return new CurrentSessionData(
         new AuthUserData(updated.id, updated.name, updated.phone, updated.gender, updated.role, {
           hasJoinedLibrary: updated.hasJoinedLibrary,
-           avatarUrl: updated.avatarUrl ?? null,
+          avatarUrl: updated.avatarUrl ?? null,
         }),
       );
     } catch (error) {
@@ -716,9 +722,7 @@ export class AuthService {
       throw new UnauthorizedError('SESSION_REVOKED');
     }
 
-    if (session.expiresAt.getTime() < Date.now()) {
-      throw new UnauthorizedError('SESSION_EXPIRED');
-    }
+    // ✅ No session expiry check — session lives until user explicitly logs out
 
     if (
       session.ownerId !== payload.sub ||
@@ -975,7 +979,6 @@ export class AuthService {
     }
   }
 
-  // ✅ FIXED — resendOtp now correctly handles the 'register' purpose
   public async resendOtp(payload: ResendOtpRequest): Promise<number> {
     try {
       const phone = this.normalizePhone(payload.phone);

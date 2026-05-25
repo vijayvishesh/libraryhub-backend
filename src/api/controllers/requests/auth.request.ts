@@ -201,9 +201,9 @@ export class RefreshSessionRequest {
 
 export class LogoutRequest {
   @Transform(trimString)
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  refreshToken!: string;
+  refreshToken?: string;
 }
 
 export class UpdateProfileRequest {
