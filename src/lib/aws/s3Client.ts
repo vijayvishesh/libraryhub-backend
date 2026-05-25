@@ -7,9 +7,17 @@ export const getS3Client = (): S3Client => {
   if (cachedClient) {
     return cachedClient;
   }
+    // Debug — remove after fix
+  console.log('S3 credentials check:');
+  console.log('accessKeyId:', process.env.AWS_ACCESS_KEY_ID);
+  console.log('secretAccessKey length:', process.env.AWS_SECRET_ACCESS_KEY?.length);
+  console.log('secretAccessKey last 4:', process.env.AWS_SECRET_ACCESS_KEY?.slice(-4));
+  console.log('region:', process.env.AWS_REGION);
 
   const config: S3ClientConfig = {
-    region: env.s3.region,
+    region: process.env.AWS_REGION || env.s3.region,  
+    requestChecksumCalculation: 'WHEN_REQUIRED',  
+    responseChecksumValidation: 'WHEN_REQUIRED',  
   };
 
   if (env.s3.endpoint) {
@@ -21,6 +29,12 @@ export const getS3Client = (): S3Client => {
     config.credentials = {
       accessKeyId: env.s3.accessKeyId,
       secretAccessKey: env.s3.secretAccessKey,
+    };
+  } else {
+    // ← fallback to AWS_* env vars directly
+    config.credentials = {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
     };
   }
 

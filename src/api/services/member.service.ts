@@ -968,4 +968,11 @@ export class MemberService {
       isDuplicate: submission?.isDuplicate ?? false,
     };
   }
+
+//   public async updateStudentAvatar(
+//   studentId: string,
+//   avatarUrl: string,
+// ): Promise<void> {
+//   await this.authRepository.updateStudent(studentId, { avatarUrl });
+// }
 }

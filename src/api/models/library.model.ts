@@ -156,6 +156,9 @@ export class LibraryModel {
   stats!: LibraryStats;
 
   @Column()
+  logoUrl!: string | null;
+
+  @Column()
   deletedAt!: Date | null;
 
   @Column()

@@ -62,6 +62,10 @@ export class AuthUserData {
   @IsString()
   bio?: string | null;
 
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string | null;  // ← added
+
   constructor(
     id: string,
     name: string,
@@ -74,6 +78,7 @@ export class AuthUserData {
       email?: string | null;
       city?: string | null;
       bio?: string | null;
+      avatarUrl?: string | null;  // ← added
     },
   ) {
     this.id = id;
@@ -85,24 +90,23 @@ export class AuthUserData {
     if (typeof statusFlags?.hasCreatedLibrary === 'boolean') {
       this.hasCreatedLibrary = statusFlags.hasCreatedLibrary;
     }
-
     if (typeof statusFlags?.hasJoinedLibrary === 'boolean') {
       this.hasJoinedLibrary = statusFlags.hasJoinedLibrary;
     }
     if (statusFlags?.email !== undefined) {
       this.email = statusFlags.email;
     }
-
     if (statusFlags?.city !== undefined) {
       this.city = statusFlags.city;
     }
-
     if (statusFlags?.bio !== undefined) {
       this.bio = statusFlags.bio;
     }
+    if (statusFlags?.avatarUrl !== undefined) {
+      this.avatarUrl = statusFlags.avatarUrl;  // ← added
+    }
   }
 }
-
 export class AuthTenantData {
   @IsString()
   id!: string;
@@ -220,10 +224,12 @@ export class UserProfileData {
   @IsString()
   bio?: string | null;
 
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string | null;  // ← added
+
   constructor(user?: AuthUserData, createdAt?: Date) {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     this.id = user.id;
     this.name = user.name;
@@ -235,11 +241,9 @@ export class UserProfileData {
     if (typeof user.hasCreatedLibrary === 'boolean') {
       this.hasCreatedLibrary = user.hasCreatedLibrary;
     }
-
     if (typeof user.hasJoinedLibrary === 'boolean') {
       this.hasJoinedLibrary = user.hasJoinedLibrary;
     }
-
     if (createdAt) {
       this.createdAt = createdAt.toISOString();
     }
@@ -251,6 +255,9 @@ export class UserProfileData {
     }
     if (user.bio !== undefined) {
       this.bio = user.bio;
+    }
+    if (user.avatarUrl !== undefined) {
+      this.avatarUrl = user.avatarUrl;  // ← added
     }
   }
 }

@@ -233,6 +233,11 @@ export class UpdateProfileRequest {
   @Transform(trimString)
   @IsString()
   bio?: string;
+
+    @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  avatarUrl?: string | null; 
 }
 
 export class ChangePasswordRequest {

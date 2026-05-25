@@ -309,59 +309,45 @@ export class AuthRepository {
     await studentRepository.save(student);
   }
 
-  public async updateOwnerProfile(
+   public async updateOwnerProfile(
     ownerId: string,
     input: UpdateOwnerProfileInput,
   ): Promise<AuthOwnerRecord | null> {
     const objectId = this.tryParseObjectId(ownerId);
-    if (!objectId) {
-      return null;
-    }
+    if (!objectId) return null;
 
     const ownerRepository = this.getOwnerRepository();
     const owner = await ownerRepository.findOneById(objectId);
-    if (!owner) {
-      return null;
-    }
+    if (!owner) return null;
 
     if (input.name !== undefined) {
       owner.name = input.name;
+    }
+    if (input.avatarUrl !== undefined) {
+      owner.avatarUrl = input.avatarUrl;  // ← added
     }
 
     const savedOwner = await ownerRepository.save(owner);
     return this.mapOwner(savedOwner);
   }
 
-  public async updateStudentProfile(
+public async updateStudentProfile(
     studentId: string,
     input: UpdateStudentProfileInput,
   ): Promise<StudentRecord | null> {
     const objectId = this.tryParseObjectId(studentId);
-    if (!objectId) {
-      return null;
-    }
+    if (!objectId) return null;
 
     const studentRepository = this.getStudentRepository();
     const student = await studentRepository.findOneById(objectId);
-    if (!student) {
-      return null;
-    }
+    if (!student) return null;
 
-    if (input.name !== undefined) {
-      student.name = input.name;
-    }
-    if (input.gender !== undefined) {
-      student.gender = input.gender;
-    }
-    if (input.email !== undefined) {
-      student.email = input.email;
-    }
-    if (input.city !== undefined) {
-      student.city = input.city;
-    }
-    if (input.bio !== undefined) {
-      student.bio = input.bio;
-    }
+    if (input.name !== undefined) student.name = input.name;
+    if (input.gender !== undefined) student.gender = input.gender;
+    if (input.email !== undefined) student.email = input.email;
+    if (input.city !== undefined) student.city = input.city;
+    if (input.bio !== undefined) student.bio = input.bio;
+    if (input.avatarUrl !== undefined) student.avatarUrl = input.avatarUrl;  // ← added
 
     const savedStudent = await studentRepository.save(student);
     return this.mapStudent(savedStudent);
@@ -443,7 +429,7 @@ export class AuthRepository {
     await sessionRepository.save(session);
   }
 
-  private mapOwner(owner: UserModel): AuthOwnerRecord {
+   private mapOwner(owner: UserModel): AuthOwnerRecord {
     return {
       id: this.toHexString(owner),
       tenantId: owner.tenantId,
@@ -452,6 +438,7 @@ export class AuthRepository {
       password: owner.password,
       hasCreatedLibrary: owner.hasCreatedLibrary ?? false,
       role: owner.role as AuthOwnerRecord['role'],
+      avatarUrl: owner.avatarUrl ?? null,  // ← added
     };
   }
 
@@ -478,6 +465,7 @@ export class AuthRepository {
       email: student.email ?? null,
       city: student.city ?? null,
       bio: student.bio ?? null,
+      avatarUrl: student.avatarUrl ?? null,
     };
   }
 

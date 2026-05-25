@@ -7,6 +7,7 @@ import {
   InternalServerError,
   JsonController,
   Param,
+  // Patch,
   Post,
   QueryParams,
 } from 'routing-controllers';
@@ -23,6 +24,7 @@ import {
   BookingListPayloadData,
 } from './responses/booking.response';
 import { ErrorResponseModel } from './responses/common.reponse';
+// import { UpdateStudentAvatarRequest } from './requests/upload.request';
 
 @Service()
 @JsonController('/v1/bookings')
@@ -137,4 +139,14 @@ export class BookingController {
       libraryUsage: params.libraryUsage,
     });
   }
+  
+// @Patch('/avatar')
+// @Authorized('STUDENT')
+// public async updateAvatar(
+//   @CurrentUser({ required: true }) session: CurrentSessionData,
+//   @Body() payload: UpdateStudentAvatarRequest,
+// ): Promise<any> {
+//   // await this.memberService.updateStudentAvatar(session.user.id, payload.avatarUrl);
+//   return { responseCode: 200, message: 'Avatar updated successfully' };
+// }
 }

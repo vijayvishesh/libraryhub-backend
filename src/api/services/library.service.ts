@@ -621,4 +621,22 @@ export class LibraryService {
       this.rethrowLibraryError(error, 'UPDATE_LIBRARY_SLOTS_FAILED');
     }
   }
+//   public async updateLibraryLogo(
+//   ownerId: string,
+//   logoUrl: string,
+// ): Promise<void> {
+//   const library = await this.getOwnerLibraryOrThrow(ownerId);
+//   await this.libraryRepository.updateLibrary(library.id, { logoUrl });
+// }
+//   getOwnerLibraryOrThrow(ownerId: string) {
+//     throw new Error('Method not implemented.');
+//   }
+
+// public async updateLibraryPhotos(
+//   ownerId: string,
+//   photos: string[],
+// ): Promise<void> {
+//   const library = await this.getOwnerLibraryOrThrow(ownerId);
+//   await this.libraryRepository.updateLibrary(library.id, { photos });
+// }
 }

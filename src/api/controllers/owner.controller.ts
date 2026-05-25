@@ -68,6 +68,7 @@ import {
   OwnerDashboardRevenueData,
   OwnerDashboardSeatsData,
 } from './responses/owner.response';
+// import { UpdateLibraryLogoRequest, UpdateLibraryPhotosRequest } from './requests/upload.request';
 
 @Service()
 @JsonController('/owner')
@@ -701,4 +702,24 @@ export class OwnerController {
       throw new InternalServerError('GET_MEMBER_PAYMENT_HISTORY_FAILED');
     }
   }
+
+//   @Patch('/logo')
+// @Authorized('OWNER')
+// public async updateLogo(
+//   @CurrentUser({ required: true }) session: CurrentSessionData,
+//   @Body() payload: UpdateLibraryLogoRequest,
+// ): Promise<LibraryActionApiResponse> {
+//   await this.libraryService.updateLibraryLogo(session.user.id, payload.logoUrl);
+//   return new LibraryActionApiResponse('Logo updated successfully');
+// }
+
+// @Patch('/photos')
+// @Authorized('OWNER')
+// public async updatePhotos(
+//   @CurrentUser({ required: true }) session: CurrentSessionData,
+//   @Body() payload: UpdateLibraryPhotosRequest,
+// ): Promise<LibraryActionApiResponse> {
+//   await this.libraryService.updateLibraryPhotos(session.user.id, payload.photos);
+//   return new LibraryActionApiResponse('Photos updated successfully');
+// }
 }

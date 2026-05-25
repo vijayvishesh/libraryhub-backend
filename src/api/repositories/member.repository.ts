@@ -78,84 +78,102 @@ export class MemberRepository {
     return this.mapMember(member);
   }
 
-  public async listMembersByLibrary(query: ListMembersQuery): Promise<ListMembersResult> {
-    const memberRepository = this.getMemberRepository();
-    const filter: Record<string, unknown> = {
-      libraryId: query.libraryId,
-    };
+ public async listMembersByLibrary(query: ListMembersQuery): Promise<ListMembersResult> {
+  const memberRepository = this.getMemberRepository();
+  const filter: Record<string, unknown> = {
+    libraryId: query.libraryId,
+  };
 
-    if (query.status) {
-      filter.status = query.status;
-    }
-
-    if (query.slotId) {
-      filter.slotId = query.slotId;
-    }
-
-    if (query.search) {
-      const escapedSearch = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const searchRegex = { $regex: escapedSearch, $options: 'i' };
-      filter.$or = [{ fullName: searchRegex }, { mobileNo: searchRegex }, { email: searchRegex }];
-    }
-
-    const [members, total] = await Promise.all([
-      memberRepository.find({
-        where: filter,
-        order: { createdAt: 'DESC' },
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      memberRepository.count({ where: filter }),
-    ]);
-
-    return {
-      members: members.map(item => this.mapMember(item)),
-      total,
-    };
+  if (query.status) {
+    filter.status = query.status;
   }
+
+  if (query.slotId) {
+    filter.slotId = query.slotId;
+  }
+
+  if (query.search) {
+    const escapedSearch = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = { $regex: escapedSearch, $options: 'i' };
+    filter.$or = [{ fullName: searchRegex }, { mobileNo: searchRegex }, { email: searchRegex }];
+  }
+
+  const [members, total] = await Promise.all([
+    memberRepository.find({
+      where: filter,
+      order: { createdAt: 'DESC' },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+    }),
+    memberRepository.count({ where: filter }),
+  ]);
+
+  // ── Enrich with student data ─────────────────────────────────────────
+  const studentIds = members
+    .map(m => m.studentId)
+    .filter((id): id is string => !!id);
+
+  const studentMap = await this.findStudentsByIds(studentIds);
+
+  return {
+    members: members.map(item => this.mapMemberWithStudent(item, studentMap)),
+    total,
+  };
+}
 
   public async findAllMembersByLibrary(libraryId: string): Promise<MemberRecord[]> {
-    const members = await this.getMemberRepository().find({
-      where: { libraryId },
-      order: { createdAt: 'DESC' },
-      take: 1000,
-    });
+  const members = await this.getMemberRepository().find({
+    where: { libraryId },
+    order: { createdAt: 'DESC' },
+    take: 1000,
+  });
 
-    return members.map(item => this.mapMember(item));
-  }
+  const studentIds = members
+    .map(m => m.studentId)
+    .filter((id): id is string => !!id);
 
-  public async findMembersExpiringInRange(
-    libraryId: string,
-    fromDate: string,
-    toDate: string,
-  ): Promise<MemberRecord[]> {
-    const members = await this.getMemberRepository().find({
-      where: {
-        libraryId,
-        endDate: { $gte: fromDate, $lte: toDate } as unknown as string,
-      },
-      order: { endDate: 'ASC' },
-    });
+  const studentMap = await this.findStudentsByIds(studentIds);
 
-    return members.map(item => this.mapMember(item));
-  }
+  return members.map(item => this.mapMemberWithStudent(item, studentMap));
+}
 
-  public async findMemberByIdAndLibrary(
-    memberId: string,
-    libraryId: string,
-  ): Promise<MemberRecord | null> {
-    const objectId = this.tryParseObjectId(memberId);
-    if (!objectId) {
-      return null;
-    }
+public async findMembersExpiringInRange(
+  libraryId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<MemberRecord[]> {
+  const members = await this.getMemberRepository().find({
+    where: {
+      libraryId,
+      endDate: { $gte: fromDate, $lte: toDate } as unknown as string,
+    },
+    order: { endDate: 'ASC' },
+  });
 
-    const member = await this.getMemberRepository().findOneById(objectId);
-    if (!member || member.libraryId !== libraryId) {
-      return null;
-    }
+  const studentIds = members
+    .map(m => m.studentId)
+    .filter((id): id is string => !!id);
 
-    return this.mapMember(member);
-  }
+  const studentMap = await this.findStudentsByIds(studentIds);
+  return members.map(item => this.mapMemberWithStudent(item, studentMap));
+}
+
+public async findMemberByIdAndLibrary(
+  memberId: string,
+  libraryId: string,
+): Promise<MemberRecord | null> {
+  const objectId = this.tryParseObjectId(memberId);
+  if (!objectId) return null;
+
+  const member = await this.getMemberRepository().findOneById(objectId);
+  if (!member || member.libraryId !== libraryId) return null;
+
+  const studentMap = member.studentId
+    ? await this.findStudentsByIds([member.studentId])
+    : new Map();
+
+  return this.mapMemberWithStudent(member, studentMap);
+}
 
   public async updateMemberByIdAndLibrary(
     memberId: string,
@@ -243,21 +261,20 @@ export class MemberRepository {
     return true;
   }
 
-  public async findMemberByStudentIdAndLibrary(
-    studentId: string,
-    libraryId: string,
-  ): Promise<MemberRecord | null> {
-    const member = await this.getMemberRepository().findOneBy({
-      studentId,
-      libraryId,
-    });
+ public async findMemberByStudentIdAndLibrary(
+  studentId: string,
+  libraryId: string,
+): Promise<MemberRecord | null> {
+  const member = await this.getMemberRepository().findOneBy({
+    studentId,
+    libraryId,
+  });
 
-    if (!member) {
-      return null;
-    }
+  if (!member) return null;
 
-    return this.mapMember(member);
-  }
+  const studentMap = await this.findStudentsByIds([studentId]);
+  return this.mapMemberWithStudent(member, studentMap);
+}
 
   // Slot types that block the seat for ALL other slots
   private readonly FULL_BLOCKING_SLOTS = ['fullday', 'twentyfour'];
@@ -466,13 +483,15 @@ export class MemberRepository {
   private getMemberRepository(): MongoRepository<MemberModel> {
     return getDataSource().getMongoRepository(MemberModel);
   }
-  public async findAllMembersByStudentId(studentId: string): Promise<MemberRecord[]> {
-    const members = await this.getMemberRepository().find({
-      where: { studentId } as any,
-      take: 1000,
-    });
-    return members.map(item => this.mapMember(item));
-  }
+ public async findAllMembersByStudentId(studentId: string): Promise<MemberRecord[]> {
+  const members = await this.getMemberRepository().find({
+    where: { studentId } as any,
+    take: 1000,
+  });
+
+  const studentMap = await this.findStudentsByIds([studentId]);
+  return members.map(item => this.mapMemberWithStudent(item, studentMap));
+}
 
   public async findAllMembersByPhone(mobileNo: string): Promise<MemberRecord[]> {
     const members = await this.getMemberRepository().find({
@@ -482,4 +501,52 @@ export class MemberRepository {
     });
     return members.map(item => this.mapMember(item));
   }
+  public async findStudentsByIds(
+  studentIds: string[],
+): Promise<Map<string, { name: string; phone: string; email: string | null; gender: string }>> {
+  if (studentIds.length === 0) return new Map();
+
+  const studentRepo = getDataSource().getMongoRepository(
+    (await import('../models/student.model')).StudentModel,
+  );
+
+  const students = await studentRepo.find({
+    where: { _id: { $in: studentIds.map(id => new ObjectId(id)) } } as any,
+  });
+
+  const map = new Map<string, { name: string; phone: string; email: string | null; gender: string }>();
+  for (const s of students) {
+    map.set(s.id.toHexString(), {
+      name: s.name,
+      phone: s.phone,
+      email: s.email ?? null,
+      gender: s.gender,
+    });
+  }
+  return map;
+}
+
+// ── New: maps member and overrides with student data if linked ───────────
+private mapMemberWithStudent(
+  member: MemberModel,
+  studentMap: Map<string, { name: string; phone: string; email: string | null; gender: string }>,
+): MemberRecord {
+  const base = this.mapMember(member);
+  const studentId = member.studentId;
+
+  if (studentId) {
+    const student = studentMap.get(studentId);
+    if (student) {
+      // Student's own data overrides whatever owner typed
+      base.fullName = student.name;
+      base.mobileNo = student.phone;
+      // Only override email if student has set one
+      if (student.email) {
+        base.email = student.email;
+      }
+    }
+  }
+
+  return base;
+}
 }

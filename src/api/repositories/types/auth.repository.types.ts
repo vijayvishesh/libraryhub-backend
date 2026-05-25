@@ -8,6 +8,7 @@ export type AuthOwnerRecord = {
   password: string;
   hasCreatedLibrary: boolean;
   role: AuthUserRole;
+  avatarUrl?: string | null;  // ← added
 };
 
 export type AuthTenantRecord = {
@@ -46,6 +47,7 @@ export type StudentRecord = {
   email?: string | null;
   city?: string | null;
   bio?: string | null;
+  avatarUrl?: string | null;  // ← added
 };
 
 export type CreateStudentInput = {
@@ -104,6 +106,7 @@ export type UpsertPendingStudentSignupInput = {
 
 export type UpdateOwnerProfileInput = {
   name?: string;
+  avatarUrl?: string | null;  // ← added
 };
 
 export type UpdateStudentProfileInput = {
@@ -112,6 +115,7 @@ export type UpdateStudentProfileInput = {
   email?: string;
   city?: string;
   bio?: string;
+  avatarUrl?: string | null;  // ← added
 };
 
 export type AuthSessionRecord = {

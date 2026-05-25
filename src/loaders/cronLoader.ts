@@ -86,10 +86,13 @@ async function sendFcmToOwners(
   if (ownerIds.length === 0) return;
   try {
     const fcmRepo = getDataSource().getMongoRepository(FcmTokenModel);
-    const tokenDocs = await fcmRepo.find({
-      where: { ownerId: { $in: ownerIds } } as any,
-    });
+
+    // ✅ FIXED — fetch all tokens and filter in JS (same fix as studentId $in bug)
+    const allTokenDocs = await fcmRepo.find({});
+    const tokenDocs = allTokenDocs.filter(t => t.ownerId && ownerIds.includes(t.ownerId));
     const tokens = tokenDocs.map(t => t.token).filter(Boolean);
+
+    console.log('🔔 Owner tokens found:', tokens.length);
     if (tokens.length === 0) return;
 
     const messaging = getFirebaseMessaging();
@@ -101,6 +104,13 @@ async function sendFcmToOwners(
         android: { priority: 'high' },
         apns: { payload: { aps: { sound: 'default' } } },
       });
+
+      console.log('🔔 FCM owner result:', JSON.stringify(response.responses.map((r, idx) => ({
+        token: batch[idx].slice(0, 20),
+        success: r.success,
+        error: r.error?.code,
+      }))));
+
       if (response.failureCount > 0) {
         const toDelete: string[] = [];
         response.responses.forEach((resp, idx) => {
@@ -113,8 +123,8 @@ async function sendFcmToOwners(
         }
       }
     }
-  } catch {
-    // non-critical
+  } catch (err) {
+    console.error('❌ sendFcmToOwners failed:', err);
   }
 }
 
@@ -749,3 +759,16 @@ export const cronLoader: MicroframeworkLoader = () => {
 
   log.info('Cron jobs loaded');
 };
+
+export async function sendOwnerInviteSubmissionPush(
+  ownerId: string,
+  studentName: string,
+  libraryName: string,
+  submissionId: string,
+): Promise<void> {
+  const title = '📋 New Join Request';
+  const body = `${studentName} has submitted a join request for ${libraryName}. Tap to review.`;
+  await sendFcmToOwners([ownerId], title, body);
+  await saveOwnerNotification(ownerId, title, body, 'booking_request', submissionId);
+}
+ 

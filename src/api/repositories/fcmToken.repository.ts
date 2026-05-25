@@ -2,7 +2,7 @@ import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { FcmTokenModel } from '../models/fcmToken.model';
-import { FcmTokenRecord, UpsertFcmTokenInput } from './types/fcmToken.repository.types';
+import { FcmTokenRecord, UpsertFcmTokenInput, UpsertOwnerFcmTokenInput } from './types/fcmToken.repository.types';
 
 @Service()
 export class FcmTokenRepository {
@@ -14,6 +14,7 @@ export class FcmTokenRepository {
     return {
       id: model.id.toHexString(),
       studentId: model.studentId,
+      ownerId: model.ownerId,       // ✅ ADDED
       token: model.token,
       deviceType: model.deviceType,
       createdAt: model.createdAt,
@@ -46,15 +47,13 @@ export class FcmTokenRepository {
     const repo = this.getRepo();
     const now = new Date();
 
-    // Find by token (device identifier) instead of studentId + deviceType
-    // This ensures when a new student logs in on the same device,
-    // the token gets reassigned to the new student correctly
     const existing = await repo.findOne({
       where: { token: input.token } as any,
     });
 
     if (existing) {
       existing.studentId = input.studentId;
+      existing.ownerId = null;        // ✅ clear owner when student logs in
       existing.deviceType = input.deviceType;
       existing.updatedAt = now;
       const saved = await repo.save(existing);
@@ -63,6 +62,37 @@ export class FcmTokenRepository {
 
     const model = repo.create({
       ...input,
+      ownerId: null,                  // ✅ student token — no ownerId
+      createdAt: now,
+      updatedAt: now,
+    });
+    const saved = await repo.save(model);
+    return this.toRecord(saved);
+  }
+
+  // ✅ ADDED — upsert owner FCM token by token (device)
+  public async upsertOwner(input: UpsertOwnerFcmTokenInput): Promise<FcmTokenRecord> {
+    const repo = this.getRepo();
+    const now = new Date();
+
+    const existing = await repo.findOne({
+      where: { token: input.token } as any,
+    });
+
+    if (existing) {
+      existing.ownerId = input.ownerId;
+      existing.studentId = null;      // ✅ clear student when owner logs in
+      existing.deviceType = input.deviceType;
+      existing.updatedAt = now;
+      const saved = await repo.save(existing);
+      return this.toRecord(saved);
+    }
+
+    const model = repo.create({
+      studentId: null,                // ✅ owner token — no studentId
+      ownerId: input.ownerId,
+      token: input.token,
+      deviceType: input.deviceType,
       createdAt: now,
       updatedAt: now,
     });

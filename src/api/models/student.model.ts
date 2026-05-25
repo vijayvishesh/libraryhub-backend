@@ -27,6 +27,7 @@ export class StudentModel {
 
   @Column()
   role!: string;
+
   @Column()
   email!: string | null;
 
@@ -35,4 +36,7 @@ export class StudentModel {
 
   @Column()
   bio!: string | null;
+
+  @Column()
+  avatarUrl!: string | null;  // ← add this
 }

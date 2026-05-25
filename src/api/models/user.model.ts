@@ -24,4 +24,7 @@ export class UserModel {
 
   @Column()
   role!: string;
+
+  @Column()
+  avatarUrl!: string | null;
 }

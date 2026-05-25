@@ -16,6 +16,7 @@ import { MemberRepository } from '../repositories/member.repository';
 import { MemberInviteLinkRepository } from '../repositories/memberInviteLink.repository';
 import { MemberInviteSubmissionRepository } from '../repositories/memberInviteSubmission.repository';
 import { SubmissionRecord } from '../repositories/types/memberInviteSubmission.repository.types';
+import { sendOwnerInviteSubmissionPush } from '../../loaders/cronLoader'; // ✅ ADDED
 
 @Service()
 export class MemberInviteSubmissionService {
@@ -72,7 +73,6 @@ export class MemberInviteSubmissionService {
     }
 
     const isExistingMember = false;
-    // const isDuplicate = false;
 
     let hasPendingFee = false;
     let pendingFeeAmount: number | null = null;
@@ -201,6 +201,20 @@ export class MemberInviteSubmissionService {
       memberId: member.id,
       studentId: student.id,
     });
+
+    // notify owner that a new invite form was submitted (non-blocking)
+    try {
+      console.log('🔔 Sending invite push to owner:', link.ownerId);
+      await sendOwnerInviteSubmissionPush(
+        link.ownerId,
+        payload.fullName.trim(),
+        library.name ?? 'your library',
+        submission.id,
+      );
+      console.log('✅ Invite push sent to owner:', link.ownerId);
+    } catch {
+      // non-critical — don't fail the submission if push fails
+    }
 
     return {
       ...submission,
@@ -384,7 +398,6 @@ export class MemberInviteSubmissionService {
     // 2. Find or create student account
     let student = await this.authRepository.findStudentByPhone(submission.mobileNo);
     if (!student) {
-      // Create student without password — they use OTP / forgot-password to set it
       const tempPassword = await bcrypt.hash(`invite_${submission.mobileNo}_${Date.now()}`, 10);
       student = await this.authRepository.createStudent({
         name: submission.fullName,
@@ -454,7 +467,6 @@ export class MemberInviteSubmissionService {
     gender: string,
     slotId?: string | null,
   ): Promise<void> {
-    // 1. Check seat exists and is active
     const seat = await this.librarySeatRepository.findSeatByLibraryAndSeatId(libraryId, seatId);
     if (!seat) {
       throw new HttpError(400, 'SEAT_NOT_FOUND');
@@ -463,13 +475,10 @@ export class MemberInviteSubmissionService {
       throw new HttpError(400, 'SEAT_NOT_ACTIVE');
     }
 
-    // 2. Gender check
     if (seat.gender !== 'any' && seat.gender !== gender) {
       throw new HttpError(400, 'SEAT_GENDER_MISMATCH');
     }
 
-    // 3. Availability check using updated findActiveMemberBySeat
-    // The method now internally handles fullday/twentyfour blocking logic
     const conflict = await this.memberRepository.findActiveMemberBySeat(
       libraryId,
       seatId,
