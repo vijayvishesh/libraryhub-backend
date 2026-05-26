@@ -2,6 +2,7 @@ import {
   Authorized,
   Body,
   CurrentUser,
+  Delete,
   Get,
   HttpError,
   InternalServerError,
@@ -316,6 +317,32 @@ export class AuthController {
     }
   }
 
+  @Delete('/me/deactivate')
+  @Authorized()
+  @OpenAPI({
+    summary: 'Deactivate current user account',
+    description: `
+      Marks the account as deactivated and revokes all active sessions.
+      The user can log back in at any time using their password or OTP —
+      the account will be automatically reactivated on successful login.
+    `,
+    security: [{ bearerAuth: [] }],
+  })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+  @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+  public async deactivateAccount(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+  ): Promise<{ responseCode: number; message: string }> {
+    try {
+      await this.authService.deactivateAccount(session);
+      return { responseCode: 200, message: 'ACCOUNT_DEACTIVATED' };
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new InternalServerError('DEACTIVATE_ACCOUNT_FAILED');
+    }
+  }
   // @Post('/member/otp/verify')
   // @ResponseSchema(AuthApiResponse, { statusCode: 200 })
   // @ResponseSchema(ErrorResponseModel, { statusCode: 400 })

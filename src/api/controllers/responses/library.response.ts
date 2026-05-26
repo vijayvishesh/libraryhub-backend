@@ -22,6 +22,70 @@ export class LibraryLocationData {
   }
 }
 
+export class LibraryCoordinatesData {
+  @IsNumber()
+  lat!: number;
+
+  @IsNumber()
+  lng!: number;
+
+  constructor(lat: number, lng: number) {
+    this.lat = lat;
+    this.lng = lng;
+  }
+}
+
+export class LibraryGeofenceData {
+  @IsBoolean()
+  enabled!: boolean;
+
+  @IsNumber()
+  radiusMeters!: number;
+
+  @IsBoolean()
+  strictMode!: boolean;
+
+  @IsBoolean()
+  exitAlert!: boolean;
+
+  constructor(params?: {
+    enabled: boolean;
+    radiusMeters: number;
+    strictMode: boolean;
+    exitAlert: boolean;
+  }) {
+    if (!params) return;
+    this.enabled = params.enabled;
+    this.radiusMeters = params.radiusMeters;
+    this.strictMode = params.strictMode;
+    this.exitAlert = params.exitAlert;
+  }
+}
+
+export class LibrarySlotPlanData {
+  @IsString() duration!: string;
+  @IsBoolean() isActive!: boolean;
+  @IsNumber() discountPercent!: number;
+
+  constructor(plan?: { duration: string; isActive: boolean; discountPercent: number }) {
+    if (!plan) return;
+    this.duration = plan.duration;
+    this.isActive = plan.isActive;
+    this.discountPercent = plan.discountPercent;
+  }
+}
+
+export class LibrarySlotTrialData {
+  @IsString() duration!: string;
+  @IsBoolean() isActive!: boolean;
+
+  constructor(trial?: { duration: string; isActive: boolean }) {
+    if (!trial) return;
+    this.duration = trial.duration;
+    this.isActive = trial.isActive;
+  }
+}
+
 export class LibrarySlotData {
   @IsString()
   slotType!: string;
@@ -185,10 +249,7 @@ export class LibrarySeatingData {
     genderMode?: string;
     sections?: LibrarySeatingSectionData[];
   }) {
-    if (!params) {
-      return;
-    }
-
+    if (!params) return;
     this.mode = params.mode;
     this.total = params.total;
     this.filled = params.filled;
@@ -307,6 +368,10 @@ export class LibrarySetupData {
   @Type(() => LibraryLocationData)
   location!: LibraryLocationData;
 
+  @ValidateNested()
+  @Type(() => LibraryCoordinatesData)
+  coordinates!: LibraryCoordinatesData;
+
   @IsNumber()
   totalSeats!: number;
 
@@ -358,6 +423,10 @@ export class LibrarySetupData {
   @IsString()
   upiIdGpay?: string;
 
+  @ValidateNested()
+  @Type(() => LibraryGeofenceData)
+  geofence!: LibraryGeofenceData;
+
   @IsOptional()
   @IsString()
   deletedAt?: string;
@@ -397,13 +466,12 @@ export class LibrarySetupData {
     paymentMethods: LibraryPaymentMethodData[];
     upiId?: string;
     upiIdGpay?: string;
+    geofence: LibraryGeofenceData;
     deletedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
   }) {
-    if (!params) {
-      return;
-    }
+    if (!params) return;
 
     this.id = params.id;
     this.ownerId = params.ownerId;
@@ -416,6 +484,11 @@ export class LibrarySetupData {
     this.state = params.state;
     this.pincode = params.pincode;
     this.location = params.location;
+    // Derive human-readable lat/lng from GeoJSON [lng, lat] coordinates
+    this.coordinates = new LibraryCoordinatesData(
+      params.location.coordinates[1], // lat
+      params.location.coordinates[0], // lng
+    );
     this.totalSeats = params.totalSeats;
     this.seating = params.seating;
     this.facilities = params.facilities;
@@ -429,6 +502,7 @@ export class LibrarySetupData {
     this.paymentMethods = params.paymentMethods;
     this.upiId = params.upiId;
     this.upiIdGpay = params.upiIdGpay;
+    this.geofence = params.geofence;
     this.deletedAt = params.deletedAt ? params.deletedAt.toISOString() : undefined;
     this.createdAt = params.createdAt.toISOString();
     this.updatedAt = params.updatedAt.toISOString();
@@ -444,10 +518,7 @@ export class LibrarySetupApiResponse {
   data!: LibrarySetupData;
 
   constructor(data?: LibrarySetupData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') {
-      return;
-    }
-
+    if (!data || typeof responseCode !== 'number') return;
     this.responseCode = responseCode;
     this.data = data;
   }
@@ -509,41 +580,12 @@ export class ListedLibrariesApiResponse {
   data!: ListedLibrariesData;
 
   constructor(libraries?: LibrarySetupData[], meta?: PaginationMetaData, responseCode = 200) {
-    if (!libraries || !meta || typeof responseCode !== 'number') {
-      return;
-    }
-
+    if (!libraries || !meta || typeof responseCode !== 'number') return;
     this.responseCode = responseCode;
     this.data = new ListedLibrariesData(libraries, meta);
   }
 }
-export class LibrarySlotPlanData {
-  @IsString() duration!: string;
-  @IsBoolean() isActive!: boolean;
-  @IsNumber() discountPercent!: number;
 
-  constructor(plan?: { duration: string; isActive: boolean; discountPercent: number }) {
-    if (!plan) {
-      return;
-    }
-    this.duration = plan.duration;
-    this.isActive = plan.isActive;
-    this.discountPercent = plan.discountPercent;
-  }
-}
-
-export class LibrarySlotTrialData {
-  @IsString() duration!: string;
-  @IsBoolean() isActive!: boolean;
-
-  constructor(trial?: { duration: string; isActive: boolean }) {
-    if (!trial) {
-      return;
-    }
-    this.duration = trial.duration;
-    this.isActive = trial.isActive;
-  }
-}
 export class LibrarySlotsPayloadData {
   @IsArray()
   @ValidateNested({ each: true })
@@ -551,23 +593,20 @@ export class LibrarySlotsPayloadData {
   slots!: LibrarySlotData[];
 
   constructor(slots?: LibrarySlotData[]) {
-    if (!slots) {
-      return;
-    }
+    if (!slots) return;
     this.slots = slots;
   }
 }
 
 export class LibrarySlotsApiResponse {
   @IsNumber() responseCode!: number;
+
   @ValidateNested()
   @Type(() => LibrarySlotsPayloadData)
   data!: LibrarySlotsPayloadData;
 
   constructor(data?: LibrarySlotsPayloadData, responseCode = 200) {
-    if (!data || typeof responseCode !== 'number') {
-      return;
-    }
+    if (!data || typeof responseCode !== 'number') return;
     this.responseCode = responseCode;
     this.data = data;
   }

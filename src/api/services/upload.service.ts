@@ -85,7 +85,12 @@ export class UploadService {
         key,
         fileUrl: `https://${env.s3.bucket}.s3.${env.s3.region}.amazonaws.com/${key}`,
       };
-    } catch (error) {
+    } catch (error:any) {
+      console.error('[UploadService] uploadFile error:', error);
+      console.error('[UploadService] error name:', error?.name);
+      console.error('[UploadService] error message:', error?.message);
+      console.error('[UploadService] error code:', error?.Code);
+      console.error('[UploadService] error $metadata:', error?.$metadata);
       console.error('[UploadService] uploadFile error:', error);
       if (error instanceof HttpError) throw error;
       throw new InternalServerError('UPLOAD_FILE_FAILED');

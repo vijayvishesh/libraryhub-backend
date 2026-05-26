@@ -4,10 +4,14 @@ import { env } from '../../env';
 let cachedClient: S3Client | null = null;
 
 export const getS3Client = (): S3Client => {
+  // ✅ Reset cache every time so new network/credentials are picked up
+  cachedClient = null;
+
   if (cachedClient) {
     return cachedClient;
   }
-    // Debug — remove after fix
+
+  // Debug — remove after fix
   console.log('S3 credentials check:');
   console.log('accessKeyId:', process.env.AWS_ACCESS_KEY_ID);
   console.log('secretAccessKey length:', process.env.AWS_SECRET_ACCESS_KEY?.length);
@@ -15,9 +19,9 @@ export const getS3Client = (): S3Client => {
   console.log('region:', process.env.AWS_REGION);
 
   const config: S3ClientConfig = {
-    region: process.env.AWS_REGION || env.s3.region,  
-    requestChecksumCalculation: 'WHEN_REQUIRED',  
-    responseChecksumValidation: 'WHEN_REQUIRED',  
+    region: process.env.AWS_REGION || env.s3.region,
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   };
 
   if (env.s3.endpoint) {

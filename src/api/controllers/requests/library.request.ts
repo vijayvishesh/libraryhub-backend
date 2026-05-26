@@ -579,3 +579,30 @@ export class UpdateLibrarySlotsRequest {
   @Type(() => UpdateLibrarySlotRequest)
   slots!: UpdateLibrarySlotRequest[];
 }
+
+export class LibraryGeofenceRequest {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(10)
+  @Max(1000)
+  radiusMeters?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  strictMode?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  exitAlert?: boolean;
+}
+
+export class UpdateLibraryGeofenceRequest {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LibraryGeofenceRequest)
+  geofence?: LibraryGeofenceRequest;
+}

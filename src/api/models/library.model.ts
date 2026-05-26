@@ -6,7 +6,12 @@ export type LibraryLocation = {
   type: 'Point';
   coordinates: [number, number];
 };
-
+export type LibraryGeofence = {
+  enabled: boolean;
+  radiusMeters: number;
+  strictMode: boolean;
+  exitAlert: boolean;
+};
 export type LibrarySlot = {
   slotType: LibrarySlotType;
   name: string;
@@ -166,4 +171,8 @@ export class LibraryModel {
 
   @Column()
   updatedAt!: Date;
+
+  @Column()
+geofence?: LibraryGeofence;
 }
+

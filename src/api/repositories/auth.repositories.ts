@@ -9,6 +9,7 @@ import { StudentModel } from '../models/student.model';
 import { TenantModel } from '../models/tenant.model';
 import { UserModel } from '../models/user.model';
 import {
+  AccountStatus,
   AuthOwnerRecord,
   AuthSessionRecord,
   AuthTenantRecord,
@@ -64,6 +65,7 @@ export class AuthRepository {
       password: input.password,
       hasCreatedLibrary: input.hasCreatedLibrary,
       role: input.role,
+      accountStatus: 'active',
     });
 
     const savedOwner = await ownerRepository.save(owner);
@@ -184,6 +186,7 @@ export class AuthRepository {
       isPhoneVerified: input.isPhoneVerified,
       hasJoinedLibrary: input.hasJoinedLibrary,
       role: input.role,
+      accountStatus: 'active',
     });
 
     const savedStudent = await studentRepository.save(student);
@@ -309,7 +312,7 @@ export class AuthRepository {
     await studentRepository.save(student);
   }
 
-   public async updateOwnerProfile(
+  public async updateOwnerProfile(
     ownerId: string,
     input: UpdateOwnerProfileInput,
   ): Promise<AuthOwnerRecord | null> {
@@ -324,14 +327,17 @@ export class AuthRepository {
       owner.name = input.name;
     }
     if (input.avatarUrl !== undefined) {
-      owner.avatarUrl = input.avatarUrl;  // ← added
+      owner.avatarUrl = input.avatarUrl;
+    }
+    if (input.accountStatus !== undefined) {
+      owner.accountStatus = input.accountStatus;
     }
 
     const savedOwner = await ownerRepository.save(owner);
     return this.mapOwner(savedOwner);
   }
 
-public async updateStudentProfile(
+  public async updateStudentProfile(
     studentId: string,
     input: UpdateStudentProfileInput,
   ): Promise<StudentRecord | null> {
@@ -347,11 +353,34 @@ public async updateStudentProfile(
     if (input.email !== undefined) student.email = input.email;
     if (input.city !== undefined) student.city = input.city;
     if (input.bio !== undefined) student.bio = input.bio;
-    if (input.avatarUrl !== undefined) student.avatarUrl = input.avatarUrl;  // ← added
+    if (input.avatarUrl !== undefined) student.avatarUrl = input.avatarUrl;
+    if (input.accountStatus !== undefined) student.accountStatus = input.accountStatus;
 
     const savedStudent = await studentRepository.save(student);
     return this.mapStudent(savedStudent);
   }
+
+  // ─── NEW: account status updaters ────────────────────────────────────────
+
+  public async updateOwnerAccountStatus(ownerId: string, status: AccountStatus): Promise<void> {
+    const objectId = this.tryParseObjectId(ownerId);
+    if (!objectId) return;
+    await this.getOwnerRepository().updateOne(
+      { _id: objectId },
+      { $set: { accountStatus: status } },
+    );
+  }
+
+  public async updateStudentAccountStatus(studentId: string, status: AccountStatus): Promise<void> {
+    const objectId = this.tryParseObjectId(studentId);
+    if (!objectId) return;
+    await this.getStudentRepository().updateOne(
+      { _id: objectId },
+      { $set: { accountStatus: status } },
+    );
+  }
+
+  // ─── Session methods ──────────────────────────────────────────────────────
 
   public async createAuthSession(input: CreateAuthSessionInput): Promise<AuthSessionRecord> {
     const sessionRepository = this.getAuthSessionRepository();
@@ -429,7 +458,122 @@ public async updateStudentProfile(
     await sessionRepository.save(session);
   }
 
-   private mapOwner(owner: UserModel): AuthOwnerRecord {
+  public async updateOwnerPassword(ownerId: string, hashedPassword: string): Promise<void> {
+    const objectId = this.tryParseObjectId(ownerId);
+    if (!objectId) {
+      return;
+    }
+
+    const repo = this.getOwnerRepository();
+    const owner = await repo.findOneById(objectId);
+    if (!owner) {
+      return;
+    }
+
+    owner.password = hashedPassword;
+    await repo.save(owner);
+  }
+
+  public async updateStudentPassword(studentId: string, hashedPassword: string): Promise<void> {
+    const objectId = this.tryParseObjectId(studentId);
+    if (!objectId) {
+      return;
+    }
+
+    const repo = this.getStudentRepository();
+    const student = await repo.findOneById(objectId);
+    if (!student) {
+      return;
+    }
+
+    student.password = hashedPassword;
+    await repo.save(student);
+  }
+
+  public async savePasswordResetToken(
+    phone: string,
+    role: string,
+    resetToken: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    if (role === 'OWNER') {
+      const repo = this.getPendingOwnerSignupRepository();
+      const existing = await repo.findOneBy({ phone });
+      if (existing) {
+        existing.otp = resetToken;
+        existing.expiresAt = expiresAt;
+        existing.updatedAt = new Date();
+        await repo.save(existing);
+      } else {
+        const now = new Date();
+        const pending = repo.create({
+          name: '',
+          phone,
+          password: '',
+          libraryName: '',
+          city: '',
+          otp: resetToken,
+          expiresAt,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await repo.save(pending);
+      }
+      return;
+    }
+
+    const repo = this.getPendingStudentSignupRepository();
+    const existing = await repo.findOneBy({ phone });
+    if (existing) {
+      existing.otp = resetToken;
+      existing.expiresAt = expiresAt;
+      existing.updatedAt = new Date();
+      await repo.save(existing);
+    } else {
+      const now = new Date();
+      const pending = repo.create({
+        name: '',
+        phone,
+        gender: 'other',
+        password: '',
+        otp: resetToken,
+        expiresAt,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await repo.save(pending);
+    }
+  }
+
+  public async findAndValidateResetToken(
+    phone: string,
+    role: string,
+    resetToken: string,
+  ): Promise<boolean> {
+    if (role === 'OWNER') {
+      const pending = await this.getPendingOwnerSignupRepository().findOneBy({ phone });
+      if (!pending || pending.otp !== resetToken) {
+        return false;
+      }
+      if (pending.expiresAt.getTime() < Date.now()) {
+        return false;
+      }
+      return true;
+    }
+
+    const pending = await this.getPendingStudentSignupRepository().findOneBy({ phone });
+    if (!pending || pending.otp !== resetToken) {
+      return false;
+    }
+    if (pending.expiresAt.getTime() < Date.now()) {
+      return false;
+    }
+    return true;
+  }
+
+  // ─── Mappers ──────────────────────────────────────────────────────────────
+
+  private mapOwner(owner: UserModel): AuthOwnerRecord {
     return {
       id: this.toHexString(owner),
       tenantId: owner.tenantId,
@@ -438,7 +582,8 @@ public async updateStudentProfile(
       password: owner.password,
       hasCreatedLibrary: owner.hasCreatedLibrary ?? false,
       role: owner.role as AuthOwnerRecord['role'],
-      avatarUrl: owner.avatarUrl ?? null,  // ← added
+      avatarUrl: owner.avatarUrl ?? null,
+      accountStatus: (owner.accountStatus ?? 'active') as AccountStatus,
     };
   }
 
@@ -466,6 +611,7 @@ public async updateStudentProfile(
       city: student.city ?? null,
       bio: student.bio ?? null,
       avatarUrl: student.avatarUrl ?? null,
+      accountStatus: (student.accountStatus ?? 'active') as AccountStatus,
     };
   }
 
@@ -547,119 +693,5 @@ public async updateStudentProfile(
 
   private getAuthSessionRepository(): MongoRepository<AuthSessionModel> {
     return getDataSource().getMongoRepository(AuthSessionModel);
-  }
-  public async updateOwnerPassword(ownerId: string, hashedPassword: string): Promise<void> {
-    const objectId = this.tryParseObjectId(ownerId);
-    if (!objectId) {
-      return;
-    }
-
-    const repo = this.getOwnerRepository();
-    const owner = await repo.findOneById(objectId);
-    if (!owner) {
-      return;
-    }
-
-    owner.password = hashedPassword;
-    await repo.save(owner);
-  }
-
-  public async updateStudentPassword(studentId: string, hashedPassword: string): Promise<void> {
-    const objectId = this.tryParseObjectId(studentId);
-    if (!objectId) {
-      return;
-    }
-
-    const repo = this.getStudentRepository();
-    const student = await repo.findOneById(objectId);
-    if (!student) {
-      return;
-    }
-
-    student.password = hashedPassword;
-    await repo.save(student);
-  }
-  public async savePasswordResetToken(
-    phone: string,
-    role: string,
-    resetToken: string,
-    expiresAt: Date,
-  ): Promise<void> {
-    // Store in pending signup models temporarily using otp field
-    // For owner:
-    if (role === 'OWNER') {
-      const repo = this.getPendingOwnerSignupRepository();
-      const existing = await repo.findOneBy({ phone });
-      if (existing) {
-        existing.otp = resetToken;
-        existing.expiresAt = expiresAt;
-        existing.updatedAt = new Date();
-        await repo.save(existing);
-      } else {
-        const now = new Date();
-        const pending = repo.create({
-          name: '',
-          phone,
-          password: '',
-          libraryName: '',
-          city: '',
-          otp: resetToken,
-          expiresAt,
-          createdAt: now,
-          updatedAt: now,
-        });
-        await repo.save(pending);
-      }
-      return;
-    }
-
-    // For student:
-    const repo = this.getPendingStudentSignupRepository();
-    const existing = await repo.findOneBy({ phone });
-    if (existing) {
-      existing.otp = resetToken;
-      existing.expiresAt = expiresAt;
-      existing.updatedAt = new Date();
-      await repo.save(existing);
-    } else {
-      const now = new Date();
-      const pending = repo.create({
-        name: '',
-        phone,
-        gender: 'other',
-        password: '',
-        otp: resetToken,
-        expiresAt,
-        createdAt: now,
-        updatedAt: now,
-      });
-      await repo.save(pending);
-    }
-  }
-
-  public async findAndValidateResetToken(
-    phone: string,
-    role: string,
-    resetToken: string,
-  ): Promise<boolean> {
-    if (role === 'OWNER') {
-      const pending = await this.getPendingOwnerSignupRepository().findOneBy({ phone });
-      if (!pending || pending.otp !== resetToken) {
-        return false;
-      }
-      if (pending.expiresAt.getTime() < Date.now()) {
-        return false;
-      }
-      return true;
-    }
-
-    const pending = await this.getPendingStudentSignupRepository().findOneBy({ phone });
-    if (!pending || pending.otp !== resetToken) {
-      return false;
-    }
-    if (pending.expiresAt.getTime() < Date.now()) {
-      return false;
-    }
-    return true;
   }
 }

@@ -4,10 +4,12 @@ import redisCache from '../../lib/redis/db.redis';
 import {
   LibraryListQueryRequest,
   LibrarySetupRequest,
+  UpdateLibraryGeofenceRequest,
   UpdateLibraryRequest,
   UpdateLibrarySlotsRequest,
 } from '../controllers/requests/library.request';
 import {
+  LibraryGeofenceData,
   LibraryLocationData,
   LibraryPaymentMethodData,
   LibraryPhotoData,
@@ -161,6 +163,7 @@ export class LibraryService {
       this.rethrowLibraryError(error, 'GET_LISTED_LIBRARIES_FAILED');
     }
   }
+
   private sortByDistance(
     libraries: LibrarySetupData[],
     studentLat: number,
@@ -247,6 +250,109 @@ export class LibraryService {
     }
   }
 
+  public async getLibrarySlots(ownerId: string): Promise<LibrarySlotData[]> {
+    try {
+      const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+      if (!library) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+
+      return library.slots.map(
+        slot =>
+          new LibrarySlotData(
+            slot.slotType,
+            slot.name,
+            slot.startTime,
+            slot.endTime,
+            slot.pricePerMonth,
+            slot.isActive,
+            slot.plans,
+            slot.trials,
+          ),
+      );
+    } catch (error) {
+      this.rethrowLibraryError(error, 'GET_LIBRARY_SLOTS_FAILED');
+    }
+  }
+
+  public async updateLibrarySlots(
+    ownerId: string,
+    payload: UpdateLibrarySlotsRequest,
+  ): Promise<LibrarySlotData[]> {
+    try {
+      const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+      if (!library || library.deletedAt) {
+        throw new NotFoundError('LIBRARY_NOT_FOUND');
+      }
+
+      const slots = payload.slots.map(slot => ({
+        slotType: slot.slotType,
+        name: slot.slotType, // use slotType as name
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        pricePerMonth: slot.pricePerMonth,
+        isActive: slot.isActive,
+        plans: slot.plans ?? [],
+        trials: slot.trials ?? [],
+      }));
+
+      const updated = await this.libraryRepository.updateLibrarySlots(library.id, slots);
+      if (!updated) {
+        throw new InternalServerError('UPDATE_LIBRARY_SLOTS_FAILED');
+      }
+
+      return updated.slots.map(
+        slot =>
+          new LibrarySlotData(
+            slot.slotType,
+            slot.name,
+            slot.startTime,
+            slot.endTime,
+            slot.pricePerMonth,
+            slot.isActive,
+            slot.plans,
+            slot.trials,
+          ),
+      );
+    } catch (error) {
+      this.rethrowLibraryError(error, 'UPDATE_LIBRARY_SLOTS_FAILED');
+    }
+  }
+
+  // ─── NEW: Geofence ────────────────────────────────────────────────────────────
+
+public async updateLibraryGeofence(
+  ownerId: string,
+  payload: UpdateLibraryGeofenceRequest,
+): Promise<LibrarySetupData> {
+  try {
+    const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
+    if (!library || library.deletedAt) {
+      throw new NotFoundError('LIBRARY_NOT_FOUND');
+    }
+
+    const existing = library.geofence;
+    const geofence = {
+      enabled:      payload.geofence?.enabled      ?? existing?.enabled      ?? false,
+      radiusMeters: payload.geofence?.radiusMeters ?? existing?.radiusMeters ?? 50,
+      strictMode:   payload.geofence?.strictMode   ?? existing?.strictMode   ?? false,
+      exitAlert:    payload.geofence?.exitAlert    ?? existing?.exitAlert    ?? true,
+    };
+
+    const updated = await this.libraryRepository.updateLibraryGeofence(library.id, geofence);
+    if (!updated) {
+      throw new InternalServerError('UPDATE_GEOFENCE_FAILED');
+    }
+
+    await redisCache.delete(`lib:detail:${library.id}`);
+    return this.mapLibrarySetupData(updated);
+  } catch (error) {
+    this.rethrowLibraryError(error, 'UPDATE_GEOFENCE_FAILED');
+  }
+}
+
+  // ─────────────────────────────────────────────────────────────────────────────
+
   private buildCreateLibraryInput(
     payload: LibrarySetupRequest,
     owner: AuthOwnerRecord,
@@ -331,6 +437,8 @@ export class LibraryService {
         this.getDefaultPaymentMethods(),
       upiId: (payload as any).upiId?.trim() || base?.upiId,
       upiIdGpay: (payload as any).upiIdGpay?.trim() || base?.upiIdGpay,
+      // Preserve existing geofence on library setup — only updated via dedicated endpoint
+      geofence: base?.geofence,
       deletedAt: base?.deletedAt ?? null,
     };
   }
@@ -510,6 +618,13 @@ export class LibraryService {
       ),
       upiId: library.upiId,
       upiIdGpay: library.upiIdGpay,
+      // NEW: geofence — defaults applied here for libraries that predate this feature
+      geofence: new LibraryGeofenceData({
+        enabled:      library.geofence?.enabled      ?? false,
+        radiusMeters: library.geofence?.radiusMeters ?? 50,
+        strictMode:   library.geofence?.strictMode   ?? false,
+        exitAlert:    library.geofence?.exitAlert    ?? true,
+      }),
       deletedAt: library.deletedAt,
       createdAt: library.createdAt,
       updatedAt: library.updatedAt,
@@ -553,90 +668,23 @@ export class LibraryService {
 
     throw new InternalServerError(defaultMessage);
   }
-  public async getLibrarySlots(ownerId: string): Promise<LibrarySlotData[]> {
-    try {
-      const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
-      if (!library) {
-        throw new NotFoundError('LIBRARY_NOT_FOUND');
-      }
 
-      return library.slots.map(
-        slot =>
-          new LibrarySlotData(
-            slot.slotType,
-            slot.name,
-            slot.startTime,
-            slot.endTime,
-            slot.pricePerMonth,
-            slot.isActive,
-            slot.plans,
-            slot.trials,
-          ),
-      );
-    } catch (error) {
-      this.rethrowLibraryError(error, 'GET_LIBRARY_SLOTS_FAILED');
-    }
-  }
+  //   public async updateLibraryLogo(
+  //   ownerId: string,
+  //   logoUrl: string,
+  // ): Promise<void> {
+  //   const library = await this.getOwnerLibraryOrThrow(ownerId);
+  //   await this.libraryRepository.updateLibrary(library.id, { logoUrl });
+  // }
+  //   getOwnerLibraryOrThrow(ownerId: string) {
+  //     throw new Error('Method not implemented.');
+  //   }
 
-  public async updateLibrarySlots(
-    ownerId: string,
-    payload: UpdateLibrarySlotsRequest,
-  ): Promise<LibrarySlotData[]> {
-    try {
-      const library = await this.libraryRepository.findLibraryByOwnerId(ownerId.trim());
-      if (!library || library.deletedAt) {
-        throw new NotFoundError('LIBRARY_NOT_FOUND');
-      }
-
-      const slots = payload.slots.map(slot => ({
-        slotType: slot.slotType,
-        name: slot.slotType, // use slotType as name
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        pricePerMonth: slot.pricePerMonth,
-        isActive: slot.isActive,
-        plans: slot.plans ?? [],
-        trials: slot.trials ?? [],
-      }));
-
-      const updated = await this.libraryRepository.updateLibrarySlots(library.id, slots);
-      if (!updated) {
-        throw new InternalServerError('UPDATE_LIBRARY_SLOTS_FAILED');
-      }
-
-      return updated.slots.map(
-        slot =>
-          new LibrarySlotData(
-            slot.slotType,
-            slot.name,
-            slot.startTime,
-            slot.endTime,
-            slot.pricePerMonth,
-            slot.isActive,
-            slot.plans,
-            slot.trials,
-          ),
-      );
-    } catch (error) {
-      this.rethrowLibraryError(error, 'UPDATE_LIBRARY_SLOTS_FAILED');
-    }
-  }
-//   public async updateLibraryLogo(
-//   ownerId: string,
-//   logoUrl: string,
-// ): Promise<void> {
-//   const library = await this.getOwnerLibraryOrThrow(ownerId);
-//   await this.libraryRepository.updateLibrary(library.id, { logoUrl });
-// }
-//   getOwnerLibraryOrThrow(ownerId: string) {
-//     throw new Error('Method not implemented.');
-//   }
-
-// public async updateLibraryPhotos(
-//   ownerId: string,
-//   photos: string[],
-// ): Promise<void> {
-//   const library = await this.getOwnerLibraryOrThrow(ownerId);
-//   await this.libraryRepository.updateLibrary(library.id, { photos });
-// }
+  // public async updateLibraryPhotos(
+  //   ownerId: string,
+  //   photos: string[],
+  // ): Promise<void> {
+  //   const library = await this.getOwnerLibraryOrThrow(ownerId);
+  //   await this.libraryRepository.updateLibrary(library.id, { photos });
+  // }
 }

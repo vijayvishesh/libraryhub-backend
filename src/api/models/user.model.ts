@@ -1,6 +1,8 @@
 import { ObjectId } from 'mongodb';
 import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
 
+export type AccountStatus = 'active' | 'deactivated';
+
 @Entity('owners')
 @Index('idx_owners_phone_unique', ['phone'], { unique: true })
 export class UserModel {
@@ -27,4 +29,7 @@ export class UserModel {
 
   @Column()
   avatarUrl!: string | null;
+
+  @Column()
+  accountStatus!: AccountStatus;
 }

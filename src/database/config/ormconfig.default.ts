@@ -26,6 +26,7 @@ import { SuperAdminModel } from '../../api/models/superAdmin.model';
 import { TenantModel } from '../../api/models/tenant.model';
 import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
+import { LibraryPaymentMethodModel } from '../../api/models/libraryPaymentMethod.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -87,6 +88,7 @@ const createDataSource = (): DataSource =>
       PaymentModel,
       MemberInviteSubmissionModel,
       LibraryTransferModel,
+      LibraryPaymentMethodModel
     ],
     synchronize: true,
     logging: false,

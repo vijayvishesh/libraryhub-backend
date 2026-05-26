@@ -8,6 +8,8 @@ import {
   UnauthorizedError,
 } from 'routing-controllers';
 import { Service } from 'typedi';
+import { getDataSource } from '../../database/config/ormconfig.default';
+import { AuthSessionModel } from '../models/authSession.model';
 import { AuthJwtPayload, AuthTokenType, AuthUserGender } from '../../types/jwtToken.types';
 import {
   AuthRequestGender,
@@ -251,6 +253,11 @@ export class AuthService {
           throw new UnauthorizedError('TENANT_NOT_FOUND');
         }
 
+        // ─── Auto-reactivate deactivated owner account on successful login ──
+        if (owner.accountStatus === 'deactivated') {
+          await this.authRepository.updateOwnerAccountStatus(owner.id, 'active');
+        }
+
         if (payload.fcmToken && payload.deviceType) {
           try {
             await this.fcmTokenRepository.upsertOwner({
@@ -275,6 +282,11 @@ export class AuthService {
       const isPasswordValid = await bcrypt.compare(payload.password, student.password);
       if (!isPasswordValid) {
         throw new UnauthorizedError('INVALID_PASSWORD');
+      }
+
+      // ─── Auto-reactivate deactivated student account on successful login ──
+      if (student.accountStatus === 'deactivated') {
+        await this.authRepository.updateStudentAccountStatus(student.id, 'active');
       }
 
       if (payload.fcmToken && payload.deviceType) {
@@ -538,6 +550,53 @@ export class AuthService {
     } catch (error) {
       this.rethrowAuthError(error, 'UPDATE_PROFILE_FAILED');
     }
+  }
+
+  // ─── NEW: deactivate account ──────────────────────────────────────────────
+
+  public async deactivateAccount(session: CurrentSessionData): Promise<void> {
+    try {
+      const role = session.user.role;
+
+      if (role === 'OWNER') {
+        const owner = await this.authRepository.findOwnerById(session.user.id);
+        if (!owner) {
+          throw new NotFoundError('USER_NOT_FOUND');
+        }
+        if (owner.accountStatus === 'deactivated') {
+          throw new HttpError(409, 'ACCOUNT_ALREADY_DEACTIVATED');
+        }
+        // Revoke all active sessions so existing tokens stop working immediately
+        await this.revokeAllSessionsByUserId(session.user.id);
+        await this.authRepository.updateOwnerAccountStatus(session.user.id, 'deactivated');
+        return;
+      }
+
+      const student = await this.authRepository.findStudentById(session.user.id);
+      if (!student) {
+        throw new NotFoundError('USER_NOT_FOUND');
+      }
+      if (student.accountStatus === 'deactivated') {
+        throw new HttpError(409, 'ACCOUNT_ALREADY_DEACTIVATED');
+      }
+      // ownerId in AuthSessionModel stores studentId for student sessions
+      await this.revokeAllSessionsByUserId(session.user.id);
+      await this.authRepository.updateStudentAccountStatus(session.user.id, 'deactivated');
+    } catch (error) {
+      this.rethrowAuthError(error, 'DEACTIVATE_ACCOUNT_FAILED');
+    }
+  }
+
+  // ─── Private helpers ──────────────────────────────────────────────────────
+
+  /** Revokes all non-revoked sessions for a user (owner or student) */
+  private async revokeAllSessionsByUserId(userId: string): Promise<void> {
+    await getDataSource()
+      .getMongoRepository(AuthSessionModel)
+      .updateMany(
+        { ownerId: userId, isRevoked: false },
+        { $set: { isRevoked: true, updatedAt: new Date() } },
+      );
   }
 
   private async createOwnerAuthData(
@@ -1167,6 +1226,11 @@ export class AuthService {
     // 4. If student account already exists → just log in
     if (existingStudent) {
       await this.authRepository.deletePendingStudentSignupByPhone(phone);
+
+      // ─── Auto-reactivate deactivated account on OTP login ──────────────
+      if (existingStudent.accountStatus === 'deactivated') {
+        await this.authRepository.updateStudentAccountStatus(existingStudent.id, 'active');
+      }
 
       // Link any unlinked member records
       const unlinkedMembers = members.filter(m => !m.studentId);

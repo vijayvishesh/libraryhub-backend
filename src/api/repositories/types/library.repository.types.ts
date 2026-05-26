@@ -96,6 +96,7 @@ export type CreateLibraryInput = {
   openingHours: string;
   stats: CreateLibraryStatsInput;
   deletedAt: Date | null;
+  geofence?: LibraryGeofence;
 };
 
 export type UpdateLibraryInput = Partial<Omit<CreateLibraryInput, 'ownerId'>>;
@@ -120,4 +121,11 @@ export type ListLibrariesQuery = {
 export type ListLibrariesResult = {
   libraries: LibraryRecord[];
   total: number;
+};
+
+export type LibraryGeofence = {
+  enabled: boolean;
+  radiusMeters: number;
+  strictMode: boolean;
+  exitAlert: boolean;
 };

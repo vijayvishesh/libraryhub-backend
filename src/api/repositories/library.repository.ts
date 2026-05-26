@@ -17,6 +17,13 @@ type WithObjectId = {
   id: ObjectId;
 };
 
+type LibraryGeofenceInput = {
+  enabled: boolean;
+  radiusMeters: number;
+  strictMode: boolean;
+  exitAlert: boolean;
+};
+
 @Service()
 export class LibraryRepository {
   private indexesEnsured = false;
@@ -94,17 +101,14 @@ export class LibraryRepository {
       ];
     }
 
-    // Facilities filter
     if (query.facilities && query.facilities.length > 0) {
       filter.facilities = { $all: query.facilities };
     }
 
-    // Min rating filter
     if (query.minRating !== undefined) {
       filter['stats.rating'] = { $gte: query.minRating };
     }
 
-    // Build sort
     let sortOrder: Record<string, unknown> = { updatedAt: 'DESC' };
 
     if (query.ratingSort === 'top_rated') {
@@ -218,6 +222,103 @@ export class LibraryRepository {
     return this.mapLibrary(savedLibrary);
   }
 
+  public async getPaymentMethods(libraryId: string): Promise<any[]> {
+    const objectId = this.tryParseObjectId(libraryId);
+    if (!objectId) {
+      return [];
+    }
+
+    const library = await this.getLibraryRepository().findOneById(objectId);
+    if (!library) {
+      return [];
+    }
+
+    return library.paymentMethods ?? [];
+  }
+
+  public async updateLibrarySlots(
+    libraryId: string,
+    slots: CreateLibrarySlotInput[],
+  ): Promise<LibraryRecord | null> {
+    const objectId = this.tryParseObjectId(libraryId);
+    if (!objectId) {
+      return null;
+    }
+
+    const repo = this.getLibraryRepository();
+    const library = await repo.findOneById(objectId);
+    if (!library) {
+      return null;
+    }
+
+    library.slots = slots as any;
+    library.updatedAt = new Date();
+    const saved = await repo.save(library);
+    return this.mapLibrary(saved);
+  }
+
+  public async updateLibraryGeofence(
+  libraryId: string,
+  geofence: LibraryGeofenceInput,
+): Promise<LibraryRecord | null> {
+  const objectId = this.tryParseObjectId(libraryId);
+  if (!objectId) return null;
+
+  const repo = this.getLibraryRepository();
+  const library = await repo.findOneById(objectId);
+  if (!library) return null;
+
+  library.geofence = geofence;
+  library.updatedAt = new Date();
+
+  const saved = await repo.save(library);
+  return this.mapLibrary(saved);
+}
+
+  public async findManyByIds(ids: string[]): Promise<LibraryRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const objectIds = ids
+      .map(id => this.tryParseObjectId(id))
+      .filter((oid): oid is ObjectId => oid !== null);
+
+    if (objectIds.length === 0) {
+      return [];
+    }
+
+    const libraries = await this.getLibraryRepository().find({
+      where: { _id: { $in: objectIds } } as any,
+    });
+
+    return libraries.map(library => this.mapLibrary(library));
+  }
+
+  public async updateLibraryStats(
+    libraryId: string,
+    stats: { rating: number; reviewCount: number },
+  ): Promise<void> {
+    const objectId = this.tryParseObjectId(libraryId);
+    if (!objectId) {
+      return;
+    }
+
+    const repo = this.getLibraryRepository();
+    const library = await repo.findOneById(objectId);
+    if (!library) {
+      return;
+    }
+
+    library.stats = {
+      ...library.stats,
+      rating: stats.rating,
+      reviewCount: stats.reviewCount,
+    };
+    library.updatedAt = new Date();
+    await repo.save(library);
+  }
+
   private async ensureIndexes(): Promise<void> {
     if (this.indexesEnsured) {
       return;
@@ -270,26 +371,11 @@ export class LibraryRepository {
       isOpen: library.isOpen,
       openingHours: library.openingHours,
       stats: library.stats,
+      geofence: library.geofence,
       deletedAt: library.deletedAt,
       createdAt: library.createdAt,
       updatedAt: library.updatedAt,
     };
-  }
-
-  public async getPaymentMethods(libraryId: string): Promise<any[]> {
-    const objectId = this.tryParseObjectId(libraryId);
-
-    if (!objectId) {
-      return [];
-    }
-
-    const library = await this.getLibraryRepository().findOneById(objectId);
-
-    if (!library) {
-      return [];
-    }
-
-    return library.paymentMethods ?? [];
   }
 
   private toHexString(value: WithObjectId): string {
@@ -306,69 +392,5 @@ export class LibraryRepository {
 
   private getLibraryRepository(): MongoRepository<LibraryModel> {
     return getDataSource().getMongoRepository(LibraryModel);
-  }
-
-  public async updateLibrarySlots(
-    libraryId: string,
-    slots: CreateLibrarySlotInput[],
-  ): Promise<LibraryRecord | null> {
-    const objectId = this.tryParseObjectId(libraryId);
-    if (!objectId) {
-      return null;
-    }
-
-    const repo = this.getLibraryRepository();
-    const library = await repo.findOneById(objectId);
-    if (!library) {
-      return null;
-    }
-
-    library.slots = slots as any;
-    library.updatedAt = new Date();
-    const saved = await repo.save(library);
-    return this.mapLibrary(saved);
-  }
-  public async findManyByIds(ids: string[]): Promise<LibraryRecord[]> {
-    if (ids.length === 0) {
-      return [];
-    }
-
-    const objectIds = ids
-      .map(id => this.tryParseObjectId(id))
-      .filter((oid): oid is ObjectId => oid !== null);
-
-    if (objectIds.length === 0) {
-      return [];
-    }
-
-    const libraries = await this.getLibraryRepository().find({
-      where: { _id: { $in: objectIds } } as any,
-    });
-
-    return libraries.map(library => this.mapLibrary(library));
-  }
-
-  public async updateLibraryStats(
-    libraryId: string,
-    stats: { rating: number; reviewCount: number },
-  ): Promise<void> {
-    const objectId = this.tryParseObjectId(libraryId);
-    if (!objectId) {
-      return;
-    }
-
-    const repo = this.getLibraryRepository();
-    const library = await repo.findOneById(objectId);
-    if (!library) {
-      return;
-    }
-
-    library.stats = {
-      ...library.stats,
-      rating: stats.rating,
-      reviewCount: stats.reviewCount,
-    };
-    library.updatedAt = new Date();
-    await repo.save(library);
   }
 }

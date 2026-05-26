@@ -11,6 +11,8 @@ export const ACTIVITY_ACTION_TYPES = [
   'USER_LOGGED_OUT',
   'BOOKING_APPROVED',
   'BOOKING_REJECTED',
+  'BOOKING_CANCELLED',
+  'LIBRARY_GEOFENCE_UPDATED'
 ] as const;
 
 export type ActivityActionType = (typeof ACTIVITY_ACTION_TYPES)[number];

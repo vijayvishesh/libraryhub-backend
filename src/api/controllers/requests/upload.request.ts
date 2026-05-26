@@ -27,3 +27,12 @@ export class UploadFolderQueryRequest {
   @IsIn(['avatars', 'logos', 'library-photos', 'uploads'])
   folder?: string;
 }
+export class ConfirmUploadRequest {
+  @IsString()
+  @IsNotEmpty()
+  key!: string;
+
+  @IsOptional()
+  @IsString()
+  folder?: string;
+}

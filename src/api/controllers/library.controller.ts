@@ -21,6 +21,7 @@ import { LibrarySeatMapQueryRequest } from './requests/booking.request';
 import {
   LibraryListQueryRequest,
   LibrarySetupRequest,
+  UpdateLibraryGeofenceRequest,
   UpdateLibraryRequest,
   UpdateLibrarySlotsRequest,
 } from './requests/library.request';
@@ -366,4 +367,37 @@ export class LibraryController {
       throw new InternalServerError('UPDATE_LIBRARY_SLOTS_FAILED');
     }
   }
+  // Add after updateMyLibrarySlots:
+
+@Patch('/my/geofence')
+@Authorized('OWNER')
+@OpenAPI({
+  summary: 'Update library location and geofence settings',
+  security: [{ bearerAuth: [] }],
+})
+@ResponseSchema(LibrarySetupApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+public async updateMyLibraryGeofence(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @Body() payload: UpdateLibraryGeofenceRequest,
+): Promise<LibrarySetupApiResponse> {
+  try {
+    const data = await this.libraryService.updateLibraryGeofence(session.user.id, payload);
+
+    await this.activityService.logActivity(
+      session.user.id,
+       'LIBRARY_GEOFENCE_UPDATED',
+      `Owner updated geofence settings for library: ${data.name}`,
+      { libraryId: data.id },
+    );
+
+    return new LibrarySetupApiResponse(data, 200);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('UPDATE_LIBRARY_GEOFENCE_FAILED');
+  }
+}
 }

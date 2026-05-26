@@ -1,5 +1,7 @@
 import { AuthUserRole } from '../../../types/jwtToken.types';
 
+export type AccountStatus = 'active' | 'deactivated';
+
 export type AuthOwnerRecord = {
   id: string;
   tenantId: string;
@@ -8,7 +10,8 @@ export type AuthOwnerRecord = {
   password: string;
   hasCreatedLibrary: boolean;
   role: AuthUserRole;
-  avatarUrl?: string | null;  // ← added
+  avatarUrl?: string | null;
+  accountStatus: AccountStatus; 
 };
 
 export type AuthTenantRecord = {
@@ -47,7 +50,8 @@ export type StudentRecord = {
   email?: string | null;
   city?: string | null;
   bio?: string | null;
-  avatarUrl?: string | null;  // ← added
+  avatarUrl?: string | null;
+  accountStatus: AccountStatus; // ← NEW
 };
 
 export type CreateStudentInput = {
@@ -106,7 +110,8 @@ export type UpsertPendingStudentSignupInput = {
 
 export type UpdateOwnerProfileInput = {
   name?: string;
-  avatarUrl?: string | null;  // ← added
+  avatarUrl?: string | null;
+  accountStatus?: AccountStatus; // ← NEW
 };
 
 export type UpdateStudentProfileInput = {
@@ -115,7 +120,8 @@ export type UpdateStudentProfileInput = {
   email?: string;
   city?: string;
   bio?: string;
-  avatarUrl?: string | null;  // ← added
+  avatarUrl?: string | null;
+  accountStatus?: AccountStatus; // ← NEW
 };
 
 export type AuthSessionRecord = {
