@@ -16,6 +16,8 @@ export type FeeRequestRecord = {
   currency: string;
   reason: FeeRequestReason;
   status: FeeRequestStatus;
+  screenshotUrl?: string;
+  screenshotUploadedAt?: Date;
   note?: string;
   dueDate?: string;
   paidAt?: Date;

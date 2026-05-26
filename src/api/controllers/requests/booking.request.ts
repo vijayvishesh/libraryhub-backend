@@ -156,3 +156,52 @@ export class MarkBookingPaidRequest {
   @Min(1)
   amount?: number;
 }
+
+export class RenewBookingRequest {
+  @IsString()
+  @IsNotEmpty()
+  libraryId!: string;
+
+  // Student can keep old slot or pick new one
+  @IsString()
+  @IsNotEmpty()
+  @IsIn([...LIBRARY_SLOT_TYPE_ENUM])
+  slotId!: string;
+
+  // Optional: student can change seat
+  @IsOptional()
+  @IsString()
+  seatId?: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  autoAllocate?: boolean;
+
+  @IsString()
+  @IsIn([...LIBRARY_PAYMENT_METHOD_ENUM])
+  paymentMethod!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  duration?: number;
+
+  @IsOptional()
+  @IsDateString({ strict: true, strictSeparator: true })
+  startDate?: string;
+
+  // Who is renewing — drives status (pending vs active)
+  @IsString()
+  @IsIn(['student', 'owner'])
+  renewedBy!: 'student' | 'owner';
+
+  @IsOptional()
+  @IsString()
+  memberId?: string;
+}

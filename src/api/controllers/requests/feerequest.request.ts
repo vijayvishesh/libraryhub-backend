@@ -1,15 +1,25 @@
+import {
+  IsString,
+  MinLength,
+  IsOptional,
+  IsNumber,
+  Min,
+  IsEnum,
+  IsDateString,
+  IsArray,
+  IsIn,
+  IsInt,
+  // IsUrl,
+} from 'class-validator';
+import { FEE_REQUEST_REASON_ENUM, FEE_REQUEST_STATUS_ENUM } from '../../models/feerequest.model';
 
-
-// ─── Send to single student ──────────────────────────────────────────────────
-
-import { IsString, MinLength, IsOptional, IsNumber, Min, IsEnum, IsDateString, IsArray, IsIn, IsInt } from "class-validator";
-import { FEE_REQUEST_REASON_ENUM, FEE_REQUEST_STATUS_ENUM } from "../../models/feerequest.model";
+// ─── Send to single student ───────────────────────────────────────────────────
 
 export class SendFeeRequestByStudentRequest {
-  /** Student's user ID (studentId field on MemberModel) */
+  /** Member record ID (MemberModel _id) — owner sees this in their member list */
   @IsString()
   @MinLength(1)
-  studentId!: string;
+  memberId!: string;             // ← was studentId
 
   @IsOptional()
   @IsNumber()
@@ -94,4 +104,16 @@ export class ListFeeRequestsQueryRequest {
   @IsInt()
   @Min(1)
   limit?: number;
+}
+
+// ─── Student: attach payment screenshot ──────────────────────────────────────
+
+export class UploadPaymentScreenshotRequest {
+  /**
+   * Public URL returned by PATCH /api/v1/upload/
+   * ?folder=payment-screenshots&feeRequestId=<id>
+   */
+  @IsString()
+  @MinLength(1)
+  screenshotUrl!: string;
 }

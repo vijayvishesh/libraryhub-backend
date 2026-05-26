@@ -9,6 +9,7 @@ import {
   InternalServerError,
   JsonController,
   Param,
+  Patch,
   Post,
   QueryParams,
 } from 'routing-controllers';
@@ -18,18 +19,31 @@ import { Service } from 'typedi';
 import { CurrentSessionData } from './responses/auth.response';
 import { FeeRequestRecord } from '../repositories/types/feerequest.repository.types';
 import { FeeRequestService } from '../services/feerequest.service';
-import { SendFeeRequestByStudentRequest, SendBulkFeeRequestByStudentRequest, ListFeeRequestsQueryRequest } from './requests/feerequest.request';
-import { FeeRequestApiResponse, BulkFeeRequestApiResponse, ListFeeRequestsApiResponse, FeeRequestPaginationMeta, DeleteFeeRequestApiResponse, FeeRequestData } from './responses/feerequest.response';
+import {
+  SendFeeRequestByStudentRequest,
+  SendBulkFeeRequestByStudentRequest,
+  ListFeeRequestsQueryRequest,
+  UploadPaymentScreenshotRequest,
+} from './requests/feerequest.request';
+import {
+  FeeRequestApiResponse,
+  BulkFeeRequestApiResponse,
+  ListFeeRequestsApiResponse,
+  FeeRequestPaginationMeta,
+  DeleteFeeRequestApiResponse,
+  FeeRequestData,
+} from './responses/feerequest.response';
 
 
 @Service()
 @JsonController('/v1/fee-requests')
 export class FeeRequestController {
+// private readonly logger = Logger.getLogger('FeeRequestController'); // ← adjust to your logger util
+
   constructor(private readonly feeRequestService: FeeRequestService) {}
 
   // ─────────────────────────────────────────────────────────────────────────
   // POST /v1/fee-requests
-  // Send fee request to ONE student
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -38,11 +52,8 @@ export class FeeRequestController {
    *   post:
    *     summary: Send a fee payment request to a single student
    *     description: |
-   *       Owner sends a fee request to one student (looked up by studentId).
+   *       Owner sends a fee request to one student (looked up by memberId).
    *       Student must have a member record in the owner's library — 404 otherwise.
-   *
-   *       To mark payment as received use the existing:
-   *       PATCH /owner/members/:memberId/mark-paid
    *
    *       **reason → required member status:**
    *       | reason | member.status must be |
@@ -59,7 +70,7 @@ export class FeeRequestController {
    *       content:
    *         application/json:
    *           example:
-   *             studentId: "6650a1b2c3d4e5f6a7b8c9d0"
+   *             memberId: "6650a1b2c3d4e5f6a7b8c9d0"
    *             reason: "new_joinee"
    *             amount: 1500
    *             note: "Please pay your joining fee"
@@ -75,22 +86,28 @@ export class FeeRequestController {
   ): Promise<FeeRequestApiResponse> {
     try {
       const record = await this.feeRequestService.sendFeeRequestByStudent(session.user.id, {
-        studentId: body.studentId,
-        amount:    body.amount,
-        reason:    body.reason,
-        note:      body.note,
-        dueDate:   body.dueDate,
+        memberId: body.memberId,
+        amount:   body.amount,
+        reason:   body.reason,
+        note:     body.note,
+        dueDate:  body.dueDate,
       });
       return new FeeRequestApiResponse(this.mapFeeRequest(record), 201);
     } catch (error) {
       if (error instanceof HttpError) throw error;
+      console.error('sendFeeRequest failed', { 
+        ownerId:  session.user.id,
+        memberId: body.memberId,
+        reason:   body.reason,
+        message:  (error as Error)?.message,
+        stack:    (error as Error)?.stack,
+      });
       throw new InternalServerError('SEND_FEE_REQUEST_FAILED');
     }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
   // POST /v1/fee-requests/bulk
-  // Send fee requests to MULTIPLE students — all-or-nothing
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -106,9 +123,6 @@ export class FeeRequestController {
    *
    *       All created requests share one `batchId` so you can filter them via:
    *       GET /v1/fee-requests?batchId=<batchId>
-   *
-   *       To mark payments as received use the existing:
-   *       PATCH /owner/members/:memberId/mark-paid
    *     tags: [FeeRequests]
    *     security:
    *       - bearerAuth: []
@@ -143,6 +157,13 @@ export class FeeRequestController {
       return new BulkFeeRequestApiResponse(result);
     } catch (error) {
       if (error instanceof HttpError) throw error;
+      console.error('sendBulkFeeRequests failed', {
+        ownerId:    session.user.id,
+        studentIds: body.studentIds,
+        reason:     body.reason,
+        message:    (error as Error)?.message,
+        stack:      (error as Error)?.stack,
+      });
       throw new InternalServerError('SEND_BULK_FEE_REQUEST_FAILED');
     }
   }
@@ -210,6 +231,12 @@ export class FeeRequestController {
       );
     } catch (error) {
       if (error instanceof HttpError) throw error;
+      console.error('listFeeRequests failed', {
+        ownerId: session.user.id,
+        query,
+        message: (error as Error)?.message,
+        stack:   (error as Error)?.stack,
+      });
       throw new InternalServerError('LIST_FEE_REQUESTS_FAILED');
     }
   }
@@ -235,7 +262,7 @@ export class FeeRequestController {
   @Authorized('OWNER')
   @OpenAPI({ security: [{ bearerAuth: [] }] })
   public async getFeeRequestById(
-    @CurrentUser({ required: true }) _session: CurrentSessionData,
+    @CurrentUser({ required: true }) session: CurrentSessionData,
     @Param('id') id: string,
   ): Promise<FeeRequestApiResponse> {
     try {
@@ -243,6 +270,12 @@ export class FeeRequestController {
       return new FeeRequestApiResponse(this.mapFeeRequest(record));
     } catch (error) {
       if (error instanceof HttpError) throw error;
+      console.error('getFeeRequestById failed', {
+        ownerId: session.user.id,
+        id,
+        message: (error as Error)?.message,
+        stack:   (error as Error)?.stack,
+      });
       throw new InternalServerError('GET_FEE_REQUEST_FAILED');
     }
   }
@@ -268,7 +301,7 @@ export class FeeRequestController {
   @Authorized('OWNER')
   @OpenAPI({ security: [{ bearerAuth: [] }] })
   public async deleteFeeRequest(
-    @CurrentUser({ required: true }) _session: CurrentSessionData,
+    @CurrentUser({ required: true }) session: CurrentSessionData,
     @Param('id') id: string,
   ): Promise<DeleteFeeRequestApiResponse> {
     try {
@@ -276,7 +309,70 @@ export class FeeRequestController {
       return new DeleteFeeRequestApiResponse(true);
     } catch (error) {
       if (error instanceof HttpError) throw error;
+      console.error('deleteFeeRequest failed', {
+        ownerId: session.user.id,
+        id,
+        message: (error as Error)?.message,
+        stack:   (error as Error)?.stack,
+      });
       throw new InternalServerError('DELETE_FEE_REQUEST_FAILED');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PATCH /v1/fee-requests/:id/screenshot
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * @swagger
+   * /api/v1/fee-requests/{id}/screenshot:
+   *   patch:
+   *     summary: Student attaches payment screenshot to a fee request
+   *     description: |
+   *       Called after the student uploads the screenshot via:
+   *       PATCH /api/v1/upload/?folder=payment-screenshots&feeRequestId=<id>
+   *
+   *       That upload returns a `fileUrl`. Pass it here to attach it to the
+   *       fee request. Status transitions: pending → screenshot_uploaded.
+   *     tags: [FeeRequests]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           example:
+   *             screenshotUrl: "https://bucket.s3.region.amazonaws.com/payment-screenshots/uuid.jpg"
+   */
+  @Patch('/:id/screenshot')
+  @Authorized('STUDENT')
+  @OpenAPI({ security: [{ bearerAuth: [] }] })
+  public async uploadPaymentScreenshot(
+    @CurrentUser({ required: true }) session: CurrentSessionData,
+    @Param('id') id: string,
+    @Body() body: UploadPaymentScreenshotRequest,
+  ): Promise<FeeRequestApiResponse> {
+    try {
+      const record = await this.feeRequestService.savePaymentScreenshot(
+        id,
+        session.user.id,
+        body.screenshotUrl,
+      );
+      return new FeeRequestApiResponse(this.mapFeeRequest(record));
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      console.error('uploadPaymentScreenshot failed', {
+        studentId:     session.user.id,
+        feeRequestId:  id,
+        screenshotUrl: body.screenshotUrl,
+        message:       (error as Error)?.message,
+        stack:         (error as Error)?.stack,
+      });
+      throw new InternalServerError('UPLOAD_SCREENSHOT_FAILED');
     }
   }
 

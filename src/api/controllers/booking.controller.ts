@@ -14,7 +14,7 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { BookingResult, BookingService } from '../services/booking.service';
-import { CreateBookingRequest, ListMyBookingsQueryRequest } from './requests/booking.request';
+import { CreateBookingRequest, ListMyBookingsQueryRequest, RenewBookingRequest } from './requests/booking.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
   BookingCreateApiResponse,
@@ -139,7 +139,24 @@ export class BookingController {
       libraryUsage: params.libraryUsage,
     });
   }
-  
+@Post('/renew')
+@Authorized()
+@OpenAPI({ security: [{ bearerAuth: [] }] })
+@ResponseSchema(BookingCreateApiResponse, { statusCode: 201 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+public async renewMembership(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @Body() payload: RenewBookingRequest,
+): Promise<BookingCreateApiResponse> {
+  try {
+    const booking = await this.bookingService.renewMembership(session.user.id, payload);
+    return new BookingCreateApiResponse(this.mapBookingData(booking), 201);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('RENEW_MEMBERSHIP_FAILED');
+  }
+}
 // @Patch('/avatar')
 // @Authorized('STUDENT')
 // public async updateAvatar(

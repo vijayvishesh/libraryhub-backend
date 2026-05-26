@@ -1,19 +1,84 @@
+import { FeeRequestReason, FeeRequestStatus } from '../../models/feerequest.model';
 
+// ─── Record returned from repository ─────────────────────────────────────────
 
-// ─── Service-layer payloads ──────────────────────────────────────────────────
+export type FeeRequestRecord = {
+  id:                   string;
+  libraryId:            string;
+  ownerId:              string;
+  memberId:             string;
+  studentName:          string;
+  studentPhone:         string;
+  bookingId?:           string;
+  amount:               number;
+  currency:             string;
+  reason:               FeeRequestReason;
+  status:               FeeRequestStatus;
+  note?:                string;
+  dueDate?:             string;
+  paidAt?:              Date;
+  batchId?:             string;
+  screenshotUrl?:       string;           // ← new
+  screenshotUploadedAt?: Date;            // ← new
+  createdAt:            Date;
+  updatedAt:            Date;
+};
 
-import { FeeRequestReason, FeeRequestStatus } from "../../models/feerequest.model";
+// ─── Input for create ─────────────────────────────────────────────────────────
+
+export type CreateFeeRequestInput = {
+  libraryId:    string;
+  ownerId:      string;
+  memberId:     string;
+  studentName:  string;
+  studentPhone: string;
+  bookingId?:   string;
+  amount:       number;
+  currency?:    string;
+  reason:       FeeRequestReason;
+  status?:      FeeRequestStatus;
+  note?:        string;
+  dueDate?:     string;
+  batchId?:     string;
+};
+
+// ─── Input for updateStatus ───────────────────────────────────────────────────
+
+export type UpdateFeeRequestStatusInput = {
+  status: FeeRequestStatus;
+  paidAt?: Date;
+};
+
+// ─── List query / result ──────────────────────────────────────────────────────
+
+export type ListFeeRequestsQuery = {
+  libraryId?: string;
+  ownerId?:   string;
+  memberId?:  string;
+  status?:    FeeRequestStatus;
+  reason?:    FeeRequestReason;
+  batchId?:   string;
+  page:       number;
+  limit:      number;
+};
+
+export type ListFeeRequestsResult = {
+  feeRequests: FeeRequestRecord[];
+  total:       number;
+};
+
+// ─── Service-layer payloads ───────────────────────────────────────────────────
 
 /**
  * Send a fee request to a single student.
- * Owner provides studentId; service resolves the member record for that
- * student inside the owner's library and throws if none is found.
+ * Owner provides memberId (the MemberModel _id); service fetches the member
+ * record directly and throws 404 if not found.
  */
 export type SendFeeRequestByStudentPayload = {
-  studentId: string;
-  amount?: number;  // Overrides planAmount when provided
+  memberId: string;          // ← was studentId; now the membership record ID
+  amount?: number;           // Overrides planAmount when provided
   note?: string;
-  dueDate?: string; // ISO date "YYYY-MM-DD"
+  dueDate?: string;          // ISO date "YYYY-MM-DD"
   reason: FeeRequestReason;
 };
 
@@ -40,7 +105,7 @@ export type ListFeeRequestsPayload = {
   limit?: number;
 };
 
-// ─── Service-layer results ───────────────────────────────────────────────────
+// ─── Service-layer results ────────────────────────────────────────────────────
 
 export type BulkFeeRequestResult = {
   batchId: string;

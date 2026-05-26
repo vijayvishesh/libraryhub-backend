@@ -27,6 +27,8 @@ import { TenantModel } from '../../api/models/tenant.model';
 import { UserModel } from '../../api/models/user.model';
 import { env } from '../../env';
 import { LibraryPaymentMethodModel } from '../../api/models/libraryPaymentMethod.model';
+import { FeeRequestModel } from '../../api/models/feerequest.model';
+import { MemberRenewalModel } from '../../api/models/memberRenewal.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -88,7 +90,9 @@ const createDataSource = (): DataSource =>
       PaymentModel,
       MemberInviteSubmissionModel,
       LibraryTransferModel,
-      LibraryPaymentMethodModel
+      LibraryPaymentMethodModel,
+      FeeRequestModel,
+      MemberRenewalModel 
     ],
     synchronize: true,
     logging: false,

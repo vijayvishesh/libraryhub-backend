@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { BadRequestError, NotFoundError } from 'routing-controllers';
+import { BadRequestError, HttpError, InternalServerError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { MemberModel } from '../models/member.model';
@@ -7,7 +7,12 @@ import { LibraryRepository } from '../repositories/library.repository';
 import { LibraryRecord } from '../repositories/types/library.repository.types';
 import { FeeRequestRepository } from '../repositories/feerequest.repository';
 import { FeeRequestRecord, CreateFeeRequestInput } from '../repositories/types/feerequest.repository.types';
-import { SendFeeRequestByStudentPayload, SendBulkFeeRequestByStudentPayload, BulkFeeRequestResult, ListFeeRequestsPayload } from './types/feerequest.service.types';
+import {
+  SendFeeRequestByStudentPayload,
+  SendBulkFeeRequestByStudentPayload,
+  BulkFeeRequestResult,
+  ListFeeRequestsPayload,
+} from './types/feerequest.service.types';
 
 
 @Service()
@@ -19,26 +24,43 @@ export class FeeRequestService {
 
   // ─── Send to single student ───────────────────────────────────────────────
 
-  /**
-   * Resolves member by studentId inside owner's library.
-   * Throws 404 if no member record found.
-   * To mark as paid — use existing PATCH /owner/members/:memberId/mark-paid
-   */
   public async sendFeeRequestByStudent(
     ownerId: string,
     payload: SendFeeRequestByStudentPayload,
   ): Promise<FeeRequestRecord> {
-    const library = await this.getOwnerLibraryOrThrow(ownerId);
-    const member  = await this.getMemberByStudentIdOrThrow(payload.studentId, library.id);
+    let library: LibraryRecord;
+    try {
+      library = await this.getOwnerLibraryOrThrow(ownerId);
+    } catch (err) {
+      console.error('[FeeRequestService] getOwnerLibraryOrThrow failed', { ownerId, err });
+      throw err;
+    }
+
+    let member: MemberRecord;
+    try {
+      member = await this.getMemberByIdOrThrow(payload.memberId, library.id);
+    } catch (err) {
+      console.error('[FeeRequestService] getMemberByIdOrThrow failed', {
+        memberId:  payload.memberId,
+        libraryId: library.id,
+        err,
+      });
+      throw err;
+    }
 
     this.assertMemberEligible(member, payload.reason);
 
     const amount = payload.amount ?? member.planAmount ?? 0;
     if (amount <= 0) {
+      console.warn('[FeeRequestService] FEE_REQUEST_AMOUNT_REQUIRED', {
+        payloadAmount: payload.amount,
+        planAmount:    member.planAmount,
+        memberId:      member.id,
+      });
       throw new BadRequestError('FEE_REQUEST_AMOUNT_REQUIRED');
     }
 
-    return this.feeRequestRepository.create({
+    const input: CreateFeeRequestInput = {
       libraryId:    library.id,
       ownerId,
       memberId:     member.id,
@@ -49,18 +71,24 @@ export class FeeRequestService {
       reason:       payload.reason,
       note:         payload.note,
       dueDate:      payload.dueDate,
-    });
+    };
+
+    console.info('[FeeRequestService] creating fee request', input);
+
+    try {
+      return await this.feeRequestRepository.create(input);
+    } catch (err) {
+      console.error('[FeeRequestService] feeRequestRepository.create failed', {
+        input,
+        message: (err as Error)?.message,
+        stack:   (err as Error)?.stack,
+      });
+      throw err; // let the controller wrap it as 500
+    }
   }
 
   // ─── Send to multiple students ────────────────────────────────────────────
 
-  /**
-   * All-or-nothing bulk send.
-   * Phase 1 — resolve ALL members (fail-fast with all missing IDs listed).
-   * Phase 2 — validate eligibility for every member.
-   * Phase 3 — single createMany() — nothing written unless all pass.
-   * To mark as paid — use existing PATCH /owner/members/:memberId/mark-paid
-   */
   public async sendBulkFeeRequestsByStudent(
     ownerId: string,
     payload: SendBulkFeeRequestByStudentPayload,
@@ -100,6 +128,10 @@ export class FeeRequestService {
     const inputs: CreateFeeRequestInput[] = resolvedResults.map(({ member }) => {
       const amount = payload.amount ?? member!.planAmount ?? 0;
       if (amount <= 0) {
+        console.warn('[FeeRequestService] FEE_REQUEST_AMOUNT_REQUIRED in bulk', {
+          memberId:  member!.id,
+          planAmount: member!.planAmount,
+        });
         throw new BadRequestError('FEE_REQUEST_AMOUNT_REQUIRED');
       }
       return {
@@ -117,7 +149,23 @@ export class FeeRequestService {
       };
     });
 
-    await this.feeRequestRepository.createMany(inputs);
+    console.info('[FeeRequestService] bulk creating fee requests', {
+      batchId,
+      count: inputs.length,
+      ownerId,
+    });
+
+    try {
+      await this.feeRequestRepository.createMany(inputs);
+    } catch (err) {
+      console.error('[FeeRequestService] feeRequestRepository.createMany failed', {
+        batchId,
+        count:   inputs.length,
+        message: (err as Error)?.message,
+        stack:   (err as Error)?.stack,
+      });
+      throw err;
+    }
 
     return { batchId, sent: inputs.length };
   }
@@ -138,7 +186,6 @@ export class FeeRequestService {
   ): Promise<{ feeRequests: FeeRequestRecord[]; total: number }> {
     const library = await this.getOwnerLibraryOrThrow(ownerId);
 
-    // If caller filters by studentId, resolve to memberId first
     let memberId = payload.memberId;
     if (payload.studentId && !memberId) {
       const member = await this.getMemberByStudentId(payload.studentId, library.id);
@@ -166,6 +213,39 @@ export class FeeRequestService {
     return true;
   }
 
+  // ─── Save payment screenshot ──────────────────────────────────────────────
+
+  public async savePaymentScreenshot(
+    feeRequestId: string,
+    studentId: string,
+    screenshotUrl: string,
+  ): Promise<FeeRequestRecord> {
+    try {
+      const record = await this.feeRequestRepository.findById(feeRequestId);
+      if (!record) throw new NotFoundError('FEE_REQUEST_NOT_FOUND');
+
+      const member = await this.getMemberByStudentId(studentId, record.libraryId);
+      if (!member || member.id !== record.memberId) {
+        throw new HttpError(403, 'FORBIDDEN');
+      }
+
+      return await this.feeRequestRepository.savePaymentScreenshot(
+        feeRequestId,
+        screenshotUrl,
+      );
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      console.error('[FeeRequestService] savePaymentScreenshot failed', {
+        feeRequestId,
+        studentId,
+        screenshotUrl,
+        message: (error as Error)?.message,
+        stack:   (error as Error)?.stack,
+      });
+      throw new InternalServerError('SAVE_SCREENSHOT_FAILED');
+    }
+  }
+
   // ─── Private helpers ──────────────────────────────────────────────────────
 
   private async getOwnerLibraryOrThrow(ownerId: string): Promise<LibraryRecord> {
@@ -176,7 +256,29 @@ export class FeeRequestService {
     return library;
   }
 
-  /** Returns null when not found — used by bulk to collect all missing IDs first. */
+  private async getMemberByIdOrThrow(
+    memberId: string,
+    libraryId: string,
+  ): Promise<MemberRecord> {
+    const { ObjectId } = await import('mongodb');
+
+    let objectId: InstanceType<typeof ObjectId>;
+    try {
+      objectId = new ObjectId(memberId);
+    } catch {
+      // Invalid ObjectId format — treat as not found
+      console.warn('[FeeRequestService] getMemberByIdOrThrow — invalid ObjectId', { memberId });
+      throw new NotFoundError('MEMBER_NOT_FOUND');
+    }
+
+    const doc = await getDataSource()
+      .getMongoRepository(MemberModel)
+      .findOne({ where: { _id: objectId, libraryId } as any });
+
+    if (!doc) throw new NotFoundError('MEMBER_NOT_FOUND');
+    return this.mapMember(doc);
+  }
+
   private async getMemberByStudentId(
     studentId: string,
     libraryId: string,
@@ -187,18 +289,6 @@ export class FeeRequestService {
     return doc ? this.mapMember(doc) : null;
   }
 
-  /** Throws 404 immediately — used by single-student path. */
-  private async getMemberByStudentIdOrThrow(
-    studentId: string,
-    libraryId: string,
-  ): Promise<MemberRecord> {
-    const member = await this.getMemberByStudentId(studentId, libraryId);
-    if (!member) {
-      throw new NotFoundError('MEMBER_NOT_FOUND_FOR_STUDENT');
-    }
-    return member;
-  }
-
   /**
    * reason → required member.status:
    *   new_joinee           → pending
@@ -207,7 +297,7 @@ export class FeeRequestService {
    *   manual               → any
    */
   private assertMemberEligible(member: MemberRecord, reason: string): void {
-    if (reason === 'new_joinee'           && member.status !== 'pending') {
+    if (reason === 'new_joinee' && member.status !== 'pending') {
       throw new BadRequestError('MEMBER_NOT_IN_PENDING_STATUS');
     }
     if (reason === 'subscription_expired' && member.status !== 'expired') {
@@ -243,7 +333,7 @@ export class FeeRequestService {
   }
 }
 
-// ─── Local type (mirrors MemberRecord from repository types) ─────────────────
+// ─── Local type ───────────────────────────────────────────────────────────────
 type MemberRecord = {
   id: string;
   fullName: string;

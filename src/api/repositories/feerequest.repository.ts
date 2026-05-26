@@ -3,7 +3,13 @@ import { Service } from 'typedi';
 import { MongoRepository } from 'typeorm';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { FeeRequestStatus, FeeRequestModel } from '../models/feerequest.model';
-import { CreateFeeRequestInput, FeeRequestRecord, ListFeeRequestsQuery, ListFeeRequestsResult, UpdateFeeRequestStatusInput } from './types/feerequest.repository.types';
+import {
+  CreateFeeRequestInput,
+  FeeRequestRecord,
+  ListFeeRequestsQuery,
+  ListFeeRequestsResult,
+  UpdateFeeRequestStatusInput,
+} from './types/feerequest.repository.types';
 
 @Service()
 export class FeeRequestRepository {
@@ -116,27 +122,53 @@ export class FeeRequestRepository {
     }
   }
 
+  /** Student attaches payment screenshot — flips status to screenshot_uploaded */
+  public async savePaymentScreenshot(
+    id: string,
+    screenshotUrl: string,
+  ): Promise<FeeRequestRecord | null> {
+    try {
+      const oid = new ObjectId(id);
+      await this.getRepo().updateOne(
+        { _id: oid },
+        {
+          $set: {
+            screenshotUrl,
+            screenshotUploadedAt: new Date(),
+            status: 'screenshot_uploaded' as FeeRequestStatus,
+            updatedAt: new Date(),
+          },
+        },
+      );
+      return this.findById(id);
+    } catch {
+      return null;
+    }
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
   private map(doc: FeeRequestModel): FeeRequestRecord {
     return {
-      id:           doc.id.toHexString(),
-      libraryId:    doc.libraryId,
-      ownerId:      doc.ownerId,
-      memberId:     doc.memberId,
-      studentName:  doc.studentName,
-      studentPhone: doc.studentPhone,
-      bookingId:    doc.bookingId,
-      amount:       doc.amount,
-      currency:     doc.currency,
-      reason:       doc.reason,
-      status:       doc.status,
-      note:         doc.note,
-      dueDate:      doc.dueDate,
-      paidAt:       doc.paidAt,
-      batchId:      doc.batchId,
-      createdAt:    doc.createdAt,
-      updatedAt:    doc.updatedAt,
+      id:                   doc.id.toHexString(),
+      libraryId:            doc.libraryId,
+      ownerId:              doc.ownerId,
+      memberId:             doc.memberId,
+      studentName:          doc.studentName,
+      studentPhone:         doc.studentPhone,
+      bookingId:            doc.bookingId,
+      amount:               doc.amount,
+      currency:             doc.currency,
+      reason:               doc.reason,
+      status:               doc.status,
+      note:                 doc.note,
+      dueDate:              doc.dueDate,
+      paidAt:               doc.paidAt,
+      batchId:              doc.batchId,
+      screenshotUrl:        doc.screenshotUrl,
+      screenshotUploadedAt: doc.screenshotUploadedAt,
+      createdAt:            doc.createdAt,
+      updatedAt:            doc.updatedAt,
     };
   }
 

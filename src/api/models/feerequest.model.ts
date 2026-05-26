@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
 
-export const FEE_REQUEST_STATUS_ENUM = ['pending', 'paid', 'cancelled', 'expired'] as const;
+export const FEE_REQUEST_STATUS_ENUM = ['pending', 'screenshot_uploaded', 'paid', 'cancelled', 'expired'] as const;
 export type FeeRequestStatus = (typeof FEE_REQUEST_STATUS_ENUM)[number];
 
 export const FEE_REQUEST_REASON_ENUM = [
@@ -77,6 +77,14 @@ export class FeeRequestModel {
   /** If this was part of a bulk send, group them under one batchId */
   @Column()
   batchId?: string;
+
+  /** URL of the payment screenshot uploaded by student */
+  @Column()
+  screenshotUrl?: string;
+
+  /** When the student uploaded the screenshot */
+  @Column()
+  screenshotUploadedAt?: Date;
 
   @Column()
   createdAt!: Date;

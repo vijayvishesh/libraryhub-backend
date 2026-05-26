@@ -625,4 +625,16 @@ export class BookingRepository {
       { $set: { ...fields, updatedAt: new Date() } },
     );
   }
+  // Find latest booking (active OR expired) for renewal context
+public async findLatestBookingByStudentAndLibrary(
+  studentId: string,
+  libraryId: string,
+): Promise<BookingRecord | null> {
+  const bookings = await this.getBookingRepository().find({
+    where: { studentId, libraryId },
+    order: { createdAt: 'DESC' },
+    take: 1,
+  });
+  return bookings[0] ? this.mapBooking(bookings[0]) : null;
+}
 }

@@ -3,6 +3,7 @@ import { Service } from 'typedi';
 import {
   CreateBookingRequest,
   ListMyBookingsQueryRequest,
+  RenewBookingRequest,
 } from '../controllers/requests/booking.request';
 import {
   buildSeatMap,
@@ -30,6 +31,8 @@ import {
   SeatMapResult,
 } from './types/booking.service.types';
 import { sendOwnerBookingRequestPush } from '../../loaders/cronLoader';
+import { LibraryPaymentMethod } from '../constants/library.constants';
+import { MemberRenewalRepository } from '../repositories/memberRenewal.repository';
 
 export type { BookingResult, ListMyBookingsResult, PaymentMethodOption, SeatMapResult };
 
@@ -43,6 +46,7 @@ export class BookingService {
     private readonly memberRepository: MemberRepository,
     private readonly attendanceRepository: AttendanceRepository,
     private readonly studySessionRepository: StudySessionRepository,
+    private readonly memberRenewalRepository: MemberRenewalRepository,
   ) {}
 
   public async getLibrarySeatMap(
@@ -664,4 +668,189 @@ export class BookingService {
 
     throw new InternalServerError(defaultMessage);
   }
+
+public async renewMembership(
+  sessionUserId: string,
+  payload: RenewBookingRequest,
+): Promise<BookingResult> {
+  try {
+    const isOwnerRenewing = payload.renewedBy === 'owner';
+    let studentId: string;
+
+    if (isOwnerRenewing) {
+      // Owner flow: resolve studentId via memberId from payload
+      if (!payload.memberId) {
+        throw new HttpError(400, 'MEMBER_ID_REQUIRED_FOR_OWNER_RENEWAL');
+      }
+
+      const member = await this.memberRepository.findMemberByIdAndLibrary(
+        payload.memberId,
+        payload.libraryId,
+      );
+      if (!member) {
+        throw new HttpError(404, 'MEMBER_NOT_FOUND');
+      }
+
+      if (!member.studentId) {
+        throw new HttpError(400, 'MEMBER_HAS_NO_LINKED_STUDENT');
+      }
+
+      studentId = member.studentId;
+    } else {
+      // Student flow: studentId comes directly from session
+      studentId = sessionUserId;
+    }
+
+    // 1. Validate student
+    const student = await this.authRepository.findStudentById(studentId);
+    if (!student) throw new NotFoundError('STUDENT_NOT_FOUND');
+
+    // 2. Validate library
+    const library = await this.getLibraryOrThrow(payload.libraryId);
+
+    // 3. Find existing member record (must exist for renewal)
+    const existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
+      studentId,
+      payload.libraryId,
+    );
+    if (!existingMember) throw new HttpError(404, 'MEMBER_NOT_FOUND');
+
+    // 4. Find current/last booking for history tracking
+    const currentBooking = await this.bookingRepository.findLatestBookingByStudentAndLibrary(
+      studentId,
+      payload.libraryId,
+    );
+
+    // 5. Resolve slot
+    const slot = this.getLibrarySlotOrThrow(library, payload.slotId);
+
+    // 6. Resolve seat — keep old seat if student doesn't change it
+    const resolvedSeatId = payload.seatId ?? existingMember.seatId;
+    const resolvedSectionId = this.resolveSectionIdForLibrary(library, payload.sectionId);
+
+    // 7. Build seat map and validate seat availability
+    const seatMap = await this.resolveSeatMapWithFallback(
+      library,
+      slot.slotType,
+      resolvedSectionId || undefined,
+    );
+    if (seatMap.length === 0) {
+      throw new HttpError(409, 'NO_SEAT_AVAILABLE');
+    }
+
+    // 8. Resolve seat selection
+    const selectedSeat = this.resolveSeatSelection(
+      seatMap,
+      resolvedSeatId || undefined,
+      payload.autoAllocate ?? false,
+      student.gender,
+    );
+
+    // 9. Check seat conflict — allow same student to renew same seat
+    const conflictingBooking = await this.bookingRepository.findActiveSeatBooking(
+      library.id,
+      slot.slotType,
+      selectedSeat.id,
+    );
+    if (conflictingBooking && conflictingBooking.studentId !== studentId) {
+      throw new HttpError(409, 'SEAT_TAKEN');
+    }
+
+    // 10. Calculate dates
+    const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
+    this.assertValidIsoDate(startDate);
+    const duration = payload.duration || 1;
+    const validUntil = this.addDaysIsoDate(startDate, duration * 30);
+    const planAmount = slot.pricePerMonth * duration;
+
+    // 11. Determine statuses based on who is renewing
+    //     Owner → immediately active + confirmed
+    //     Student → pending until owner approves
+    const newBookingStatus = isOwnerRenewing ? 'confirmed' : 'pending_approval';
+    const newMemberStatus  = isOwnerRenewing ? 'active'    : 'pending';
+
+    // 12. Update member status to pending/active immediately
+    await this.memberRepository.updateMemberByIdAndLibrary(
+      existingMember.id,
+      payload.libraryId,
+      {
+        status: newMemberStatus,
+        seatId: selectedSeat.id,
+        slotId: slot.slotType,
+        startDate,
+        endDate: validUntil,
+        duration,
+        planAmount,
+        updatedAt: new Date(),
+      },
+    );
+
+    // 13. Expire old seat bookings before inserting new one
+    //     (prevents partial unique index conflict)
+    await this.bookingRepository.expireOldSeatBookings(
+      library.id,
+      selectedSeat.id,
+      slot.slotType,
+    );
+
+    // 14. Create new booking record
+    const newBooking = await this.bookingRepository.createBooking({
+      libraryId:     library.id,
+      studentId:     student.id,
+      libraryName:   library.name,
+      libraryAddress:`${library.address}, ${library.city}`,
+      slotType:      slot.slotType,
+      slotName:      slot.name,
+      slotStartTime: slot.startTime,
+      slotEndTime:   slot.endTime,
+      seatId:        selectedSeat.id,
+      sectionId:     selectedSeat.sectionId,
+      paymentMethod: payload.paymentMethod as LibraryPaymentMethod,
+      amount:        planAmount,
+      duration,
+      startDate,
+      validUntil,
+      status:        newBookingStatus,
+      checkedInAt:   null,
+      checkedOutAt:  null,
+      invoiceNo:     this.buildInvoiceNo(),
+    });
+
+    // 15. Update member with new bookingId
+    await this.memberRepository.updateMemberByIdAndLibrary(
+      existingMember.id,
+      payload.libraryId,
+      {
+        bookingId:  newBooking.id,
+        updatedAt:  new Date(),
+      },
+    );
+
+    // 16. Save renewal history record
+    await this.memberRenewalRepository.createRenewal({
+      memberId:          existingMember.id,
+      studentId:         student.id,
+      libraryId:         library.id,
+      previousBookingId: currentBooking?.id        || null,
+      previousSeatId:    existingMember.seatId,
+      previousSlotId:    existingMember.slotId,
+      previousEndDate:   existingMember.endDate,
+      newBookingId:      newBooking.id,
+      newSeatId:         selectedSeat.id,
+      newSlotId:         slot.slotType,
+      newSlotName:       slot.name,
+      newStartDate:      startDate,
+      newEndDate:        validUntil,
+      duration,
+      planAmount,
+      paymentMethod:     payload.paymentMethod,
+      renewedBy:         payload.renewedBy,
+      status:            isOwnerRenewing ? 'approved' : 'pending',
+    });
+
+    return this.mapBookingResult(newBooking, library);
+  } catch (error) {
+    this.rethrowBookingError(error, 'RENEW_MEMBERSHIP_FAILED');
+  }
+}
 }

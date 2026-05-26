@@ -29,6 +29,8 @@ import {
 } from './responses/upload.response';
 import { ErrorResponseModel } from './responses/common.reponse';
 import { CurrentSessionData } from './responses/auth.response';
+import { LibraryPaymentMethodService } from '../services/libraryPaymentMethod.service';
+import { FeeRequestRepository } from '../repositories/feerequest.repository';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -38,7 +40,9 @@ export class UploadController {
   constructor(
     private readonly uploadService: UploadService,
     private readonly authRepository: AuthRepository,
-    private readonly libraryRepository: LibraryRepository, // ✅ ADD THIS
+    private readonly libraryRepository: LibraryRepository,
+    private readonly libraryPaymentMethodService: LibraryPaymentMethodService,
+    private readonly feeRequestRepository: FeeRequestRepository,
   ) {}
 
   @Post('/presigned')
@@ -159,6 +163,17 @@ export class UploadController {
       // ✅ Owner logo/avatar
       if (folder === 'logos' && role === 'OWNER') {
         await this.authRepository.updateOwnerProfile(userId, { avatarUrl: fileUrl });
+        return;
+      }
+
+      // ✅ QR code
+if (folder === 'qr-codes' && role === 'OWNER') {
+  await this.libraryPaymentMethodService.saveQrCodeUrl(userId, fileUrl);
+  return;
+}
+
+      if (folder === 'payment-screenshots' && role === 'STUDENT') {
+        await this.feeRequestRepository.savePaymentScreenshot(userId, fileUrl);
         return;
       }
 
