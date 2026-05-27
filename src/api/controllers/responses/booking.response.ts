@@ -424,7 +424,10 @@ export class BookingListPayloadData {
   @IsNumber()
   total!: number;
 
-  constructor(bookings?: BookingData[], page?: number, limit?: number, total?: number) {
+  @IsNumber()
+  todayStudyTime!: number;
+
+  constructor(bookings?: BookingData[], page?: number, limit?: number, total?: number, todayStudyTime?: number) {
     if (
       !bookings ||
       typeof page !== 'number' ||
@@ -438,6 +441,7 @@ export class BookingListPayloadData {
     this.page = page;
     this.limit = limit;
     this.total = total;
+    this.todayStudyTime = todayStudyTime ?? 0;
   }
 }
 

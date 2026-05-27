@@ -70,4 +70,10 @@ export class MemberModel {
 
   @Column()
   isNewUser?: boolean;
+
+  @Column()
+  paymentMethod?: string | null;     
+
+  @Column()
+  paymentScreenshotUrl?: string | null; 
 }

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class OwnerDashboardLibraryData {
   @IsString()
@@ -120,6 +120,10 @@ export class OwnerDashboardRecentActivityData {
   @IsString()
   studentId!: string | null;
 
+  @IsOptional()
+  @IsString()
+  memberId!: string | null; 
+
   constructor(params?: {
     id: string;
     name: string;
@@ -128,6 +132,7 @@ export class OwnerDashboardRecentActivityData {
     time: string;
     color: string;
     studentId: string | null;
+    memberId: string | null;
   }) {
     if (!params) {
       return;
@@ -140,6 +145,66 @@ export class OwnerDashboardRecentActivityData {
     this.time = params.time;
     this.color = params.color;
     this.studentId = params.studentId;
+    this.memberId  = params.memberId;
+  }
+}
+
+export class OwnerDashboardSubscriptionData {
+  @IsBoolean()
+  isActive!: boolean;
+
+  @IsOptional()
+  @IsString()
+  planName!: string | null;
+
+  @IsOptional()
+  @IsString()
+  planId!: string | null;
+
+  @IsOptional()
+  @IsString()
+  startDate!: string | null;
+
+  @IsOptional()
+  @IsString()
+  endDate!: string | null;
+
+  @IsNumber()
+  daysRemaining!: number;
+
+  @IsOptional()
+  @IsString()
+  activatedBy!: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  amount!: number | null;
+
+  @IsOptional()
+  @IsString()
+  lastPurchasedAt!: string | null;
+
+  constructor(params?: {
+    isActive:        boolean;
+    planName:        string | null;
+    planId:          string | null;
+    startDate:       string | null;
+    endDate:         string | null;
+    daysRemaining:   number;
+    activatedBy:     string | null;
+    amount:          number | null;
+    lastPurchasedAt: string | null;
+  }) {
+    if (!params) return;
+    this.isActive        = params.isActive;
+    this.planName        = params.planName;
+    this.planId          = params.planId;
+    this.startDate       = params.startDate;
+    this.endDate         = params.endDate;
+    this.daysRemaining   = params.daysRemaining;
+    this.activatedBy     = params.activatedBy;
+    this.amount          = params.amount;
+    this.lastPurchasedAt = params.lastPurchasedAt;
   }
 }
 
@@ -168,6 +233,10 @@ export class OwnerDashboardData {
   @Type(() => OwnerDashboardRecentActivityData)
   recentActivity!: OwnerDashboardRecentActivityData[];
 
+  @ValidateNested()
+  @Type(() => OwnerDashboardSubscriptionData)
+  subscription!: OwnerDashboardSubscriptionData;
+
   constructor(params?: {
     // libraryId: string;
     library: OwnerDashboardLibraryData;
@@ -175,6 +244,7 @@ export class OwnerDashboardData {
     seats: OwnerDashboardSeatsData;
     alerts: OwnerDashboardAlertsData;
     recentActivity: OwnerDashboardRecentActivityData[];
+     subscription:   OwnerDashboardSubscriptionData;
   }) {
     if (!params) {
       return;
@@ -185,6 +255,7 @@ export class OwnerDashboardData {
     this.seats = params.seats;
     this.alerts = params.alerts;
     this.recentActivity = params.recentActivity;
+    this.subscription   = params.subscription; 
   }
 }
 
@@ -205,3 +276,4 @@ export class OwnerDashboardApiResponse {
     this.data = data;
   }
 }
+

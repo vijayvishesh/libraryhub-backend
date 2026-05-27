@@ -10,7 +10,8 @@ export type BookingStatus =
   | 'checked_in'
   | 'checked_out'
   | 'cancelled'
-  | 'rejected';
+  | 'rejected'
+  | 'expired';
 
 @Entity('bookings')
 @Index('idx_bookings_student_created_at', ['studentId', 'createdAt'])

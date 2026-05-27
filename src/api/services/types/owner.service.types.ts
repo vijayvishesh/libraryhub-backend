@@ -24,6 +24,7 @@ export type OwnerDashboardRecentActivity = {
   time: string;
   color: string;
   studentId: string | null;
+  memberId:  string | null;
 };
 
 export type OwnerDashboardResult = {
@@ -37,4 +38,17 @@ export type OwnerDashboardResult = {
   seats: OwnerDashboardSeats;
   alerts: OwnerDashboardAlerts;
   recentActivity: OwnerDashboardRecentActivity[];
+  subscription:   OwnerDashboardSubscription;
+};
+
+export type OwnerDashboardSubscription = {
+  isActive:        boolean;
+  planName:        string | null;
+  planId:          string | null;
+  startDate:       string | null;
+  endDate:         string | null;
+  daysRemaining:   number;
+  activatedBy:     string | null;
+  amount:          number | null;
+  lastPurchasedAt: string | null; 
 };

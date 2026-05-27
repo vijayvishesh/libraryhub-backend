@@ -17,6 +17,8 @@ export type CreateMemberInput = {
   notes: string | null;
   isInviteSubmission?: boolean;
   isNewUser?: boolean;
+  paymentMethod?: string | null;     
+  paymentScreenshotUrl?: string | null;
 };
 
 export type MemberRecord = CreateMemberInput & {
@@ -25,11 +27,16 @@ export type MemberRecord = CreateMemberInput & {
   updatedAt: Date;
   isInviteSubmission?: boolean;
   isNewUser?: boolean;
+  paymentMethod?: string | null;         
+  paymentScreenshotUrl?: string | null; 
 };
 
 export type UpdateMemberInput = Partial<
   Omit<CreateMemberInput, 'libraryId'> & {
     updatedAt: Date;
+    paymentMethod?: string | null;       
+    paymentScreenshotUrl?: string | null;
+
   }
 >;
 

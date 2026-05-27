@@ -369,7 +369,8 @@ export class BookingService {
           const attendanceFields = records.length > 0 ? this.computeAttendanceFields(records) : {};
           return { ...base, todayStudyTime, ...attendanceFields };
         }
-        return base;
+        // ✅ Always return todayStudyTime regardless of booking status
+        return { ...base, todayStudyTime };
       });
 
       return {
@@ -377,52 +378,62 @@ export class BookingService {
         page,
         limit,
         total: result.total,
+        todayStudyTime,
       };
     } catch (error) {
       this.rethrowBookingError(error, 'GET_MY_BOOKINGS_FAILED');
     }
   }
 
-  public async getMyBookingById(studentId: string, bookingId: string): Promise<BookingResult> {
-    try {
-      const booking = await this.bookingRepository.findStudentBookingById(
+ public async getMyBookingById(studentId: string, bookingId: string): Promise<BookingResult> {
+  try {
+    const booking = await this.bookingRepository.findStudentBookingById(
+      studentId.trim(),
+      bookingId.trim(),
+    );
+    if (!booking) {
+      throw new NotFoundError('BOOKING_NOT_FOUND');
+    }
+
+    const library = await this.libraryRepository.findLibraryById(booking.libraryId);
+    const base    = this.mapBookingResult(booking, library);
+
+    // Always fetch todayStudyTime — not dependent on library or booking status
+    const todayStudyTime = await this.studySessionRepository
+      .sumTodayDurationMinutes(studentId.trim());
+
+    if (booking.status === 'confirmed') {
+      const today = new Date().toISOString().slice(0, 10);
+      const records = await this.attendanceRepository.findAllByStudentAndDate(
         studentId.trim(),
-        bookingId.trim(),
+        booking.libraryId,
+        today,
       );
-      if (!booking) {
-        throw new NotFoundError('BOOKING_NOT_FOUND');
-      }
 
-      const library = await this.libraryRepository.findLibraryById(booking.libraryId);
-      const base = this.mapBookingResult(booking, library);
+      const attendanceFields = records.length > 0
+        ? this.computeAttendanceFields(records)
+        : {};
 
-      if (booking.status === 'confirmed') {
-        const today = new Date().toISOString().slice(0, 10);
-        const [todayStudyTime, records] = await Promise.all([
-          this.studySessionRepository.sumTodayDurationMinutes(studentId.trim()),
-          this.attendanceRepository.findAllByStudentAndDate(studentId.trim(), booking.libraryId, today),
-        ]);
-        const attendanceFields = records.length > 0 ? this.computeAttendanceFields(records) : {};
-        const latestRecord = records[records.length - 1];
-        const todayAttendance = latestRecord
-          ? {
-            checkInTime: new Date(latestRecord.checkInTime).toISOString(),
+      const latestRecord    = records[records.length - 1];
+      const todayAttendance = latestRecord
+        ? {
+            checkInTime:  new Date(latestRecord.checkInTime).toISOString(),
             checkOutTime: latestRecord.checkOutTime
               ? new Date(latestRecord.checkOutTime).toISOString()
               : null,
-            status: latestRecord.status, // 'checked_in' | 'checked_out'
+            status: latestRecord.status,
           }
-          : undefined;
+        : undefined;
 
-        return { ...base, todayStudyTime, todayAttendance, ...attendanceFields };
-
-      }
-
-      return base;
-    } catch (error) {
-      this.rethrowBookingError(error, 'GET_MY_BOOKING_FAILED');
+      return { ...base, todayStudyTime, todayAttendance, ...attendanceFields };
     }
+
+    return { ...base, todayStudyTime };
+
+  } catch (error) {
+    this.rethrowBookingError(error, 'GET_MY_BOOKING_FAILED');
   }
+}
 
   private resolveSeatSelection(
     seatMap: SeatMapItem[],
@@ -678,7 +689,6 @@ public async renewMembership(
     let studentId: string;
 
     if (isOwnerRenewing) {
-      // Owner flow: resolve studentId via memberId from payload
       if (!payload.memberId) {
         throw new HttpError(400, 'MEMBER_ID_REQUIRED_FOR_OWNER_RENEWAL');
       }
@@ -697,7 +707,6 @@ public async renewMembership(
 
       studentId = member.studentId;
     } else {
-      // Student flow: studentId comes directly from session
       studentId = sessionUserId;
     }
 
@@ -759,7 +768,7 @@ public async renewMembership(
     // 10. Calculate dates
     const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
     this.assertValidIsoDate(startDate);
-    const duration = payload.duration || 1;
+    const duration  = payload.duration || 1;
     const validUntil = this.addDaysIsoDate(startDate, duration * 30);
     const planAmount = slot.pricePerMonth * duration;
 
@@ -769,31 +778,40 @@ public async renewMembership(
     const newBookingStatus = isOwnerRenewing ? 'confirmed' : 'pending_approval';
     const newMemberStatus  = isOwnerRenewing ? 'active'    : 'pending';
 
-    // 12. Update member status to pending/active immediately
+    // 12. Update member status immediately
     await this.memberRepository.updateMemberByIdAndLibrary(
       existingMember.id,
       payload.libraryId,
       {
-        status: newMemberStatus,
-        seatId: selectedSeat.id,
-        slotId: slot.slotType,
+        status:               newMemberStatus,
+        seatId:               selectedSeat.id,
+        slotId:               slot.slotType,
         startDate,
-        endDate: validUntil,
+        endDate:              validUntil,
         duration,
         planAmount,
-        updatedAt: new Date(),
+        paymentMethod:        payload.paymentMethod ?? null,
+        paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
+        updatedAt:            new Date(),
       },
     );
 
-    // 13. Expire old seat bookings before inserting new one
-    //     (prevents partial unique index conflict)
+    // ✅ 13. Mark OLD booking as expired — NEW
+    if (currentBooking?.id) {
+      await this.bookingRepository.updateBookingStatus(
+        currentBooking.id,
+        'expired',  // not checked_out — that's for attendance only
+      );
+    }
+
+    // 14. Expire old seat bookings (partial unique index cleanup)
     await this.bookingRepository.expireOldSeatBookings(
       library.id,
       selectedSeat.id,
       slot.slotType,
     );
 
-    // 14. Create new booking record
+    // 15. Create new booking record
     const newBooking = await this.bookingRepository.createBooking({
       libraryId:     library.id,
       studentId:     student.id,
@@ -816,22 +834,24 @@ public async renewMembership(
       invoiceNo:     this.buildInvoiceNo(),
     });
 
-    // 15. Update member with new bookingId
+    // ✅ 16. Update member with new bookingId + payment info — UPDATED
     await this.memberRepository.updateMemberByIdAndLibrary(
       existingMember.id,
       payload.libraryId,
       {
-        bookingId:  newBooking.id,
-        updatedAt:  new Date(),
+        bookingId:            newBooking.id,
+        paymentMethod:        payload.paymentMethod ?? null,
+        paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
+        updatedAt:            new Date(),
       },
     );
 
-    // 16. Save renewal history record
+    // 17. Save renewal history record
     await this.memberRenewalRepository.createRenewal({
       memberId:          existingMember.id,
       studentId:         student.id,
       libraryId:         library.id,
-      previousBookingId: currentBooking?.id        || null,
+      previousBookingId: currentBooking?.id     || null,
       previousSeatId:    existingMember.seatId,
       previousSlotId:    existingMember.slotId,
       previousEndDate:   existingMember.endDate,

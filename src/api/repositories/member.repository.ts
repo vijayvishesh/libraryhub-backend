@@ -469,6 +469,8 @@ public async findMemberByIdAndLibrary(
       updatedAt: member.updatedAt,
       isInviteSubmission: member.isInviteSubmission ?? false,
       isNewUser: member.isNewUser ?? false,
+      paymentMethod:        member.paymentMethod ?? null,       
+      paymentScreenshotUrl: member.paymentScreenshotUrl ?? null,
     };
   }
 

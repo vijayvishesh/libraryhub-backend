@@ -75,6 +75,7 @@ export class BookingController {
           result.page,
           result.limit,
           result.total,
+          result.todayStudyTime,
         ),
         200,
       );

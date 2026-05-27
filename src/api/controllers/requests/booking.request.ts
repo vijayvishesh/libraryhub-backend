@@ -204,4 +204,8 @@ export class RenewBookingRequest {
   @IsOptional()
   @IsString()
   memberId?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentScreenshotUrl?: string;
 }

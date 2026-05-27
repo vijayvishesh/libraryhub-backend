@@ -67,6 +67,7 @@ import {
   OwnerDashboardRecentActivityData,
   OwnerDashboardRevenueData,
   OwnerDashboardSeatsData,
+  OwnerDashboardSubscriptionData,
 } from './responses/owner.response';
 // import { UpdateLibraryLogoRequest, UpdateLibraryPhotosRequest } from './requests/upload.request';
 
@@ -237,8 +238,10 @@ export class OwnerController {
                 time: item.time,
                 color: item.color,
                 studentId: item.studentId,
+                 memberId:  item.memberId,
               }),
           ),
+          subscription: new OwnerDashboardSubscriptionData(dashboard.subscription),
         }),
         200,
       );

@@ -59,4 +59,5 @@ export type ListMyBookingsResult = {
   page: number;
   limit: number;
   total: number;
+  todayStudyTime: number;
 };

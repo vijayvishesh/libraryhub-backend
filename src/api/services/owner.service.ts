@@ -13,7 +13,10 @@ import {
   OwnerDashboardRecentActivity,
   OwnerDashboardResult,
   OwnerDashboardRevenue,
+  OwnerDashboardSubscription,
 } from './types/owner.service.types';
+import { LibrarySubscriptionRepository } from '../repositories/librarySubscription.repository';
+import { MemberRepository } from '../repositories/member.repository';
 
 export type { OwnerDashboardResult };
 
@@ -23,6 +26,8 @@ export class OwnerService {
     private readonly libraryRepository: LibraryRepository,
     private readonly bookingService: BookingService,
     private readonly activityService: ActivityService,
+    private readonly librarySubscriptionRepository: LibrarySubscriptionRepository, 
+    private readonly memberRepository: MemberRepository, 
   ) {}
 
   public async getDashboard(ownerId: string): Promise<OwnerDashboardResult> {
@@ -40,13 +45,51 @@ export class OwnerService {
       const pendingSeatCount = seatMap.seats.filter(s => s.seatStatus === 'pending').length;
       const totalSeatCount = seatMap.seats.length;
       const freeSeatCount = Math.max(0, totalSeatCount - occupiedSeatCount - pendingSeatCount);
+      const activeSub = await this.librarySubscriptionRepository.findActiveByLibraryId(library.id);
 
       const [revenue, alerts, recentActivity] = await Promise.all([
         this.getRevenueStats(library.id),
         this.getAlertStats(library.id),
-        this.getRecentActivity(ownerId),
+        this.getRecentActivity(ownerId, library.id),
       ]);
+      
+      const today = new Date().toISOString().slice(0, 10);
+      let subscription: OwnerDashboardSubscription;
 
+      if (activeSub) {
+        const endMs = new Date(activeSub.endDate).getTime();
+        const todayMs = new Date(today).getTime();
+        const daysRemaining = Math.max(
+          0,
+          Math.ceil((endMs - todayMs) / (1000 * 60 * 60 * 24)),
+        );
+
+        subscription = {
+          isActive: true,
+          planName: activeSub.planName ?? null,
+          planId: activeSub.planId ?? null,
+          startDate: activeSub.startDate ?? null,
+          endDate: activeSub.endDate ?? null,
+          daysRemaining,
+          activatedBy: activeSub.activatedBy ?? null,
+          amount: activeSub.amount ?? null,
+          lastPurchasedAt: activeSub.createdAt
+            ? new Date(activeSub.createdAt).toISOString()
+            : null,
+        };
+      } else {
+        subscription = {
+          isActive: false,
+          planName: null,
+          planId: null,
+          startDate: null,
+          endDate: null,
+          daysRemaining: 0,
+          activatedBy: null,
+          amount: null,
+          lastPurchasedAt: null,
+        };
+      }
       const result: OwnerDashboardResult = {
         library: {
           name: library.name,
@@ -63,6 +106,7 @@ export class OwnerService {
         },
         alerts,
         recentActivity,
+        subscription,
       };
 
       await redisCache.set(cacheKey, result, 300);
@@ -209,22 +253,45 @@ private async getAlertStats(libraryId: string): Promise<OwnerDashboardAlerts> {
   };
 }
 
-  private async getRecentActivity(ownerId: string): Promise<OwnerDashboardRecentActivity[]> {
+  private async getRecentActivity(ownerId: string, libraryId: string,): Promise<OwnerDashboardRecentActivity[]> {
     const activities = await this.activityService.listRecentActivities(ownerId.trim(), 3);
-    return activities.map(item => this.mapRecentActivity(item));
+     const studentIds = activities
+    .map(a => a.metadata?.studentId as string | undefined)
+    .filter((id): id is string => !!id);
+
+  // Batch fetch members by studentId for this library
+  const memberMap = new Map<string, string>(); // studentId → memberId
+  if (studentIds.length > 0) {
+    await Promise.all(
+      studentIds.map(async studentId => {
+        const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
+          studentId,
+          libraryId,
+        );
+        if (member) {
+          memberMap.set(studentId, member.id);
+        }
+      }),
+    );
+  }
+    return activities.map(item => this.mapRecentActivity(item, memberMap));
   }
 
-  private mapRecentActivity(activity: ActivityRecord): OwnerDashboardRecentActivity {
+  private mapRecentActivity(activity: ActivityRecord, memberMap: Map<string, string>,): OwnerDashboardRecentActivity {
     const baseName = this.extractActivityName(activity);
     const mappedAction = this.mapActivityAction(activity.actionType);
     const detail = this.extractActivityDetail(activity);
     const studentId = activity.metadata?.studentId ?? null;
+     const memberId = studentId ? (memberMap.get(studentId) ?? null) : null;
+    // const memberId   = activity.metadata?.memberId  ?? null; 
+    
     return {
       id: activity.id,
       name: baseName,
       action: mappedAction.action,
       detail,
       studentId,
+      memberId, 
       time: this.formatTimeAgo(activity.timestamp),
       color: mappedAction.color,
     };
