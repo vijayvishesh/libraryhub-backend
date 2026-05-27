@@ -40,6 +40,7 @@ export const LIBRARY_PAYMENT_METHOD_ENUM = [
   'razorpay',
   'phonePe',
   'gpay',
+  'qr_code'
 ] as const;
 
 export const LIBRARY_SEATING_MODE_ENUM = ['general', 'section'] as const;

@@ -29,6 +29,8 @@ import { env } from '../../env';
 import { LibraryPaymentMethodModel } from '../../api/models/libraryPaymentMethod.model';
 import { FeeRequestModel } from '../../api/models/feerequest.model';
 import { MemberRenewalModel } from '../../api/models/memberRenewal.model';
+import { SubscriptionPlanModel } from '../../api/models/subscriptionPlan.model';
+import { LibrarySubscriptionModel } from '../../api/models/librarySubscription.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -92,7 +94,9 @@ const createDataSource = (): DataSource =>
       LibraryTransferModel,
       LibraryPaymentMethodModel,
       FeeRequestModel,
-      MemberRenewalModel 
+      MemberRenewalModel,
+      SubscriptionPlanModel,   
+      LibrarySubscriptionModel, 
     ],
     synchronize: true,
     logging: false,
