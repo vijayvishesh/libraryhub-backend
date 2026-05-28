@@ -14,7 +14,13 @@ export type NotificationType =
   | 'slot_not_checked_in'
   | 'timetable_reminder'
   | 'revision_reminder'
-  | 'member_expired';
+  | 'member_expired'
+  | 'renewal_request'       
+  | 'renewal_approved'      
+  | 'renewal_rejected'     
+  | 'payment_received'     
+  | 'payment_screenshot'    
+  | 'subscription_expiring';
 
 export type NotificationAudience = 'student' | 'owner';
 

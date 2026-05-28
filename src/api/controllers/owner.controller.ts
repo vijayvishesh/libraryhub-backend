@@ -13,6 +13,7 @@ import {
   Param,
   Patch,
   Post,
+  QueryParam,
   QueryParams,
   Res,
   UploadedFile,
@@ -44,6 +45,9 @@ import {
 } from './responses/booking.response';
 import { CommonResponse, ErrorResponseModel } from './responses/common.reponse';
 import {
+  InactiveMemberData,
+  InactiveMembersApiResponse,
+  InactiveMembersListPayloadData,
   MemberActionApiResponse,
   MemberCreateApiResponse,
   MemberData,
@@ -301,6 +305,113 @@ export class OwnerController {
       throw new InternalServerError('DOWNLOAD_MEMBER_UPLOAD_TEMPLATE_FAILED');
     }
   }
+
+//    @Get('/members/inactive')
+// @Authorized('OWNER')
+// @OpenAPI({
+//   summary: 'Get expired, overdue, and inactive members',
+//   description: 'Filter by type=expired|overdue|inactive or omit for all three combined.',
+//   security: [{ bearerAuth: [] }],
+// })
+// @ResponseSchema(InactiveMembersApiResponse, { statusCode: 200 })
+// @ResponseSchema(ErrorResponseModel, { statusCode: 401 })
+// @ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+// @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
+// public async listInactiveMembers(
+//   @CurrentUser({ required: true }) session: CurrentSessionData,
+//   @QueryParams() query: ListInactiveMembersQueryRequest,
+// ): Promise<InactiveMembersApiResponse> {
+//   try {
+//     const result = await this.memberService.listInactiveMembers(session.user.id, query);
+
+//     return new InactiveMembersApiResponse(
+//       new InactiveMembersListPayloadData({
+//         members: result.members.map(
+//           m =>
+//             new InactiveMemberData({
+//               id: m.id,
+//               fullName: m.fullName,
+//               mobileNo: m.mobileNo,
+//               email: m.email,
+//               seatId: m.seatId,
+//               slotId: m.slotId,
+//               status: m.status,
+//               memberType: m.memberType,
+//               planAmount: m.planAmount,
+//               startDate: m.startDate,
+//               endDate: m.endDate,
+//               paidAt: m.paidAt,
+//               createdAt: m.createdAt,
+//               updatedAt: m.updatedAt,
+//             }),
+//         ),
+//         page: result.page,
+//         limit: result.limit,
+//         total: result.total,
+//         expiredCount: result.expiredCount,
+//         overdueCount: result.overdueCount,
+//         inactiveCount: result.inactiveCount,
+//       }),
+//       200,
+//     );
+//   } catch (error) {
+//     if (error instanceof HttpError) throw error;
+//     throw new InternalServerError('LIST_INACTIVE_MEMBERS_FAILED');
+//   }
+// }
+
+@Get('/members/inactive')
+@Authorized('OWNER')
+public async listInactiveMembers(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @QueryParam('page') page?: number,
+  @QueryParam('limit') limit?: number,
+  @QueryParam('type') type?: string,
+  @QueryParam('search') search?: string,
+): Promise<InactiveMembersApiResponse> {
+  try {
+    const result = await this.memberService.listInactiveMembers(session.user.id, {
+      page,
+      limit,
+      type: type as 'expired' | 'overdue' | 'inactive' | undefined,
+      search,
+    });
+
+    return new InactiveMembersApiResponse(
+      new InactiveMembersListPayloadData({
+        members: result.members.map(
+          m =>
+            new InactiveMemberData({
+              id: m.id,
+              fullName: m.fullName,
+              mobileNo: m.mobileNo,
+              email: m.email,
+              seatId: m.seatId,
+              slotId: m.slotId,
+              status: m.status,
+              memberType: m.memberType,
+              planAmount: m.planAmount,
+              startDate: m.startDate,
+              endDate: m.endDate,
+              paidAt: m.paidAt,
+              createdAt: m.createdAt,
+              updatedAt: m.updatedAt,
+            }),
+        ),
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        expiredCount: result.expiredCount,
+        overdueCount: result.overdueCount,
+        inactiveCount: result.inactiveCount,
+      }),
+      200,
+    );
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('LIST_INACTIVE_MEMBERS_FAILED');
+  }
+}
 
   @Post('/members/upload')
   @Authorized('OWNER')
@@ -760,4 +871,5 @@ public async deactivateMember(
     throw new InternalServerError('DEACTIVATE_MEMBER_FAILED');
   }
 }
+
 }

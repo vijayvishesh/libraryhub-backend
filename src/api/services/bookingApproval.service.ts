@@ -62,7 +62,14 @@ export class BookingApprovalService {
       }
 
       const targetStatus = markPaid ? 'confirmed' : 'pending_payment';
-      const memberStatus = markPaid ? 'active' : 'pending';
+
+      // ✅ Back-date check: if markPaid but validUntil already passed, mark member as expired
+      const today = new Date().toISOString().slice(0, 10);
+      const memberStatus: 'active' | 'pending' | 'expired' = markPaid
+        ? booking.validUntil < today
+          ? 'expired'
+          : 'active'
+        : 'pending';
 
       const updated = markPaid
         ? await this.bookingRepository.markBookingPaid(
@@ -80,12 +87,12 @@ export class BookingApprovalService {
           await this.syncMemberForBooking(
             student,
             library.id,
-            finalSeatId, // ← resolved seat (owner's choice or student's original)
+            finalSeatId,
             booking.slotType,
             booking.amount,
             booking.startDate,
             booking.validUntil,
-            memberStatus,
+            memberStatus, // ← now correctly 'expired' for back-dated bookings
             bookingId,
             booking.duration,
           );
@@ -206,7 +213,7 @@ export class BookingApprovalService {
     planAmount: number,
     startDate: string,
     endDate: string,
-    memberStatus: 'active' | 'pending',
+    memberStatus: 'active' | 'pending' | 'expired',
     bookingId: string | null = null,
     duration = 1,
   ): Promise<void> {

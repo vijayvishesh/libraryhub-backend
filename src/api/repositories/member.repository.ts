@@ -5,6 +5,8 @@ import { getDataSource } from '../../database/config/ormconfig.default';
 import { MemberModel } from '../models/member.model';
 import {
   CreateMemberInput,
+  ListInactiveMembersQuery,
+  ListInactiveMembersResult,
   ListMembersQuery,
   ListMembersResult,
   MemberRecord,
@@ -78,10 +80,10 @@ export class MemberRepository {
     return this.mapMember(member);
   }
 
- public async listMembersByLibrary(query: ListMembersQuery): Promise<ListMembersResult> {
+public async listMembersByLibrary(query: ListMembersQuery): Promise<ListMembersResult> {
   const memberRepository = this.getMemberRepository();
   const filter: Record<string, unknown> = {
-    libraryId: query.libraryId,
+    libraryId: query.libraryId, // ✅ plain string, not new ObjectId(...)
   };
 
   if (query.status) {
@@ -108,7 +110,6 @@ export class MemberRepository {
     memberRepository.count({ where: filter }),
   ]);
 
-  // ── Enrich with student data ─────────────────────────────────────────
   const studentIds = members
     .map(m => m.studentId)
     .filter((id): id is string => !!id);
@@ -120,7 +121,6 @@ export class MemberRepository {
     total,
   };
 }
-
   public async findAllMembersByLibrary(libraryId: string): Promise<MemberRecord[]> {
   const members = await this.getMemberRepository().find({
     where: { libraryId },
@@ -550,5 +550,272 @@ private mapMemberWithStudent(
   }
 
   return base;
+}
+
+// public async listInactiveMembers(
+//   query: ListInactiveMembersQuery,
+// ): Promise<ListInactiveMembersResult> {
+//   const memberRepository = this.getMemberRepository();
+//   const today = query.todayIso;
+
+//   // Build per-type filters
+//   const expiredFilter = { libraryId: new ObjectId(query.libraryId), status: 'expired' };
+//   const overdueFilter = {
+//     libraryId: new ObjectId(query.libraryId),
+//     status: 'active',
+//     endDate: { $lte: today } as unknown as string,
+//   };
+//   const inactiveFilter = { libraryId: new ObjectId(query.libraryId), status: 'inactive' };
+
+//   // Always get counts for all three types (for tab/summary display)
+//   const [expiredCount, overdueCount, inactiveCount] = await Promise.all([
+//     memberRepository.count({ where: expiredFilter }),
+//     memberRepository.count({ where: overdueFilter }),
+//     memberRepository.count({ where: inactiveFilter }),
+//   ]);
+
+//   // Determine which filter to apply based on requested type
+//   let activeFilter: Record<string, unknown>;
+
+//   if (query.type === 'expired') {
+//     activeFilter = { ...expiredFilter };
+//   } else if (query.type === 'overdue') {
+//     activeFilter = { ...overdueFilter };
+//   } else if (query.type === 'inactive') {
+//     activeFilter = { ...inactiveFilter };
+//   } else {
+//     // No type filter — return all three combined
+//     activeFilter = {
+//       libraryId: new ObjectId(query.libraryId),
+//       $or: [
+//         { status: 'expired' },
+//         { status: 'inactive' },
+//         { status: 'active', endDate: { $lte: today } },
+//       ],
+//     };
+//   }
+
+//   // Apply search on top of the type filter
+//   if (query.search) {
+//     const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+//     const searchRegex = { $regex: escaped, $options: 'i' };
+//     const searchConditions = [
+//       { fullName: searchRegex },
+//       { mobileNo: searchRegex },
+//       { email: searchRegex },
+//     ];
+
+//     // Merge search with existing $or safely
+//     if (activeFilter.$or) {
+//       // Wrap existing $or + new search in $and
+//       activeFilter = {
+//         libraryId: new ObjectId(query.libraryId),
+//         $and: [
+//           { $or: activeFilter.$or },
+//           { $or: searchConditions },
+//         ],
+//       };
+//     } else {
+//       activeFilter.$or = searchConditions;
+//     }
+//   }
+
+//   const [members, total] = await Promise.all([
+//     memberRepository.find({
+//       where: activeFilter,
+//       order: { updatedAt: 'DESC' },
+//       skip: (query.page - 1) * query.limit,
+//       take: query.limit,
+//     }),
+//     memberRepository.count({ where: activeFilter }),
+//   ]);
+
+//   // Enrich with student data
+//   const studentIds = members
+//     .map(m => m.studentId)
+//     .filter((id): id is string => !!id);
+//   const studentMap = await this.findStudentsByIds(studentIds);
+
+//   const enriched = members.map(m => {
+//     const base = this.mapMemberWithStudent(m, studentMap);
+
+//     // Derive the memberType for each record
+//     let memberType: 'expired' | 'overdue' | 'inactive';
+//     if (m.status === 'inactive') {
+//       memberType = 'inactive';
+//     } else if (m.status === 'expired') {
+//       memberType = 'expired';
+//     } else {
+//       // status === 'active' but endDate <= today
+//       memberType = 'overdue';
+//     }
+
+//     return { ...base, memberType };
+//   });
+
+//   return { members: enriched, total, expiredCount, overdueCount, inactiveCount };
+// }
+public async listInactiveMembers(
+  query: ListInactiveMembersQuery,
+): Promise<ListInactiveMembersResult> {
+  const memberRepository = this.getMemberRepository();
+  const libraryId = query.libraryId; // ✅ plain string — matches how it's stored in DB
+  const today = query.todayIso;
+
+  // ── Count filters ─────────────────────────────────────────────────────
+  const expiredFilter = {
+    libraryId,
+    $or: [{ status: 'expired' }, { status: 'active', endDate: { $lt: today } }],
+  };
+  const overdueFilter = {
+    libraryId,
+    status: 'active',
+    endDate: { $lte: today },
+  };
+  const inactiveFilter = {
+    libraryId,
+    status: 'inactive',
+  };
+
+  // ── Always fetch all three counts for tab badges ──────────────────────
+  const [expiredCountResult, overdueCountResult, inactiveCountResult] =
+    await Promise.all([
+      memberRepository.aggregate([{ $match: expiredFilter }, { $count: 'n' }]).toArray(),
+      memberRepository.aggregate([{ $match: overdueFilter }, { $count: 'n' }]).toArray(),
+      memberRepository.aggregate([{ $match: inactiveFilter }, { $count: 'n' }]).toArray(),
+    ]);
+
+  const expiredCount: number = expiredCountResult[0]?.n ?? 0;
+  const overdueCount: number = overdueCountResult[0]?.n ?? 0;
+  const inactiveCount: number = inactiveCountResult[0]?.n ?? 0;
+
+  // ── Active filter based on requested type ─────────────────────────────
+  let activeFilter: Record<string, unknown>;
+
+  if (query.type === 'expired') {
+    activeFilter = {
+      libraryId,
+      $or: [{ status: 'expired' }, { status: 'active', endDate: { $lt: today } }],
+    };
+  } else if (query.type === 'overdue') {
+    activeFilter = {
+      libraryId,
+      status: 'active',
+      endDate: { $lte: today },
+    };
+  } else if (query.type === 'inactive') {
+    activeFilter = {
+      libraryId,
+      status: 'inactive',
+    };
+  } else {
+    activeFilter = {
+      libraryId,
+      $or: [
+        { status: 'expired' },
+        { status: 'inactive' },
+        { status: 'active', endDate: { $lte: today } },
+      ],
+    };
+  }
+
+  // ── Merge search on top of type filter ────────────────────────────────
+  if (query.search) {
+    const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = { $regex: escaped, $options: 'i' };
+    const searchConditions = [
+      { fullName: searchRegex },
+      { mobileNo: searchRegex },
+      { email: searchRegex },
+    ];
+
+    if ((activeFilter as any).$or) {
+      activeFilter = {
+        libraryId,
+        $and: [{ $or: (activeFilter as any).$or }, { $or: searchConditions }],
+      };
+    } else {
+      (activeFilter as any).$or = searchConditions;
+    }
+  }
+
+  const skip = (query.page - 1) * query.limit;
+
+  // ── Paginated fetch + total count ─────────────────────────────────────
+  const [rawMembers, totalResult] = await Promise.all([
+    memberRepository
+      .aggregate([
+        { $match: activeFilter },
+        { $sort: { updatedAt: -1 } },
+        { $skip: skip },
+        { $limit: query.limit },
+      ])
+      .toArray(),
+    memberRepository
+      .aggregate([{ $match: activeFilter }, { $count: 'n' }])
+      .toArray(),
+  ]);
+
+  const total: number = totalResult[0]?.n ?? 0;
+
+  // ── Map raw aggregate docs to MemberModel shape ───────────────────────
+  const memberModels: MemberModel[] = rawMembers.map((doc: any) => {
+    const model = new MemberModel();
+    model.id                   = doc._id;
+    model.fullName             = doc.fullName;
+    model.mobileNo             = doc.mobileNo;
+    model.aadharId             = doc.aadharId ?? null;
+    model.studentId            = doc.studentId ?? null;
+    model.email                = doc.email ?? null;
+    model.duration             = doc.duration;
+    model.libraryId            = doc.libraryId;
+    model.seatId               = doc.seatId ?? null;
+    model.slotId               = doc.slotId ?? null;
+    model.status               = doc.status;
+    model.planAmount           = doc.planAmount ?? null;
+    model.startDate            = doc.startDate ?? null;
+    model.endDate              = doc.endDate ?? null;
+    model.bookingId            = doc.bookingId ?? null;
+    model.paidAt               = doc.paidAt ?? null;
+    model.notes                = doc.notes ?? null;
+    model.createdAt            = doc.createdAt;
+    model.updatedAt            = doc.updatedAt;
+    model.isInviteSubmission   = doc.isInviteSubmission;
+    model.isNewUser            = doc.isNewUser;
+    model.paymentMethod        = doc.paymentMethod ?? null;
+    model.paymentScreenshotUrl = doc.paymentScreenshotUrl ?? null;
+    return model;
+  });
+
+  // ── Enrich with student data ──────────────────────────────────────────
+  const studentIds = memberModels
+    .map(m => m.studentId)
+    .filter((id): id is string => !!id);
+
+  const studentMap = await this.findStudentsByIds(studentIds);
+
+  // ── Derive memberType and build final result ──────────────────────────
+  const enriched = memberModels.map(m => {
+    const base = this.mapMemberWithStudent(m, studentMap);
+
+    let memberType: 'expired' | 'overdue' | 'inactive';
+    if (m.status === 'inactive') {
+      memberType = 'inactive';
+    } else if (m.status === 'expired') {
+      memberType = 'expired';
+    } else {
+      memberType = query.type === 'expired' ? 'expired' : 'overdue';
+    }
+
+    return { ...base, memberType };
+  });
+
+  return {
+    members: enriched,
+    total,
+    expiredCount,
+    overdueCount,
+    inactiveCount,
+  };
 }
 }

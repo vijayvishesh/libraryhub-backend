@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEmail,
@@ -244,7 +244,7 @@ export class SubmitMemberViaInviteLinkRequest {
   notes?: string;
 }
 
-// Add to existing member.request.ts
+
 
 export class ListMemberPaymentsQueryRequest {
   @IsOptional()
@@ -259,4 +259,33 @@ export class ListMemberPaymentsQueryRequest {
   @Min(1)
   @Max(100)
   limit?: number;
+}
+
+const INACTIVE_MEMBER_TYPE_ENUM = ['expired', 'overdue', 'inactive'] as const;
+
+export class ListInactiveMembersQueryRequest {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (Array.isArray(value) ? value[0] : String(value ?? '')).trim())
+  @IsString()
+  @IsIn([...INACTIVE_MEMBER_TYPE_ENUM])
+  type?: (typeof INACTIVE_MEMBER_TYPE_ENUM)[number];
+
+  @IsOptional()
+  @Transform(({ value }) => (Array.isArray(value) ? value[0] : String(value ?? '')).trim())
+  @IsString()
+  @IsNotEmpty()
+  search?: string;
 }

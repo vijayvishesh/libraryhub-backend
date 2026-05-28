@@ -16,6 +16,8 @@ import { getDataSource } from '../database/config/ormconfig.default';
 import { getFirebaseMessaging } from '../lib/firebase/firebase';
 import { Logger } from '../lib/logger';
 import redisCache from '../lib/redis/db.redis';
+import { ObjectId } from 'mongodb';
+import { AnnouncementModel, AnnouncementTarget } from '../api/models/announcement.model';
 
 const log = new Logger(__filename);
 
@@ -382,48 +384,84 @@ export async function runTimetableReminderJob(): Promise<void> {
   }
 }
 
-// ── Auto-checkout (unchanged) ─────────────────────────────────────────────────
 
 export async function runAutoCheckoutJob(): Promise<void> {
   const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+
   const attendanceRepo = getDataSource().getMongoRepository(AttendanceModel);
-  const bookingRepo = getDataSource().getMongoRepository(BookingModel);
+  const bookingRepo    = getDataSource().getMongoRepository(BookingModel);
 
   const checkedIn = await attendanceRepo.find({
-    where: { status: 'checked_in', date: { $lt: today } } as any,
+    where: {
+      status: 'checked_in',
+      $or: [
+        { date: { $lt: today } },                                                    // normal slots from previous days
+        { checkInTime: { $lte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },   // 24hr slots where 24hrs have passed
+      ],
+    } as any,
   });
 
   let count = 0;
+
   for (const record of checkedIn) {
     try {
+      const recordId = record.id ?? (record as any)._id;
+
       const booking = await bookingRepo.findOne({
         where: {
           studentId: record.studentId,
           libraryId: record.libraryId,
-          status: 'confirmed',
+          status:    'confirmed',
         } as any,
         order: { createdAt: 'DESC' } as any,
       });
 
       let checkOutTime: Date;
-      if (booking?.slotEndTime) {
+
+      const is24HourSlot = booking?.slotType === 'twentyfour';
+
+      if (is24HourSlot && record.checkInTime) {
+        // ✅ 24hr slot — checkout exactly 24 hours after check-in
+        const checkInDate = new Date(record.checkInTime);
+        checkOutTime = new Date(checkInDate.getTime() + 24 * 60 * 60 * 1000);
+      } else if (booking?.slotEndTime) {
+        // ✅ Normal slot — checkout at slot end time on the same day
         const [hour, minute] = (booking.slotEndTime as string).split(':').map(Number);
         const hh = String(hour).padStart(2, '0');
         const mm = String(minute).padStart(2, '0');
         checkOutTime = new Date(`${record.date}T${hh}:${mm}:00`);
       } else {
+        // ⚠️ No booking info found — fallback to end of day
         checkOutTime = new Date(`${record.date}T23:59:59`);
       }
 
-      await attendanceRepo.updateOne(
-        { _id: record.id } as any,
-        { $set: { checkOutTime, status: 'checked_out', updatedAt: new Date() } },
+      const result = await attendanceRepo.updateOne(
+        { _id: recordId } as any,
+        {
+          $set: {
+            checkOutTime,
+            status:    'checked_out',
+            updatedAt: new Date(),
+          },
+        },
       );
-      count++;
-    } catch {
-      log.warn(
-        `Cron: Auto-checkout failed for ${record.studentId}/${record.libraryId}/${record.date}`,
-      );
+
+      if (result.modifiedCount > 0) {
+        count++;
+      } else {
+        // ✅ fallback — fetch and save manually
+        const fresh = await attendanceRepo.findOneById(recordId);
+        if (fresh) {
+          (fresh as any).checkOutTime = checkOutTime;
+          (fresh as any).status       = 'checked_out';
+          (fresh as any).updatedAt    = new Date();
+          await attendanceRepo.save(fresh);
+          count++;
+        }
+      }
+    } catch (err) {
+      log.warn(`Cron: Auto-checkout failed for ${record.studentId}/${record.libraryId}/${record.date}: ${err}`);
     }
   }
 
@@ -720,21 +758,6 @@ export const cronLoader: MicroframeworkLoader = () => {
     }
   });
 
-  // ── Existing: timetable reminders (every minute) ──────────────────────────
-  // NEW: also runs slot-starting and not-checked-in every minute
-  cron.schedule('* * * * *', async () => {
-    await Promise.allSettled([
-      runTimetableReminderJob().catch(err =>
-        log.error('Cron: Timetable reminder job failed', [err]),
-      ),
-      runSlotStartingReminderJob().catch(err =>
-        log.error('Cron: Slot starting reminder job failed', [err]),
-      ),
-      runNotCheckedInReminderJob().catch(err =>
-        log.error('Cron: Not checked-in reminder job failed', [err]),
-      ),
-    ]);
-  });
 
   // ── Existing: midnight auto-checkout ──────────────────────────────────────
   cron.schedule('0 0 * * *', async () => {
@@ -771,4 +794,449 @@ export async function sendOwnerInviteSubmissionPush(
   await sendFcmToOwners([ownerId], title, body);
   await saveOwnerNotification(ownerId, title, body, 'booking_request', submissionId);
 }
- 
+
+// ── RENEWAL: Student sends renewal request → notify owner ────────────────────
+export async function sendOwnerRenewalRequestPush(
+  ownerId:          string,
+  studentName:      string,
+  libraryName:      string,
+  memberId:         string,
+  paymentMethod:    string,
+  screenshotUrl?:   string | null,
+): Promise<void> {
+  const hasScreenshot = !!screenshotUrl;
+  const title = '🔄 Renewal Request Received';
+  const body  = hasScreenshot
+    ? `${studentName} has requested renewal at ${libraryName} with QR payment. Screenshot attached.`
+    : `${studentName} has requested renewal at ${libraryName} via ${paymentMethod}.`;
+
+  await sendFcmToOwners([ownerId], title, body);
+  await saveOwnerNotification(
+    ownerId,
+    title,
+    // ✅ attach screenshot url in message if QR payment
+    hasScreenshot ? `${body} Screenshot: ${screenshotUrl}` : body,
+    'renewal_request',
+    memberId,
+  );
+}
+
+// ── RENEWAL: Owner approves renewal → notify student ────────────────────────
+export async function sendStudentRenewalApprovedPush(
+  studentId:   string,
+  libraryName: string,
+  endDate:     string,
+  bookingId:   string,
+): Promise<void> {
+  const title = '✅ Renewal Approved!';
+  const body  = `Your membership renewal at ${libraryName} has been approved. Valid until ${endDate}.`;
+  await sendFcmToStudents([studentId], title, body);
+  await saveInAppNotification(studentId, title, body, 'renewal_approved', bookingId);
+}
+
+// ── RENEWAL: Owner rejects renewal → notify student ──────────────────────────
+export async function sendStudentRenewalRejectedPush(
+  studentId:   string,
+  libraryName: string,
+  bookingId:   string,
+): Promise<void> {
+  const title = '❌ Renewal Rejected';
+  const body  = `Your renewal request at ${libraryName} was not approved. Contact the library.`;
+  await sendFcmToStudents([studentId], title, body);
+  await saveInAppNotification(studentId, title, body, 'renewal_rejected', bookingId);
+}
+
+// ── PAYMENT: Owner marks payment received → notify student ───────────────────
+export async function sendStudentPaymentReceivedPush(
+  studentId:   string,
+  libraryName: string,
+  amount:      number,
+  memberId:    string,
+): Promise<void> {
+  const title = '💰 Payment Received';
+  const body  = `Your payment of ₹${amount} at ${libraryName} has been received. Thank you!`;
+  await sendFcmToStudents([studentId], title, body);
+  await saveInAppNotification(studentId, title, body, 'payment_received', memberId);
+}
+
+// ── PAYMENT SCREENSHOT: Student uploads QR screenshot → notify owner ─────────
+export async function sendOwnerPaymentScreenshotPush(
+  ownerId:       string,
+  studentName:   string,
+  libraryName:   string,
+  screenshotUrl: string,
+  memberId:      string,
+): Promise<void> {
+  const title = '📸 Payment Screenshot Received';
+  const body  = `${studentName} has uploaded a payment screenshot for ${libraryName}. Screenshot: ${screenshotUrl}`;
+  await sendFcmToOwners([ownerId], title, body);
+  await saveOwnerNotification(ownerId, title, body, 'payment_screenshot', memberId);
+}
+
+// ── SUBSCRIPTION: Library subscription expiring → notify owner ───────────────
+export async function sendOwnerSubscriptionExpiringPush(
+  ownerId:      string,
+  libraryName:  string,
+  daysLeft:     number,
+  libraryId:    string,
+): Promise<void> {
+  const title = '⚠️ Subscription Expiring Soon';
+  const body  = `Your ${libraryName} subscription expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Renew to keep access.`;
+  await sendFcmToOwners([ownerId], title, body);
+  await saveOwnerNotification(ownerId, title, body, 'subscription_expiring', libraryId);
+}
+
+// ── NEW: Subscription expiry reminder (daily 10AM) ────────────────────────────
+// export async function runSubscriptionExpiryReminderJob(): Promise<void> {
+//   try {
+//     const librarySubscriptionRepo = getDataSource().getMongoRepository(
+//       (await import('../api/models/librarySubscription.model')).LibrarySubscriptionModel,
+//     );
+//     const libraryRepo = getDataSource().getMongoRepository(LibraryModel);
+
+//     for (const daysAhead of [1, 3, 7]) {
+//       const targetDate = new Date();
+//       targetDate.setDate(targetDate.getDate() + daysAhead);
+//       const targetDateStr = targetDate.toISOString().slice(0, 10);
+
+//       const expiring = await librarySubscriptionRepo.find({
+//         where: {
+//           status:  'active',
+//           endDate: targetDateStr,
+//         } as any,
+//       });
+
+//       for (const sub of expiring) {
+//         try {
+//           const library = await libraryRepo.findOne({
+//             where: { _id: sub.libraryId } as any,
+//           });
+//           if (!library) continue;
+
+//           await sendOwnerSubscriptionExpiringPush(
+//             library.ownerId,
+//             library.name,
+//             daysAhead,
+//             sub.libraryId,
+//           );
+//         } catch {
+//           // non-critical
+//         }
+//       }
+//     }
+
+//     log.info('Cron: Subscription expiry reminders sent');
+//   } catch (err) {
+//     log.error('Cron: runSubscriptionExpiryReminderJob failed', [err]);
+//   }
+// }
+ export async function runSubscriptionExpiryReminderJob(): Promise<void> {
+  try {
+    const memberRepo   = getDataSource().getMongoRepository(MemberModel);
+    const libraryRepo  = getDataSource().getMongoRepository(LibraryModel);
+
+    for (const daysAhead of [1, 3, 7]) {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + daysAhead);
+      const targetDateStr = targetDate.toISOString().slice(0, 10); // e.g., "2026-05-28"
+
+      // ✅ Find all active members whose membership ends on this exact date
+      const expiringMembers = await memberRepo.find({
+        where: {
+          status:  'active',
+          endDate: targetDateStr,
+          studentId: { $ne: null }, // only members with app accounts
+        } as any,
+      });
+
+      if (expiringMembers.length === 0) continue;
+
+      // Group members by libraryId to avoid fetching same library multiple times
+      const libraryMap = new Map<string, typeof expiringMembers[0] & { libraryName?: string }>();
+
+      for (const member of expiringMembers) {
+        try {
+          // Fetch library name (cache it to avoid duplicate DB calls)
+          let libraryName: string;
+          if (libraryMap.has(member.libraryId)) {
+            libraryName = (libraryMap.get(member.libraryId) as any).libraryName;
+          } else {
+            const library = await libraryRepo.findOne({
+              where: { _id: new ObjectId(member.libraryId) } as any,
+            });
+            if (!library) continue;
+            libraryName = library.name;
+            (libraryMap as any).set(member.libraryId, { libraryName });
+          }
+
+          const title = '📅 Membership Expiring Soon';
+          const body  = `Your membership at ${libraryName} is expiring on ${member.endDate}. Renew now to keep your seat!`;
+
+          // ✅ Send push notification to student
+          await sendFcmToStudents([member.studentId as string], title, body);
+
+          // ✅ Save in-app notification
+          await saveInAppNotifications(
+            [member.studentId as string],
+            title,
+            body,
+            'member_expired',
+            member.libraryId,
+          );
+        } catch {
+          // non-critical — skip this member, continue others
+        }
+      }
+    }
+
+    log.info('Cron: Membership expiry reminders sent to students');
+  } catch (err) {
+    log.error('Cron: runSubscriptionExpiryReminderJob failed', [err]);
+  }
+}
+
+// ── CHECK-IN REMINDER (10 min before + 30 min after slot start) ──────────────
+// Runs every minute via the existing '* * * * *' cron
+export async function runCheckinReminderJob(): Promise<void> {
+  try {
+    const now = new Date();
+    const libraryRepo    = getDataSource().getMongoRepository(LibraryModel);
+    const memberRepo     = getDataSource().getMongoRepository(MemberModel);
+    const attendanceRepo = getDataSource().getMongoRepository(AttendanceModel);
+
+    const today      = now.toISOString().slice(0, 10);
+    const minus10    = hhmm(now, -10);  // 10 min before now  → slot starting in 10 min
+    const minus30    = hhmm(now, -30);  // 30 min before now  → slot started 30 min a/go
+
+    // const isReminder10 = true;          // always check 10-min window
+    // const isReminder30 = true;          // always check 30-min window
+
+    const libraries = await libraryRepo.find({
+      where: { isActive: true, deletedAt: null } as any,
+    });
+
+    for (const library of libraries) {
+      const libraryId = (library.id || (library as any)._id).toHexString();
+
+      // Get today's check-ins for this library
+      const todayAttendance = await attendanceRepo.find({
+        where: {
+          libraryId,
+          date: today,
+          status: { $in: ['checked_in', 'on_break'] },
+        } as any,
+      });
+      const checkedInIds = new Set(todayAttendance.map(a => a.studentId));
+
+      for (const slot of (library.slots ?? [])) {
+        if (!slot.isActive) continue;
+
+        // ── 10 min BEFORE slot start ─────────────────────────────────────────
+        if (slot.startTime === minus10) {
+          const members = await memberRepo.find({
+            where: {
+              libraryId,
+              slotId:    slot.slotType,
+              status:    'active',
+              studentId: { $ne: null },
+            } as any,
+          });
+
+          const studentIds = [
+            ...new Set(
+              members
+                .map(m => m.studentId as string)
+                .filter(id => !checkedInIds.has(id)), // not yet checked in
+            ),
+          ];
+
+          if (studentIds.length > 0) {
+            const title = '⏰ Check-in Reminder';
+            const body  = `Your ${slot.name} slot at ${library.name} starts in 10 minutes. Don't forget to check in!`;
+            await sendFcmToStudents(studentIds, title, body);
+            await saveInAppNotifications(studentIds, title, body, 'checkin_reminder', libraryId);
+          }
+        }
+
+        // ── 30 min AFTER slot start ──────────────────────────────────────────
+        if (slot.startTime === minus30) {
+          const members = await memberRepo.find({
+            where: {
+              libraryId,
+              slotId:    slot.slotType,
+              status:    'active',
+              studentId: { $ne: null },
+            } as any,
+          });
+
+          // Only those who STILL haven't checked in after 30 min
+          const studentIds = [
+            ...new Set(
+              members
+                .map(m => m.studentId as string)
+                .filter(id => !checkedInIds.has(id)),
+            ),
+          ];
+
+          if (studentIds.length > 0) {
+            const title = '📍 Still Not Checked In?';
+            const body  = `Your ${slot.name} slot at ${library.name} started 30 minutes ago. Check in now before you're marked absent!`;
+            await sendFcmToStudents(studentIds, title, body);
+            await saveInAppNotifications(studentIds, title, body, 'checkin_reminder', libraryId);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    log.error('Cron: runCheckinReminderJob failed', [err]);
+  }
+}
+
+// ── ANNOUNCEMENT NOTIFICATION ─────────────────────────────────────────────────
+// Called directly when owner creates/sends an announcement (not a cron)
+export async function sendAnnouncementNotification(
+  announcementId: string,
+  libraryId:      string,
+  title:          string,
+  message:        string,
+  target:         AnnouncementTarget,
+  memberIds?:     string[], // ← for owner-selected specific members
+): Promise<void> {
+  try {
+    const memberRepo  = getDataSource().getMongoRepository(MemberModel);
+    const today       = new Date().toISOString().slice(0, 10);
+    const attendanceRepo = getDataSource().getMongoRepository(AttendanceModel);
+
+    let members: MemberModel[] = [];
+
+    if (memberIds && memberIds.length > 0) {
+      // ── Owner selected specific members ─────────────────────────────────
+      members = await memberRepo.find({
+        where: {
+          libraryId,
+          studentId: { $ne: null },
+          _id: { $in: memberIds.map(id => new ObjectId(id)) },
+        } as any,
+      });
+    } else {
+      // ── Target-based filtering ───────────────────────────────────────────
+      switch (target) {
+
+        case 'all':
+          members = await memberRepo.find({
+            where: { libraryId, status: 'active', studentId: { $ne: null } } as any,
+          });
+          break;
+
+        case 'fee_due':
+          members = await memberRepo.find({
+            where: { libraryId, status: 'pending', studentId: { $ne: null } } as any,
+          });
+          break;
+
+        case 'expired':
+          members = await memberRepo.find({
+            where: { libraryId, status: 'expired', studentId: { $ne: null } } as any,
+          });
+          break;
+
+        case 'overdue':
+          // active members whose endDate has already passed
+          members = await memberRepo.find({
+            where: {
+              libraryId,
+              status:  'active',
+              endDate: { $lt: today },
+              studentId: { $ne: null },
+            } as any,
+          });
+          break;
+
+        case 'absent': {
+          // active members who have NOT checked in today
+          const todayAttendance = await attendanceRepo.find({
+            where: {
+              libraryId,
+              date:   today,
+              status: { $in: ['checked_in', 'on_break', 'checked_out'] },
+            } as any,
+          });
+          const presentIds = new Set(todayAttendance.map(a => a.studentId));
+          const allActive  = await memberRepo.find({
+            where: { libraryId, status: 'active', studentId: { $ne: null } } as any,
+          });
+          members = allActive.filter(m => !presentIds.has(m.studentId));
+          break;
+        }
+
+        // ── Slot-type targets ────────────────────────────────────────────
+        case 'fullday':
+        case 'firsthalf':
+        case 'secondhalf':
+        case 'twentyfour':
+        case 'halfday':
+        case 'evening':
+        case 'morning':
+        case 'night':
+        case 'custom':
+          members = await memberRepo.find({
+            where: {
+              libraryId,
+              status:    'active',
+              slotId:    target,
+              studentId: { $ne: null },
+            } as any,
+          });
+          break;
+
+        default:
+          members = [];
+      }
+    }
+
+    if (members.length === 0) return;
+
+    const studentIds = [...new Set(members.map(m => m.studentId as string))];
+
+    await sendFcmToStudents(studentIds, title, message);
+    await saveInAppNotifications(studentIds, title, message, 'announcement', announcementId);
+
+    // Update sentCount on the announcement
+    const announcementRepo = getDataSource().getMongoRepository(AnnouncementModel);
+    await announcementRepo.updateOne(
+      { _id: new ObjectId(announcementId) } as any,
+      { $set: { sentCount: studentIds.length, updatedAt: new Date() } },
+    );
+
+  } catch (err) {
+    log.error('Cron: sendAnnouncementNotification failed', [err]);
+  }
+}
+
+// ── NEW: subscription expiry (daily 10AM) ─────────────────────────────────
+cron.schedule('0 10 * * *', async () => {
+  try {
+    // await runSubscriptionExpiryReminderJob();
+  } catch (error) {
+    log.error('Cron: Subscription expiry reminder job failed', [error]);
+  }
+});
+
+  // ── Existing: timetable reminders (every minute) ──────────────────────────
+  //  also runs slot-starting and not-checked-in every minute
+cron.schedule('* * * * *', async () => {
+  await Promise.allSettled([
+    runTimetableReminderJob().catch(err =>
+      log.error('Cron: Timetable reminder job failed', [err]),
+    ),
+    runSlotStartingReminderJob().catch(err =>
+      log.error('Cron: Slot starting reminder job failed', [err]),
+    ),
+    runNotCheckedInReminderJob().catch(err =>
+      log.error('Cron: Not checked-in reminder job failed', [err]),
+    ),
+    runCheckinReminderJob().catch(err =>     
+      log.error('Cron: Check-in reminder job failed', [err]),
+    ),
+  ]);
+});

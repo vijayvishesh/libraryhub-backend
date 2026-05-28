@@ -30,7 +30,7 @@ import {
   PaymentMethodOption,
   SeatMapResult,
 } from './types/booking.service.types';
-import { sendOwnerBookingRequestPush } from '../../loaders/cronLoader';
+import { sendOwnerBookingRequestPush, sendOwnerRenewalRequestPush } from '../../loaders/cronLoader';
 import { LibraryPaymentMethod } from '../constants/library.constants';
 import { MemberRenewalRepository } from '../repositories/memberRenewal.repository';
 
@@ -246,18 +246,18 @@ export class BookingService {
   }
   }
 
-  private async syncMemberForBooking(
-    student: { id: string; name: string; phone: string },
-    libraryId: string,
-    seatId: string,
-    slotId: string,
-    planAmount: number,
-    startDate: string,
-    endDate: string,
-    memberStatus: 'active' | 'pending' = 'active',
-    bookingId: string | null = null,
-    duration = 1,
-  ): Promise<void> {
+private async syncMemberForBooking(
+  student: { id: string; name: string; phone: string },
+  libraryId: string,
+  seatId: string,
+  slotId: string,
+  planAmount: number,
+  startDate: string,
+  endDate: string,
+  memberStatus: 'active' | 'pending' | 'expired' = 'active',
+  bookingId: string | null = null,
+  duration = 1,
+): Promise<void> {
     // Find existing member FIRST before counting records
     let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
       student.id,
@@ -868,6 +868,18 @@ public async renewMembership(
       status:            isOwnerRenewing ? 'approved' : 'pending',
     });
 
+    try {
+    await sendOwnerRenewalRequestPush(
+      library.ownerId,
+      student.name,
+      library.name,
+      existingMember.id,
+      payload.paymentMethod,
+      payload.paymentScreenshotUrl ?? null,
+    );
+  } catch (err: any) {
+    console.log('Push notification failed:', err.message);
+  }
     return this.mapBookingResult(newBooking, library);
   } catch (error) {
     this.rethrowBookingError(error, 'RENEW_MEMBERSHIP_FAILED');

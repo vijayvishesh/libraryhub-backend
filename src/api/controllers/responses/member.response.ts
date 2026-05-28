@@ -590,3 +590,147 @@ export class MemberPaymentListApiResponse {
     this.data = data;
   }
 }
+
+export class InactiveMemberData {
+  @IsString()
+  id!: string;
+
+  @IsString()
+  fullName!: string;
+
+  @IsString()
+  mobileNo!: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  seatId?: string;
+
+  @IsOptional()
+  @IsString()
+  slotId?: string;
+
+  @IsString()
+  status!: string;
+
+  @IsString()
+  memberType!: 'expired' | 'overdue' | 'inactive'; // derived type
+
+  @IsOptional()
+  @IsNumber()
+  planAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  paidAt?: string;
+
+  @IsString()
+  createdAt!: string;
+
+  @IsString()
+  updatedAt!: string;
+
+  constructor(data?: {
+    id: string;
+    fullName: string;
+    mobileNo: string;
+    email: string | null;
+    seatId: string | null;
+    slotId: string | null;
+    status: string;
+    memberType: 'expired' | 'overdue' | 'inactive';
+    planAmount: number | null;
+    startDate: string | null;
+    endDate: string | null;
+    paidAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    if (!data) return;
+    this.id = data.id;
+    this.fullName = data.fullName;
+    this.mobileNo = data.mobileNo;
+    this.email = data.email ?? undefined;
+    this.seatId = data.seatId ?? undefined;
+    this.slotId = data.slotId ?? undefined;
+    this.status = data.status;
+    this.memberType = data.memberType;
+    this.planAmount = data.planAmount ?? undefined;
+    this.startDate = data.startDate ?? undefined;
+    this.endDate = data.endDate ?? undefined;
+    this.paidAt = data.paidAt ? data.paidAt.toISOString() : undefined;
+    this.createdAt = data.createdAt.toISOString();
+    this.updatedAt = data.updatedAt.toISOString();
+  }
+}
+
+export class InactiveMembersListPayloadData {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InactiveMemberData)
+  members!: InactiveMemberData[];
+
+  @IsNumber()
+  page!: number;
+
+  @IsNumber()
+  limit!: number;
+
+  @IsNumber()
+  total!: number;
+
+  // Summary counts always returned regardless of filter
+  @IsNumber()
+  expiredCount!: number;
+
+  @IsNumber()
+  overdueCount!: number;
+
+  @IsNumber()
+  inactiveCount!: number;
+
+  constructor(data?: {
+    members: InactiveMemberData[];
+    page: number;
+    limit: number;
+    total: number;
+    expiredCount: number;
+    overdueCount: number;
+    inactiveCount: number;
+  }) {
+    if (!data) return;
+    this.members = data.members;
+    this.page = data.page;
+    this.limit = data.limit;
+    this.total = data.total;
+    this.expiredCount = data.expiredCount;
+    this.overdueCount = data.overdueCount;
+    this.inactiveCount = data.inactiveCount;
+  }
+}
+
+export class InactiveMembersApiResponse {
+  @IsNumber()
+  responseCode!: number;
+
+  @ValidateNested()
+  @Type(() => InactiveMembersListPayloadData)
+  data!: InactiveMembersListPayloadData;
+
+  constructor(data?: InactiveMembersListPayloadData, responseCode = 200) {
+    if (!data || typeof responseCode !== 'number') return;
+    this.responseCode = responseCode;
+    this.data = data;
+  }
+}

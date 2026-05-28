@@ -59,3 +59,21 @@ export type MemberMsgResponse = {
   memberId?: string;
   studentId?: string | null;
 };
+
+// In member.repository.types.ts
+export type ListInactiveMembersQuery = {
+  libraryId: string;
+  type?: 'expired' | 'overdue' | 'inactive';
+  search?: string;
+  page: number;
+  limit: number;
+  todayIso: string;
+};
+
+export type ListInactiveMembersResult = {
+  members: (MemberRecord & { memberType: 'expired' | 'overdue' | 'inactive' })[];
+  total: number;
+  expiredCount: number;
+  overdueCount: number;
+  inactiveCount: number;
+};

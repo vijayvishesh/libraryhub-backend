@@ -1,11 +1,11 @@
-import * as dns from 'dns';
-dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+// import * as dns from 'dns';
+// dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
-import { setDefaultResultOrder } from 'dns';
-setDefaultResultOrder('ipv4first');
+// import { setDefaultResultOrder } from 'dns';
+// setDefaultResultOrder('ipv4first');
 
-import { promises as dnsPromises } from 'dns';
-dnsPromises.setDefaultResultOrder('ipv4first');
+// import { promises as dnsPromises } from 'dns';
+// dnsPromises.setDefaultResultOrder('ipv4first');
 import 'reflect-metadata';
 import { initEnv } from './bootstrap/initEnv';
 

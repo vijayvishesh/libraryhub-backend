@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { LibraryPaymentMethod } from '../constants/library.constants';
 import {
   AddMemberRequest,
+  ListInactiveMembersQueryRequest,
   ListMemberPaymentsQueryRequest,
   ListMembersQueryRequest,
   ListMemberUploadsQueryRequest,
@@ -326,90 +327,102 @@ export class MemberService {
     }
   }
 
-  public async markMemberPaid(
-    ownerId: string,
-    memberId: string,
-    paymentMethod?: string,
-    overrideDuration?: number,
-    overrideAmount?: number,
-  ): Promise<MemberRecord> {
-    try {
-      const library = await this.getOwnerLibraryOrThrow(ownerId);
-      const member = await this.memberRepository.findMemberByIdAndLibrary(
-        memberId.trim(),
-        library.id,
-      );
-      if (!member) {
-        throw new NotFoundError('MEMBER_NOT_FOUND');
-      }
+ public async markMemberPaid(
+  ownerId:          string,
+  memberId:         string,
+  paymentMethod?:   string,
+  overrideDuration?: number,
+  overrideAmount?:  number,
+): Promise<MemberRecord> {
+  try {
+    const library = await this.getOwnerLibraryOrThrow(ownerId);
+    const member  = await this.memberRepository.findMemberByIdAndLibrary(
+      memberId.trim(),
+      library.id,
+    );
+    if (!member) {
+      throw new NotFoundError('MEMBER_NOT_FOUND');
+    }
 
-      if (
-        member.status !== 'pending' &&
-        member.status !== 'active' &&
-        member.status !== 'expired'
-      ) {
-        throw new HttpError(409, 'MEMBER_NOT_ELIGIBLE_FOR_PAYMENT');
-      }
+    if (
+      member.status !== 'pending' &&
+      member.status !== 'active'  &&
+      member.status !== 'expired'
+    ) {
+      throw new HttpError(409, 'MEMBER_NOT_ELIGIBLE_FOR_PAYMENT');
+    }
 
-      const isFirstPayment = member.status === 'pending';
-      const isRenewal = member.status === 'active' || member.status === 'expired';
-      const duration = overrideDuration || (isFirstPayment ? member.duration || 1 : 1);
-      const newStartDate =
-        isRenewal && member.endDate ? member.endDate : new Date().toISOString().slice(0, 10);
-      const newEndDate = this.calculateEndDate(newStartDate, duration);
+    const isFirstPayment = member.status === 'pending';
+    const isRenewal      = member.status === 'active' || member.status === 'expired';
+    const duration       = overrideDuration || (isFirstPayment ? member.duration || 1 : 1);
 
-      const monthlyRate =
-        member.duration && member.duration > 0
-          ? member.planAmount / member.duration
-          : member.planAmount;
-      const newAmount = overrideAmount ?? monthlyRate * duration;
+    const newStartDate =
+      isRenewal && member.endDate
+        ? member.endDate
+        : new Date().toISOString().slice(0, 10);
 
-      const updated = await this.memberRepository.updateMemberByIdAndLibrary(
-        member.id,
-        library.id,
-        {
-          status: 'active',
-          paidAt: new Date(),
-          startDate: newStartDate,
-          endDate: newEndDate,
-          duration,
-          planAmount: newAmount,
-          updatedAt: new Date(),
-        },
-      );
+    const newEndDate = this.calculateEndDate(newStartDate, duration);
 
-      if (!updated) {
-        throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
-      }
+    const monthlyRate =
+      member.duration && member.duration > 0
+        ? (member.planAmount ?? 0) / member.duration
+        : (member.planAmount ?? 0);
+    const newAmount = overrideAmount ?? monthlyRate * duration;
 
-      if (member.bookingId) {
-        await this.bookingRepository.markBookingPaid(
-          member.bookingId,
-          paymentMethod as LibraryPaymentMethod | undefined,
-        );
-      }
+    // ✅ KEY FIX: check if endDate is already in past after payment
+    // If owner is marking paid for a back-dated member (old data entry),
+    // endDate may already be expired — set status accordingly
+    const today      = new Date().toISOString().slice(0, 10);
+    const resolvedStatus: 'active' | 'expired' =
+      newEndDate < today ? 'expired' : 'active';
 
-      if (member.studentId && member.bookingId) {
-        try {
-          await sendStudentBookingStatusPush(
-            member.studentId,
-            'approved',
-            library.name,
-            member.bookingId,
-          );
-        } catch {
-          // non-critical
-        }
-      }
-      
-       return updated;
-    } catch (error) {
-      if (error instanceof HttpError) {
-        throw error;
-      }
+    const updated = await this.memberRepository.updateMemberByIdAndLibrary(
+      member.id,
+      library.id,
+      {
+        status:    resolvedStatus, // ← 'expired' if endDate already passed
+        paidAt:    new Date(),
+        startDate: newStartDate,
+        endDate:   newEndDate,
+        duration,
+        planAmount: newAmount,
+        updatedAt:  new Date(),
+      },
+    );
+
+    if (!updated) {
       throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
     }
+
+    if (member.bookingId) {
+      await this.bookingRepository.markBookingPaid(
+        member.bookingId,
+        paymentMethod as LibraryPaymentMethod | undefined,
+      );
+    }
+
+    // ✅ Only send push if member is actually active (not back-dated expired)
+    if (member.studentId && member.bookingId && resolvedStatus === 'active') {
+      try {
+        await sendStudentBookingStatusPush(
+          member.studentId,
+          'approved',
+          library.name,
+          member.bookingId,
+        );
+      } catch {
+        // non-critical
+      }
+    }
+
+    return updated;
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
   }
+}
 
   private calculateEndDate(startDateIso: string, durationMonths: number): string {
     const date = new Date(`${startDateIso}T00:00:00.000Z`);
@@ -771,7 +784,7 @@ export class MemberService {
     }
   }
   /* eslint-disable max-lines-per-function */
-  private async createMemberForLibrary(
+ private async createMemberForLibrary(
     libraryId: string,
     payload: AddMemberRequest | SubmitMemberViaInviteLinkRequest,
   ): Promise<MemberRecord> {
@@ -782,12 +795,19 @@ export class MemberService {
     const seatId = payload.seatId?.trim() ?? null;
     const slotId = payload.slotId?.trim() ?? null;
     const markPaid = 'markPaid' in payload && payload.markPaid === true;
-    const status = markPaid ? 'active' : 'pending';
     const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
     this.assertValidIsoDate(startDate);
     const endDate = this.addMonthsIsoDate(startDate, payload.duration);
     const notes = payload.notes?.trim() ?? null;
     const planAmount = typeof payload.planAmount === 'number' ? payload.planAmount : null;
+
+    // ✅ Back-date check: if markPaid but endDate already passed, mark as expired
+    const today = new Date().toISOString().slice(0, 10);
+    const status: 'active' | 'pending' | 'expired' = markPaid
+      ? endDate < today
+        ? 'expired'
+        : 'active'
+      : 'pending';
 
     // Check if phone belongs to the library owner
     const ownerLibrary = await this.libraryRepository.findLibraryById(libraryId);
@@ -1014,6 +1034,48 @@ public async deactivateMember(
       throw error;
     }
     throw new InternalServerError('DEACTIVATE_MEMBER_FAILED');
+  }
+}
+
+public async listInactiveMembers(
+  ownerId: string,
+  query: ListInactiveMembersQueryRequest,
+): Promise<{
+  members: (MemberRecord & { memberType: 'expired' | 'overdue' | 'inactive' })[];
+  page: number;
+  limit: number;
+  total: number;
+  expiredCount: number;
+  overdueCount: number;
+  inactiveCount: number;
+}> {
+  try {
+    const library = await this.getOwnerLibraryOrThrow(ownerId);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 100;
+    const todayIso = new Date().toISOString().slice(0, 10);
+
+    const result = await this.memberRepository.listInactiveMembers({
+      libraryId: library.id,
+      type: query.type,
+      search: query.search?.trim() || undefined,
+      page,
+      limit,
+      todayIso,
+    });
+
+    return {
+      members: result.members,
+      page,
+      limit,
+      total: result.total,
+      expiredCount: result.expiredCount,
+      overdueCount: result.overdueCount,
+      inactiveCount: result.inactiveCount,
+    };
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('LIST_INACTIVE_MEMBERS_FAILED');
   }
 }
 }
