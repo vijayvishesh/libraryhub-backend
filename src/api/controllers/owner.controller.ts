@@ -805,6 +805,8 @@ public async listInactiveMembers(
       return new MemberPaymentListApiResponse(
         new MemberPaymentListPayloadData(
           result.payments.map(p => new MemberPaymentData(p)),
+          result.page,   
+          result.limit,  
           result.total,
         ),
         200,

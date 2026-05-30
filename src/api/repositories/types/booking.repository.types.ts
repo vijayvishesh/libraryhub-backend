@@ -24,6 +24,7 @@ export type CreateBookingInput = {
   utrNumber?: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
+  paymentScreenshotUrl?: string | null;
 };
 
 export type BookingRecord = CreateBookingInput & {

@@ -394,6 +394,26 @@ export class MemberService {
       throw new InternalServerError('MARK_MEMBER_PAID_FAILED');
     }
 
+    try {
+      await this.memberPaymentRepository.createPayment({
+        memberId: member.id,
+        libraryId: library.id,
+        studentId: member.studentId ?? null,
+        bookingId: member.bookingId ?? null,
+        amount: newAmount,
+        duration,
+        startDate: newStartDate,
+        endDate: newEndDate,
+        paymentMethod: paymentMethod ?? member.paymentMethod ?? null,
+        paymentScreenshotUrl: member.paymentScreenshotUrl ?? null,
+        type: isFirstPayment ? 'first_join' : 'renewal',
+        status: 'confirmed',
+        paidAt: new Date(),
+      });
+    } catch {
+      // non-critical — payment record failure shouldn't block main flow
+    }
+
     if (member.bookingId) {
       await this.bookingRepository.markBookingPaid(
         member.bookingId,
@@ -775,7 +795,7 @@ export class MemberService {
         limit,
       });
 
-      return { payments: result.payments, total: result.total };
+      return { payments: result.payments, total: result.total, page:  result.page,limit:result.limit, };
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;

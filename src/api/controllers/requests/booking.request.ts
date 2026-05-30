@@ -70,6 +70,10 @@ export class CreateBookingRequest {
   @IsString()
   razorpayPaymentId?: string;
 
+  @IsOptional()
+  @IsString()
+  paymentScreenshotUrl?: string;
+
   // @IsOptional()
   // @IsInt()
   // @Min(1)
@@ -117,8 +121,18 @@ export class OwnerFeeCollectionQueryRequest {
 
   @IsOptional()
   @IsString()
-  @IsIn(['today', 'week', 'month', 'lastMonth'])
-  collectedRange?: 'today' | 'week' | 'month' | 'lastMonth';
+  @IsIn(['today', 'week', 'month', 'lastMonth', 'custom'])
+  collectedRange?: 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
+
+    @IsOptional()
+  @IsString()
+  @IsDateString({ strict: true, strictSeparator: true })
+  fromDate?: string; // e.g. '2026-04-30'
+
+  @IsOptional()
+  @IsString()
+  @IsDateString({ strict: true, strictSeparator: true })
+  toDate?: string;   // e.g. '2026-05-30'
 
   @IsOptional()
   @Type(() => Number)
@@ -205,6 +219,17 @@ export class RenewBookingRequest {
   @IsString()
   memberId?: string;
 
+  @IsOptional()
+  @IsString()
+  paymentScreenshotUrl?: string;
+}
+
+export class UpdateBookingPaymentRequest {
+  @IsString()
+  @IsIn([...LIBRARY_PAYMENT_METHOD_ENUM])
+  paymentMethod!: (typeof LIBRARY_PAYMENT_METHOD_ENUM)[number];
+
+  // S3 url — required when paymentMethod is qr_code or upi
   @IsOptional()
   @IsString()
   paymentScreenshotUrl?: string;

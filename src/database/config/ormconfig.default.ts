@@ -31,6 +31,7 @@ import { FeeRequestModel } from '../../api/models/feerequest.model';
 import { MemberRenewalModel } from '../../api/models/memberRenewal.model';
 import { SubscriptionPlanModel } from '../../api/models/subscriptionPlan.model';
 import { LibrarySubscriptionModel } from '../../api/models/librarySubscription.model';
+import { MemberLeaveRequestModel } from '../../api/models/memberLeaveRequest.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -96,7 +97,8 @@ const createDataSource = (): DataSource =>
       FeeRequestModel,
       MemberRenewalModel,
       SubscriptionPlanModel,   
-      LibrarySubscriptionModel, 
+      LibrarySubscriptionModel,
+      MemberLeaveRequestModel
     ],
     synchronize: true,
     logging: false,

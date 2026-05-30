@@ -10,6 +10,7 @@ import { MemberRepository } from '../repositories/member.repository';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { LibraryRecord } from '../repositories/types/library.repository.types';
 import { BookingResult } from './types/booking.service.types';
+import { MemberPaymentRepository } from '../repositories/memberPayment.repository';
 
 @Service()
 export class BookingApprovalService {
@@ -20,6 +21,7 @@ export class BookingApprovalService {
     private readonly memberRepository: MemberRepository,
     private readonly notificationRepository: NotificationRepository,
     private readonly fcmTokenRepository: FcmTokenRepository,
+    private readonly memberPaymentRepository: MemberPaymentRepository,
   ) {}
 
   public async approveBooking(
@@ -95,12 +97,42 @@ export class BookingApprovalService {
             memberStatus, // ← now correctly 'expired' for back-dated bookings
             bookingId,
             booking.duration,
+            booking.paymentMethod ?? null,       
+            booking.paymentScreenshotUrl ?? null,
           );
         } catch (_syncError) {
           // Roll back booking status so owner can retry
           console.error('Member sync failed after booking approval:', _syncError);
           await this.bookingRepository.updateBookingStatus(bookingId, 'pending_approval');
           throw new InternalServerError('APPROVE_BOOKING_MEMBER_SYNC_FAILED');
+        }
+      }
+
+      if (markPaid && student) {
+        try {
+          const memberRecord = await this.memberRepository.findMemberByStudentIdAndLibrary(
+            student.id,
+            library.id,
+          );
+          if (memberRecord) {
+            await this.memberPaymentRepository.createPayment({
+              memberId: memberRecord.id,
+              libraryId: library.id,
+              studentId: student.id,
+              bookingId: bookingId,
+              amount: booking.amount,
+              duration: booking.duration,
+              startDate: booking.startDate,
+              endDate: booking.validUntil,
+              paymentMethod: paymentMethod ?? booking.paymentMethod ?? null,
+              paymentScreenshotUrl: memberRecord.paymentScreenshotUrl ?? null,
+              type: 'first_join',
+              status: 'confirmed',
+              paidAt: new Date(),
+            });
+          }
+        } catch {
+          // non-critical
         }
       }
 
@@ -196,6 +228,8 @@ export class BookingApprovalService {
           'active',
           bookingId,
           booking.duration,
+          booking.paymentMethod ?? null,        
+          booking.paymentScreenshotUrl ?? null, 
         );
       }
 
@@ -216,6 +250,9 @@ export class BookingApprovalService {
     memberStatus: 'active' | 'pending' | 'expired',
     bookingId: string | null = null,
     duration = 1,
+    paymentMethod?: string | null,           
+    paymentScreenshotUrl?: string | null,    
+
   ): Promise<void> {
     let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
       student.id,
@@ -271,7 +308,16 @@ export class BookingApprovalService {
         paidAt: memberStatus === 'active' ? new Date() : undefined,
         isNewUser, // ← correctly calculated at approval time
         updatedAt: new Date(),
+        paymentMethod:        paymentMethod ?? existingMember.paymentMethod ?? null,        
+        paymentScreenshotUrl: paymentScreenshotUrl ?? existingMember.paymentScreenshotUrl ?? null,
+
       });
+      console.log('[approvalService.syncMember] updating member:', {
+        memberId: existingMember.id,
+        paymentMethod: paymentMethod ?? existingMember.paymentMethod,
+        paymentScreenshotUrl: paymentScreenshotUrl ?? existingMember.paymentScreenshotUrl,
+      });
+
     }
   }
 
@@ -338,6 +384,7 @@ export class BookingApprovalService {
       libraryAddress: string;
       duration: number;
       studentId?: string | null;
+      paymentScreenshotUrl?: string | null;
     },
     library?: LibraryRecord | null,
   ): BookingResult {
@@ -364,6 +411,7 @@ export class BookingApprovalService {
       libraryLongitude: library?.location?.coordinates?.[0] ?? null,
       duration: booking.duration,
       studentId: booking.studentId ?? null,
+      paymentScreenshotUrl: booking.paymentScreenshotUrl ?? null,
     };
   }
 

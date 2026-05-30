@@ -33,6 +33,7 @@ import {
 import { sendOwnerBookingRequestPush, sendOwnerRenewalRequestPush } from '../../loaders/cronLoader';
 import { LibraryPaymentMethod } from '../constants/library.constants';
 import { MemberRenewalRepository } from '../repositories/memberRenewal.repository';
+import { LibraryPaymentMethodRepository } from '../repositories/libraryPaymentMethod.repository';
 
 export type { BookingResult, ListMyBookingsResult, PaymentMethodOption, SeatMapResult };
 
@@ -47,6 +48,7 @@ export class BookingService {
     private readonly attendanceRepository: AttendanceRepository,
     private readonly studySessionRepository: StudySessionRepository,
     private readonly memberRenewalRepository: MemberRenewalRepository,
+    private readonly libraryPaymentMethodRepository: LibraryPaymentMethodRepository,
   ) {}
 
   public async getLibrarySeatMap(
@@ -78,7 +80,7 @@ export class BookingService {
   public async getLibraryPaymentOptions(libraryId: string): Promise<PaymentMethodOption[]> {
     try {
       const library = await this.getLibraryOrThrow(libraryId);
-      const paymentMethods = this.resolveLibraryPaymentMethods(library);
+      const paymentMethods = await this.resolveLibraryPaymentMethodsWithNewTable(library);
       return paymentMethods.filter(item => item.enabled);
     } catch (error) {
       this.rethrowBookingError(error, 'GET_LIBRARY_PAYMENT_OPTIONS_FAILED');
@@ -114,7 +116,7 @@ export class BookingService {
       const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
       this.assertValidIsoDate(startDate);
 
-      const paymentMethods = this.resolveLibraryPaymentMethods(library);
+      const paymentMethods = await this.resolveLibraryPaymentMethodsWithNewTable(library);
       const selectedPaymentMethod = paymentMethods.find(
         item => item.type === payload.paymentMethod,
       );
@@ -182,6 +184,7 @@ export class BookingService {
         utrNumber: payload.utrNumber,
         razorpayOrderId: payload.razorpayOrderId,
         razorpayPaymentId: payload.razorpayPaymentId,
+        paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
       };
 
       const booking = await this.bookingRepository.createBooking(bookingToCreate);
@@ -230,6 +233,8 @@ export class BookingService {
         'pending',
         bookingId,
         payload.duration || 1,
+        payload.paymentMethod ?? null,       
+        payload.paymentScreenshotUrl ?? null, 
       );
     } catch (syncError) {
       console.warn('[BookingService] Failed to sync member for booking:', {
@@ -257,6 +262,8 @@ private async syncMemberForBooking(
   memberStatus: 'active' | 'pending' | 'expired' = 'active',
   bookingId: string | null = null,
   duration = 1,
+  paymentMethod?:       string | null,       
+  paymentScreenshotUrl?: string | null, 
 ): Promise<void> {
     // Find existing member FIRST before counting records
     let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
@@ -295,6 +302,8 @@ private async syncMemberForBooking(
         notes: null,
         isNewUser: false,
         isInviteSubmission: false,
+        paymentMethod:        paymentMethod ?? null,
+        paymentScreenshotUrl: paymentScreenshotUrl ?? null,
       });
     } else {
       await this.memberRepository.updateMemberByIdAndLibrary(existingMember.id, libraryId, {
@@ -307,6 +316,8 @@ private async syncMemberForBooking(
         startDate,
         endDate,
         updatedAt: new Date(),
+        paymentMethod:        paymentMethod ?? null,
+        paymentScreenshotUrl: paymentScreenshotUrl ?? null,
         // isNewUser intentionally NOT here — preserve original value
       });
     }
@@ -551,16 +562,16 @@ private async syncMemberForBooking(
     return slot;
   }
 
-  private resolveLibraryPaymentMethods(library: LibraryRecord): PaymentMethodOption[] {
-    if (library.paymentMethods && library.paymentMethods.length > 0) {
-      return library.paymentMethods;
-    }
+  // private resolveLibraryPaymentMethods(library: LibraryRecord): PaymentMethodOption[] {
+  //   if (library.paymentMethods && library.paymentMethods.length > 0) {
+  //     return library.paymentMethods;
+  //   }
 
-    return [
-      { type: 'upi', enabled: true, label: 'UPI' },
-      { type: 'cash', enabled: true, label: 'Cash' },
-    ];
-  }
+  //   return [
+  //     { type: 'upi', enabled: true, label: 'UPI' },
+  //     { type: 'cash', enabled: true, label: 'Cash' },
+  //   ];
+  // }
 
   private async getLibraryOrThrow(libraryId: string): Promise<LibraryRecord> {
     const library = await this.libraryRepository.findLibraryById(libraryId.trim());
@@ -590,6 +601,7 @@ private async syncMemberForBooking(
       invoiceNo: string;
       libraryAddress: string;
       duration: number;
+      paymentScreenshotUrl?: string | null;
     },
     library?: LibraryRecord | null,
   ): BookingResult {
@@ -616,6 +628,7 @@ private async syncMemberForBooking(
       libraryLongitude: library?.location?.coordinates?.[0] ?? null,
       duration: booking.duration,
       studentId: null,
+      paymentScreenshotUrl: booking.paymentScreenshotUrl ?? null,
     };
   }
 
@@ -832,6 +845,15 @@ public async renewMembership(
       checkedInAt:   null,
       checkedOutAt:  null,
       invoiceNo:     this.buildInvoiceNo(),
+      paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
+    });
+
+    console.log('[renewMembership] new booking created:', {
+      bookingId: newBooking.id,
+      studentId: student.id,
+      paymentMethod: payload.paymentMethod,
+      paymentScreenshotUrl: payload.paymentScreenshotUrl,
+      savedScreenshotUrl: newBooking.paymentScreenshotUrl,
     });
 
     // ✅ 16. Update member with new bookingId + payment info — UPDATED
@@ -845,7 +867,11 @@ public async renewMembership(
         updatedAt:            new Date(),
       },
     );
-
+    console.log('[renewMembership] member record updated:', {
+      memberId: existingMember.id,
+      paymentMethod: payload.paymentMethod ?? null,
+      paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
+    });
     // 17. Save renewal history record
     await this.memberRenewalRepository.createRenewal({
       memberId:          existingMember.id,
@@ -884,5 +910,72 @@ public async renewMembership(
   } catch (error) {
     this.rethrowBookingError(error, 'RENEW_MEMBERSHIP_FAILED');
   }
+}
+
+public async updateBookingPayment(
+  studentId: string,
+  bookingId: string,
+  paymentMethod: string,
+  paymentScreenshotUrl?: string | null,
+): Promise<BookingResult> {
+  try {
+    const updated = await this.bookingRepository.updatePaymentInfo(
+      bookingId,
+      studentId,
+      paymentMethod,
+      paymentScreenshotUrl,
+    );
+
+    if (!updated) {
+      throw new HttpError(404, 'BOOKING_NOT_FOUND_OR_NOT_UPDATABLE');
+    }
+
+    // Sync paymentMethod + screenshotUrl to member table
+    const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
+      studentId,
+      updated.libraryId,
+    );
+    if (member) {
+      await this.memberRepository.updateMemberByIdAndLibrary(
+        member.id,
+        updated.libraryId,
+        {
+          paymentMethod:        paymentMethod ?? null,
+          paymentScreenshotUrl: paymentScreenshotUrl ?? null,
+          updatedAt:            new Date(),
+        },
+      );
+    }
+
+    const library = await this.libraryRepository.findLibraryById(updated.libraryId);
+    return this.mapBookingResult(updated, library);
+  } catch (error) {
+    this.rethrowBookingError(error, 'UPDATE_BOOKING_PAYMENT_FAILED');
+  }
+}
+private async resolveLibraryPaymentMethodsWithNewTable(
+  library: LibraryRecord,
+): Promise<PaymentMethodOption[]> {
+  // 1. Try the dedicated library_payment_methods table first
+  const pmRecord = await this.libraryPaymentMethodRepository.findByLibraryId(library.id);
+
+  if (pmRecord && pmRecord.methods.length > 0) {
+    return pmRecord.methods.map(m => ({
+      type: m.type,
+      enabled: m.enabled,
+      label: m.label,
+    }));
+  }
+
+  // 2. Fallback to embedded paymentMethods in libraries table
+  if (library.paymentMethods && library.paymentMethods.length > 0) {
+    return library.paymentMethods;
+  }
+
+  // 3. Default
+  return [
+    { type: 'upi', enabled: true, label: 'UPI' },
+    { type: 'cash', enabled: true, label: 'Cash' },
+  ];
 }
 }

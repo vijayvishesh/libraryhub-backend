@@ -240,10 +240,30 @@ public async findMemberByIdAndLibrary(
       member.isNewUser = input.isNewUser;
     }
 
+    if (input.paymentMethod !== undefined) {
+      member.paymentMethod = input.paymentMethod;
+    }
+    if (input.paymentScreenshotUrl !== undefined) {
+      member.paymentScreenshotUrl = input.paymentScreenshotUrl;
+    }
+console.log('[updateMemberByIdAndLibrary] saving member:', {
+  memberId:             memberId,
+  paymentMethod:        member.paymentMethod,
+  paymentScreenshotUrl: member.paymentScreenshotUrl,
+});
+
     member.updatedAt = input.updatedAt || new Date();
     const savedMember = await memberRepository.save(member);
+    console.log('[updateMemberByIdAndLibrary] saved result:', {
+  memberId:             savedMember.id.toHexString(),
+  paymentMethod:        savedMember.paymentMethod,
+  paymentScreenshotUrl: savedMember.paymentScreenshotUrl,
+});
     return this.mapMember(savedMember);
+
+    
   }
+  
 
   public async deleteMemberByIdAndLibrary(memberId: string, libraryId: string): Promise<boolean> {
     const objectId = this.tryParseObjectId(memberId);

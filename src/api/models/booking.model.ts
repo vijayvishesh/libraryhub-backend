@@ -89,6 +89,9 @@ export class BookingModel {
   razorpayPaymentId?: string;
 
   @Column()
+  paymentScreenshotUrl?: string | null;
+
+  @Column()
   createdAt!: Date;
 
   @Column()

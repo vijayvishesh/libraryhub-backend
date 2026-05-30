@@ -45,6 +45,8 @@ export class MemberPaymentRepository {
     return {
       payments: payments.map(p => this.mapPayment(p)),
       total,
+      page: query.page,
+      limit: query.limit, 
     };
   }
 
@@ -53,10 +55,16 @@ export class MemberPaymentRepository {
       id: payment.id.toHexString(),
       memberId: payment.memberId,
       libraryId: payment.libraryId,
+      studentId: payment.studentId ?? null,
+      bookingId: payment.bookingId ?? null,
       amount: payment.amount,
       duration: payment.duration,
       startDate: payment.startDate,
       endDate: payment.endDate,
+      paymentMethod: payment.paymentMethod ?? null,       
+      paymentScreenshotUrl: payment.paymentScreenshotUrl ?? null, 
+      type: payment.type ?? 'first_join',        
+      status: payment.status ?? 'pending',         
       paidAt: payment.paidAt,
       createdAt: payment.createdAt,
     };

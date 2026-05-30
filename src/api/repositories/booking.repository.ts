@@ -524,9 +524,44 @@ export class BookingRepository {
       checkedInAt: booking.checkedInAt,
       checkedOutAt: booking.checkedOutAt,
       invoiceNo: booking.invoiceNo,
+      paymentScreenshotUrl: booking.paymentScreenshotUrl ?? null, 
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
     };
+  }
+
+  public async updatePaymentInfo(
+    bookingId: string,
+    studentId: string,
+    paymentMethod: string,
+    paymentScreenshotUrl?: string | null,
+  ): Promise<BookingRecord | null> {
+    const objectId = this.tryParseObjectId(bookingId);
+    if (!objectId) return null;
+
+    const repo = this.getBookingRepository();
+    const booking = await repo.findOneById(objectId);
+
+    // Validate ownership and status
+    if (!booking || booking.studentId !== studentId) return null;
+    if (!['pending_approval', 'pending_payment'].includes(booking.status)) return null;
+
+    const setFields: Record<string, unknown> = {
+      paymentMethod,
+      updatedAt: new Date(),
+    };
+    if (paymentScreenshotUrl !== undefined) {
+      setFields.paymentScreenshotUrl = paymentScreenshotUrl;
+    }
+
+    await repo.updateOne(
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      { _id: objectId },
+      { $set: setFields },
+    );
+
+    const updated = await repo.findOneById(objectId);
+    return updated ? this.mapBooking(updated) : null;
   }
 
   private toHexString(value: WithObjectId): string {

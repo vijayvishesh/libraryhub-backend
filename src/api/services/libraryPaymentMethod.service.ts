@@ -57,7 +57,14 @@ export class LibraryPaymentMethodService {
         ownerId,
         updates,
       );
-
+    await this.libraryRepository.partialUpdateLibrary(library.id, {
+      paymentMethods: record.methods.map(m => ({
+        type: m.type,
+        enabled: m.enabled,
+        label: m.label,
+        upiId: undefined,
+      })),
+    });
       return { id: record.id, libraryId: record.libraryId, methods: record.methods };
     } catch (error) {
       if (error instanceof HttpError) throw error;

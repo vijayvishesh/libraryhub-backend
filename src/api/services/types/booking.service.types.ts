@@ -48,6 +48,7 @@ export type BookingResult = {
   libraryLatitude: number | null;
   libraryLongitude: number | null;
   studentId: string | null;
+  paymentScreenshotUrl: string | null;
   todayStudyTime?: number; // total minutes from today's study sessions
    todayAttendance?: TodayAttendance;
   libraryStatus?: 'CHECKED_IN' | 'CHECKED_OUT';

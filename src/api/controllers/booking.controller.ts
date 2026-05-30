@@ -7,6 +7,7 @@ import {
   InternalServerError,
   JsonController,
   Param,
+  Patch,
   // Patch,
   Post,
   QueryParams,
@@ -14,7 +15,7 @@ import {
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
 import { Service } from 'typedi';
 import { BookingResult, BookingService } from '../services/booking.service';
-import { CreateBookingRequest, ListMyBookingsQueryRequest, RenewBookingRequest } from './requests/booking.request';
+import { CreateBookingRequest, ListMyBookingsQueryRequest, RenewBookingRequest, UpdateBookingPaymentRequest } from './requests/booking.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
   BookingCreateApiResponse,
@@ -167,4 +168,30 @@ public async renewMembership(
 //   // await this.memberService.updateStudentAvatar(session.user.id, payload.avatarUrl);
 //   return { responseCode: 200, message: 'Avatar updated successfully' };
 // }
+
+@Patch('/:bookingId/payment')
+@Authorized('STUDENT')
+@OpenAPI({ summary: 'Update payment method or screenshot on existing booking', security: [{ bearerAuth: [] }] })
+@ResponseSchema(BookingDetailApiResponse, { statusCode: 200 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 400 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 404 })
+@ResponseSchema(ErrorResponseModel, { statusCode: 409 })
+public async updateBookingPayment(
+  @CurrentUser({ required: true }) session: CurrentSessionData,
+  @Param('bookingId') bookingId: string,
+  @Body() payload: UpdateBookingPaymentRequest,
+): Promise<BookingDetailApiResponse> {
+  try {
+    const booking = await this.bookingService.updateBookingPayment(
+      session.user.id,
+      bookingId,
+      payload.paymentMethod,
+      payload.paymentScreenshotUrl ?? null,
+    );
+    return new BookingDetailApiResponse(this.mapBookingData(booking), 200);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new InternalServerError('UPDATE_BOOKING_PAYMENT_FAILED');
+  }
+}
 }

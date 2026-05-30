@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { HttpError, InternalServerError, NotFoundError } from 'routing-controllers';
+import { BadRequestError, HttpError, InternalServerError, NotFoundError } from 'routing-controllers';
 import { Service } from 'typedi';
 import { getDataSource } from '../../database/config/ormconfig.default';
 import { OwnerFeeCollectionQueryRequest } from '../controllers/requests/booking.request';
@@ -79,7 +79,7 @@ export class FeeCollectionService {
       return this.listExpiringMembers(libraryId, query.expiringRange ?? 'today', page, limit);
     }
 
-    return this.listCollectedMembers(libraryId, query.collectedRange ?? 'today', page, limit);
+    return this.listCollectedMembers(libraryId, query.collectedRange ?? 'today', page, limit, query.fromDate,query.toDate,);
   }
 
   private async listExpiringMembers(
@@ -114,35 +114,37 @@ export class FeeCollectionService {
     };
   }
 
-  private async listCollectedMembers(
-    libraryId: string,
-    range: 'today' | 'week' | 'month' | 'lastMonth',
-    page: number,
-    limit: number,
-  ): Promise<{ members: MemberRecord[]; total: number }> {
-    const { start, end } = this.getCollectedDateRange(range);
+ private async listCollectedMembers(
+  libraryId: string,
+  range: 'today' | 'week' | 'month' | 'lastMonth' | 'custom',
+  page: number,
+  limit: number,
+  fromDate?: string,
+  toDate?: string,
+): Promise<{ members: MemberRecord[]; total: number }> {
+  const { start, end } = this.getCollectedDateRange(range, fromDate, toDate);
 
-    const memberRepo = getDataSource().getMongoRepository(MemberModel);
-    const whereFilter = {
-      libraryId,
-      paidAt: { $gte: start, $lt: end },
-    };
+  const memberRepo = getDataSource().getMongoRepository(MemberModel);
+  const whereFilter = {
+    libraryId,
+    paidAt: { $gte: start, $lt: end },
+  };
 
-    const [members, total] = await Promise.all([
-      memberRepo.find({
-        where: whereFilter,
-        order: { paidAt: 'DESC' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      memberRepo.count({ where: whereFilter }),
-    ]);
+  const [members, total] = await Promise.all([
+    memberRepo.find({
+      where: whereFilter,
+      order: { paidAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    memberRepo.count({ where: whereFilter }),
+  ]);
 
-    return {
-      members: members.map(m => this.mapMemberModel(m)),
-      total,
-    };
-  }
+  return {
+    members: members.map(m => this.mapMemberModel(m)),
+    total,
+  };
+}
 
   private async getFeeCollectionSummary(
     libraryId: string,
@@ -223,36 +225,47 @@ export class FeeCollectionService {
     return d.toISOString().slice(0, 10);
   }
 
-  private getCollectedDateRange(range: 'today' | 'week' | 'month' | 'lastMonth'): {
-    start: Date;
-    end: Date;
-  } {
-    const now = new Date();
-    const startOfToday = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
-    const startOfTomorrow = new Date(startOfToday);
-    startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+private getCollectedDateRange(
+  range: 'today' | 'week' | 'month' | 'lastMonth' | 'custom',
+  fromDate?: string,
+  toDate?: string,
+): { start: Date; end: Date } {
+  const now = new Date();
+  const startOfToday = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
 
-    if (range === 'today') {
-      return { start: startOfToday, end: startOfTomorrow };
+  if (range === 'custom') {
+    if (!fromDate || !toDate) {
+      throw new BadRequestError('fromDate and toDate are required for custom range');
     }
-
-    if (range === 'week') {
-      const startOfWeek = new Date(startOfToday);
-      startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay());
-      return { start: startOfWeek, end: startOfTomorrow };
-    }
-
-    if (range === 'month') {
-      const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      return { start: startOfMonth, end: startOfTomorrow };
-    }
-
-    const startOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-    const endOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    return { start: startOfLastMonth, end: endOfLastMonth };
+    const start = new Date(`${fromDate}T00:00:00.000Z`);
+    const end = new Date(`${toDate}T00:00:00.000Z`);
+    end.setUTCDate(end.getUTCDate() + 1); // make toDate inclusive
+    return { start, end };
   }
+
+  if (range === 'today') {
+    return { start: startOfToday, end: startOfTomorrow };
+  }
+
+  if (range === 'week') {
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay());
+    return { start: startOfWeek, end: startOfTomorrow };
+  }
+
+  if (range === 'month') {
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    return { start: startOfMonth, end: startOfTomorrow };
+  }
+
+  const startOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const endOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return { start: startOfLastMonth, end: endOfLastMonth };
+}
 
   private mapFeeCollectionItem(member: MemberRecord): OwnerFeeCollectionItemResult {
     const todayIsoDate = new Date().toISOString().slice(0, 10);

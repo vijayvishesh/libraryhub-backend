@@ -103,6 +103,18 @@ export class MemberData {
   @IsBoolean()
   isDuplicate!: boolean;
 
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string | null;       
+
+  @IsOptional()
+  @IsString()
+  paymentScreenshotUrl?: string | null; 
+
+  @IsOptional()
+  @IsString()
+  paymentStatus?: string;              
+
   constructor(data?: {
     id: string;
     fullName: string;
@@ -130,6 +142,9 @@ export class MemberData {
     pendingFeeAmount?: number | null;
     previousEndDate?: string | null;
     isDuplicate?: boolean;
+    paymentMethod?: string | null;        
+    paymentScreenshotUrl?: string | null; 
+    
   }) {
     if (!data) {
       return;
@@ -161,6 +176,10 @@ export class MemberData {
     this.pendingFeeAmount = data.pendingFeeAmount ?? null;
     this.previousEndDate = data.previousEndDate ?? null;
     this.isDuplicate = data.isDuplicate ?? false;
+    this.paymentMethod = data.paymentMethod ?? null;
+    this.paymentScreenshotUrl = data.paymentScreenshotUrl ?? null;
+    this.paymentStatus = data.status === 'active' ? 'confirmed' : 'pending';
+    
   }
 }
 
@@ -519,6 +538,12 @@ export class MemberPaymentData {
   @IsString()
   createdAt!: string;
 
+  @IsString()
+  type!: string; 
+
+  @IsString()
+  status!: string; 
+
   constructor(data?: {
     id: string;
     memberId: string;
@@ -528,6 +553,10 @@ export class MemberPaymentData {
     endDate: string;
     paidAt: Date;
     createdAt: Date;
+    paymentMethod?:        string | null;   
+    paymentScreenshotUrl?: string | null;   
+    type?:                 string;          
+    status?:               string;          
   }) {
     if (!data) {
       return;
@@ -538,6 +567,8 @@ export class MemberPaymentData {
     this.duration = data.duration;
     this.startDate = data.startDate;
     this.endDate = data.endDate;
+    this.type = data.type?? 'first_join';
+    this.status= data.status?? 'pending';
     this.paidAt = data.paidAt.toISOString();
     this.createdAt = data.createdAt.toISOString();
   }
