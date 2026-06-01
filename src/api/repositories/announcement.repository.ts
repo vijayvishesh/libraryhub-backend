@@ -21,6 +21,7 @@ export class AnnouncementRepository {
       target: model.target,
       sentCount: model.sentCount,
       isActive: model.isActive ?? true,
+      memberIds: model.memberIds ?? null,
       expiresAt: model.expiresAt ?? null,
       expiryUnit: model.expiryUnit ?? null,
       expiryValue: model.expiryValue ?? null,

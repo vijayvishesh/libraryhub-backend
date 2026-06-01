@@ -15,6 +15,10 @@ export type AnnouncementTarget =
   | 'evening'
   | 'morning'
   | 'night'
+  | 'afternoon'  
+  | 'latenight'  
+  | 'weekend'    
+  | 'weekday'    
   | 'custom';
 
 @Entity('announcements')
@@ -64,4 +68,7 @@ export class AnnouncementModel {
 
   @Column()
   updatedAt!: Date;
+
+  @Column()
+  memberIds!: string[] | null;
 }

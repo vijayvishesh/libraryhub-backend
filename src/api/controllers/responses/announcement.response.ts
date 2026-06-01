@@ -22,6 +22,7 @@ export class AnnouncementData {
   @IsOptional() @IsNumber() expiryValue?: number | null;
   @IsString() createdAt!: string;
   @IsString() updatedAt!: string;
+  @IsOptional() @IsArray() memberIds?: string[] | null;
 
   constructor(r?: AnnouncementRecord) {
     if (!r) {
@@ -34,6 +35,7 @@ export class AnnouncementData {
     this.target = r.target;
     this.sentCount = r.sentCount;
     this.isActive = r.isActive;
+    this.memberIds = r.memberIds ?? null;
     this.expiresAt = r.expiresAt?.toISOString() ?? null;
     this.expiryUnit = r.expiryUnit;
     this.expiryValue = r.expiryValue;

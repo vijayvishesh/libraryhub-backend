@@ -108,4 +108,10 @@ export class FcmTokenRepository {
   public async deleteByTokens(tokens: string[]): Promise<void> {
     await this.getRepo().deleteMany({ token: { $in: tokens } } as any);
   }
+  public async findByOwnerId(ownerId: string): Promise<FcmTokenRecord[]> {
+  const models = await this.getRepo().find({
+    where: { ownerId } as any,
+  });
+  return models.map(m => this.toRecord(m));
+}
 }

@@ -7,6 +7,10 @@ import { MemberLeaveRequestRepository } from '../repositories/memberLeaveRequest
 import { MemberRepository } from '../repositories/member.repository';
 import { LeaveRequestResult } from './types/memberLeaveRequest.service.types';
 import { ObjectId } from 'mongodb';
+import { FcmTokenRepository } from '../repositories/fcmToken.repository';
+import { NotificationRepository } from '../repositories/notification.repository';
+import { ActivityService } from './activity.service';
+import { getFirebaseMessaging } from '../../lib/firebase/firebase';
 
 @Service()
 export class MemberLeaveRequestService {
@@ -16,6 +20,9 @@ export class MemberLeaveRequestService {
     private readonly bookingRepository: BookingRepository,
     private readonly libraryRepository: LibraryRepository,
     private readonly authRepository: AuthRepository,
+    private readonly notificationRepository: NotificationRepository,   
+    private readonly fcmTokenRepository: FcmTokenRepository,           
+    private readonly activityService: ActivityService,                 
   ) {}
 
   // ── STUDENT: raise a leave request ───────────────────────────────────────
@@ -61,12 +68,67 @@ export class MemberLeaveRequestService {
         bookingId: member.bookingId ?? null,
         reason:    reason?.trim() || null,
       });
+           await this.notifyOwnerOfLeaveRequest(
+        libraryId,
+        student.name,
+        request.id,
+      );
+
+      // ── Recent activity (owner's feed) ────────────────────────────────────
+      const library = await this.libraryRepository.findLibraryById(libraryId);
+      if (library?.ownerId) {
+        await this.activityService.logActivity(
+          library.ownerId,
+          'LEAVE_REQUEST_RAISED',
+          `${student.name} raised a leave request`,
+          { studentId, libraryId, requestId: request.id },
+        );
+      }
 
       return this.mapResult(request, student.name, student.phone, member.seatId, member.slotId);
     } catch (error) {
       this.rethrow(error, 'RAISE_LEAVE_REQUEST_FAILED');
     }
   }
+
+    private async notifyOwnerOfLeaveRequest(
+    libraryId: string,
+    studentName: string,
+    requestId: string,
+  ): Promise<void> {
+    try {
+      const library = await this.libraryRepository.findLibraryById(libraryId);
+      if (!library?.ownerId) return;
+
+      const title   = 'Leave Request';
+      const message = `${studentName} has requested to leave the library`;
+
+      // DB notification for owner
+      await this.notificationRepository.createOwnerNotification({
+        ownerId:     library.ownerId,
+        title,
+        message,
+        type:        'leave_request',
+        referenceId: requestId,
+      });
+
+      // Push notification to owner's devices
+      const ownerTokens = await this.fcmTokenRepository.findByOwnerId(library.ownerId);
+      const tokens = ownerTokens.map(t => t.token);
+      if (tokens.length > 0) {
+        const messaging = getFirebaseMessaging();
+        await messaging.sendEachForMulticast({
+          tokens,
+          notification: { title, body: message },
+          android: { priority: 'high' },
+          apns:    { payload: { aps: { sound: 'default' } } },
+        });
+      }
+    } catch (error) {
+      console.error('Leave request owner notification failed:', error);
+    }
+  }
+
 
   // ── STUDENT: get their leave request status for a library ─────────────────
 
@@ -99,7 +161,42 @@ export class MemberLeaveRequestService {
   }
 
   // ── OWNER: list all leave requests for their library ──────────────────────
+private async notifyStudentOfLeaveResolution(
+  studentId: string,
+  status: 'approved' | 'rejected',
+  requestId: string,
+  rejectionReason?: string,
+): Promise<void> {
+  try {
+    const title   = status === 'approved' ? 'Leave Approved' : 'Leave Rejected';
+    const message = status === 'approved'
+      ? 'Your leave request has been approved. You are no longer an active member.'
+      : `Your leave request was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`;
 
+    // DB notification for student
+    await this.notificationRepository.createMany([{
+      studentId,
+      title,
+      message,
+      type:        status === 'approved' ? 'leave_approved' : 'leave_rejected',
+      referenceId: requestId,
+    }]);
+
+    // Push notification to student's devices
+    const tokens = await this.fcmTokenRepository.findTokensByStudentIds([studentId]);
+    if (tokens.length > 0) {
+      const messaging = getFirebaseMessaging();
+      await messaging.sendEachForMulticast({
+        tokens,
+        notification: { title, body: message },
+        android: { priority: 'high' },
+        apns:    { payload: { aps: { sound: 'default' } } },
+      });
+    }
+  } catch (error) {
+    console.error('Leave resolution student notification failed:', error);
+  }
+}
   public async listLeaveRequests(
     ownerId: string,
     status?: 'pending' | 'approved' | 'rejected',
@@ -185,7 +282,7 @@ export class MemberLeaveRequestService {
         request.memberId,
         library.id,
       );
-
+      await this.notifyStudentOfLeaveResolution(request.studentId, 'approved', request.id);
       return this.mapResult(
         updated!,
         student?.name,
@@ -231,6 +328,12 @@ export class MemberLeaveRequestService {
         library.id,
       );
 
+      await this.notifyStudentOfLeaveResolution(
+        request.studentId,
+        'rejected',
+        request.id,
+        rejectionReason,
+      );
       return this.mapResult(
         updated!,
         student?.name,

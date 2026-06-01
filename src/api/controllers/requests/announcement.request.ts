@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -13,19 +14,10 @@ import { AnnouncementTarget } from '../../models/announcement.model';
 
 // All possible targets — slot-based ones filtered dynamically per library
 export const ALL_ANNOUNCEMENT_TARGETS: AnnouncementTarget[] = [
-  'all',
-  'absent',
-  'fee_due',
-  'expired',
-  'overdue',
-  'fullday',
-  'firsthalf',
-  'secondhalf',
-  'twentyfour',
-  'halfday',
-  'evening',
-  'morning',
-  'night',
+  'all', 'absent', 'fee_due', 'expired', 'overdue',
+  'fullday', 'firsthalf', 'secondhalf', 'twentyfour',
+  'halfday', 'evening', 'morning', 'night',
+  'afternoon', 'latenight', 'weekend', 'weekday', // ← add
   'custom',
 ];
 
@@ -56,9 +48,20 @@ export class CreateAnnouncementRequest {
   @IsNotEmpty()
   message!: string;
 
+  // @IsString()
+  // @IsIn(ALL_ANNOUNCEMENT_TARGETS)
+  // target!: AnnouncementTarget;
+
   @IsString()
   @IsIn(ALL_ANNOUNCEMENT_TARGETS)
-  target!: AnnouncementTarget;
+  @IsOptional()                      
+  target?: AnnouncementTarget;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  memberIds?: string[];             
+
 
   // isActive defaults to true on create
   @IsOptional()
@@ -87,6 +90,11 @@ export class UpdateAnnouncementRequest {
   @IsString()
   @IsIn(ALL_ANNOUNCEMENT_TARGETS)
   target?: AnnouncementTarget;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  memberIds?: string[];     
 
   @IsOptional()
   @IsBoolean()

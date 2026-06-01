@@ -7,6 +7,7 @@ export type AnnouncementRecord = {
   title: string;
   message: string;
   target: AnnouncementTarget;
+  memberIds: string[] | null;
   sentCount: number;
   isActive: boolean;
   expiresAt: Date | null;
@@ -23,6 +24,7 @@ export type CreateAnnouncementInput = {
   title: string;
   message: string;
   target: AnnouncementTarget;
+   memberIds: string[] | null;
   sentCount: number;
   isActive: boolean;
   expiresAt: Date | null;

@@ -51,16 +51,21 @@ const STATIC_TARGETS: AnnouncementTargetData[] = [
 ];
 
 // Slot target metadata
+// Add missing slots to SLOT_TARGET_META:
 const SLOT_TARGET_META: Record<string, { label: string; description: string }> = {
-  fullday: { label: 'Full Day Slot', description: 'Members in the full day slot' },
-  firsthalf: { label: 'First Half Slot', description: 'Members in the first half slot' },
+  fullday:    { label: 'Full Day Slot',    description: 'Members in the full day slot' },
+  firsthalf:  { label: 'First Half Slot',  description: 'Members in the first half slot' },
   secondhalf: { label: 'Second Half Slot', description: 'Members in the second half slot' },
-  twentyfour: { label: '24 Hours Slot', description: 'Members in the 24-hour slot' },
-  halfday: { label: 'Half Day Slot', description: 'Members in the half day slot' },
-  evening: { label: 'Evening Slot', description: 'Members in the evening slot' },
-  morning: { label: 'Morning Slot', description: 'Members in the morning slot' },
-  night: { label: 'Night Slot', description: 'Members in the night slot' },
-  custom: { label: 'Custom Slot', description: 'Members in the custom slot' },
+  twentyfour: { label: '24 Hours Slot',    description: 'Members in the 24-hour slot' },
+  halfday:    { label: 'Half Day Slot',    description: 'Members in the half day slot' },
+  evening:    { label: 'Evening Slot',     description: 'Members in the evening slot' },
+  morning:    { label: 'Morning Slot',     description: 'Members in the morning slot' },
+  night:      { label: 'Night Slot',       description: 'Members in the night slot' },
+  afternoon:  { label: 'Afternoon Slot',   description: 'Members in the afternoon slot' },  
+  latenight:  { label: 'Late Night Slot',  description: 'Members in the late night slot' }, 
+  weekend:    { label: 'Weekend Slot',     description: 'Members in the weekend slot' },    
+  weekday:    { label: 'Weekday Slot',     description: 'Members in the weekday slot' },    
+  custom:     { label: 'Custom Slot',      description: 'Members in the custom slot' },
 };
 
 @Service()
@@ -104,7 +109,11 @@ export class AnnouncementService {
       throw new NotFoundError('LIBRARY_NOT_FOUND');
     }
 
-    const studentIds = await this.getTargetedStudentIds(library.id, input.target);
+    const studentIds = await this.getTargetedStudentIds(
+      library.id,
+      input.target,
+      input.memberIds,
+    );
     const { expiresAt, expiryUnit, expiryValue } = this.resolveExpiry(input.expiry);
 
     const announcement = await this.announcementRepository.create({
@@ -112,12 +121,14 @@ export class AnnouncementService {
       ownerId,
       title: input.title,
       message: input.message,
-      target: input.target,
+      target:    input.target ?? 'all',
+      memberIds: input.memberIds ?? null,
       sentCount: studentIds.length,
       isActive: input.isActive ?? true,
       expiresAt,
       expiryUnit,
       expiryValue,
+      
     });
 
     if (studentIds.length > 0) {
@@ -276,6 +287,7 @@ export class AnnouncementService {
   private async getTargetedStudentIds(
     libraryId: string,
     target: AnnouncementTarget,
+    memberIds?: string[],
   ): Promise<string[]> {
     const allMembers = await this.memberRepository.findAllMembersByLibrary(libraryId);
     const today = new Date().toISOString().split('T')[0];

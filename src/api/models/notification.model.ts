@@ -20,7 +20,10 @@ export type NotificationType =
   | 'renewal_rejected'     
   | 'payment_received'     
   | 'payment_screenshot'    
-  | 'subscription_expiring';
+  | 'subscription_expiring'
+  | 'leave_request'          
+  | 'leave_approved'         
+  | 'leave_rejected';        
 
 export type NotificationAudience = 'student' | 'owner';
 
