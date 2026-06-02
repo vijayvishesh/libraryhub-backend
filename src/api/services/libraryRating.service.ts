@@ -19,13 +19,9 @@ export class LibraryRatingService {
     libraryId: string,
     input: RateLibraryRequest,
   ): Promise<LibraryRatingRecord> {
-    // Check library exists
     const library = await this.libraryRepository.findLibraryById(libraryId);
-    if (!library) {
-      throw new NotFoundError('LIBRARY_NOT_FOUND');
-    }
+    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
 
-    // Check student has active membership
     const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
       studentId,
       libraryId,
@@ -34,7 +30,6 @@ export class LibraryRatingService {
       throw new BadRequestError('MUST_BE_ACTIVE_MEMBER_TO_RATE');
     }
 
-    // Check if already rated — update if yes
     const existing = await this.ratingRepository.findByStudentAndLibrary(studentId, libraryId);
     let record: LibraryRatingRecord;
 
@@ -44,9 +39,7 @@ export class LibraryRatingService {
         input.rating,
         input.review ?? null,
       );
-      if (!updated) {
-        throw new NotFoundError('RATING_NOT_FOUND');
-      }
+      if (!updated) throw new NotFoundError('RATING_NOT_FOUND');
       record = updated;
     } else {
       record = await this.ratingRepository.create({
@@ -57,7 +50,6 @@ export class LibraryRatingService {
       });
     }
 
-    // Update library stats
     const { average, count } = await this.ratingRepository.getAverageRating(libraryId);
     await this.libraryRepository.updateLibraryStats(libraryId, {
       rating: average,
@@ -71,5 +63,18 @@ export class LibraryRatingService {
     libraryId: string,
   ): Promise<{ average: number; count: number }> {
     return this.ratingRepository.getAverageRating(libraryId);
+  }
+
+  public async getLibraryRatings(libraryId: string): Promise<LibraryRatingRecord[]> {
+    const library = await this.libraryRepository.findLibraryById(libraryId);
+    if (!library) throw new NotFoundError('LIBRARY_NOT_FOUND');
+    return this.ratingRepository.findByLibrary(libraryId);
+  }
+
+  public async getMyRating(
+    studentId: string,
+    libraryId: string,
+  ): Promise<LibraryRatingRecord | null> {
+    return this.ratingRepository.findByStudentAndLibrary(studentId, libraryId);
   }
 }
