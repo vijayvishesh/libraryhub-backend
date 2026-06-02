@@ -27,6 +27,11 @@ export class CreateStudySessionRequest {
 
   @IsOptional()
   @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'revisionReminderTime must be in HH:mm format e.g. 08:00' })
+  revisionReminderTime?: string | null;
+
+  @IsOptional()
+  @IsString()
   libraryId?: string;
 
   // @IsOptional()

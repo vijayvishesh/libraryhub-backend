@@ -19,6 +19,9 @@ export class StudySessionModel {
   studyDuration!: number;
 
   @Column()
+  revisionReminderTime!: string | null;
+
+  @Column()
   startTime!: string; // HH:mm
 
   @Column()

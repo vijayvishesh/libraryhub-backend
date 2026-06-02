@@ -36,6 +36,11 @@ export class SubjectData {
   @IsString({ each: true })
   days!: TimetableDay[];
 
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  specificDates?: string[]; 
+
   @IsString()
   startTime!: string;
 
@@ -52,6 +57,7 @@ export class SubjectData {
   constructor(params?: {
     subjectName: string;
     days: TimetableDay[];
+    specificDates?: string[]; 
     startTime: string;
     endTime: string;
     color: string;
@@ -62,6 +68,7 @@ export class SubjectData {
     }
     this.subjectName = params.subjectName;
     this.days = params.days;
+    this.specificDates = params.specificDates;
     this.startTime = params.startTime;
     this.endTime = params.endTime;
     this.color = params.color;

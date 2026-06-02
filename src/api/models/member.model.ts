@@ -76,4 +76,7 @@ export class MemberModel {
 
   @Column()
   paymentScreenshotUrl?: string | null; 
+
+  @Column()
+  avatarUrl?: string | null;
 }

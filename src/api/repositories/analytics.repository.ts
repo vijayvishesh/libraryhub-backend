@@ -34,6 +34,23 @@ export type SlotBreakdown = {
 @Service()
 export class AnalyticsRepository {
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  private toUTCStart(dateStr: string): Date {
+    return new Date(dateStr + 'T00:00:00.000Z');
+  }
+
+  private toUTCEnd(dateStr: string): Date {
+    return new Date(dateStr + 'T23:59:59.999Z');
+  }
+
+  private toISTDateString(date: Date): string {
+    // IST = UTC + 5:30
+    return new Date(date.getTime() + 5.5 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
+  }
+
   // ── Revenue ───────────────────────────────────────────────────────────────
 
   public async getTotalRevenue(libraryId: string, range: DateRange): Promise<number> {
@@ -41,7 +58,11 @@ export class AnalyticsRepository {
     const payments = await repo.find({
       where: {
         libraryId,
-        paidAt: { $gte: new Date(range.from), $lte: new Date(range.to + 'T23:59:59') },
+        status: 'paid',
+        paidAt: {
+          $gte: this.toUTCStart(range.from),
+          $lte: this.toUTCEnd(range.to),
+        },
       } as any,
     });
     return payments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
@@ -52,15 +73,18 @@ export class AnalyticsRepository {
     const payments = await repo.find({
       where: {
         libraryId,
-        paidAt: { $gte: new Date(range.from), $lte: new Date(range.to + 'T23:59:59') },
+        status: 'paid',
+        paidAt: {
+          $gte: this.toUTCStart(range.from),
+          $lte: this.toUTCEnd(range.to),
+        },
       } as any,
     });
 
-    // Group by date
     const map = new Map<string, number>();
     for (const p of payments) {
-      const date = new Date(p.paidAt).toISOString().split('T')[0];
-      map.set(date, (map.get(date) ?? 0) + (p.amount ?? 0));
+      const istDate = this.toISTDateString(new Date(p.paidAt));
+      map.set(istDate, (map.get(istDate) ?? 0) + (p.amount ?? 0));
     }
 
     return this.fillDateRange(range).map(date => ({
@@ -70,11 +94,14 @@ export class AnalyticsRepository {
   }
 
   public async getPendingRevenue(libraryId: string): Promise<number> {
-    const repo = getDataSource().getMongoRepository(MemberModel);
-    const members = await repo.find({
-      where: { libraryId, status: 'pending' } as any,
+    const repo = getDataSource().getMongoRepository(MemberPaymentModel);
+    const payments = await repo.find({
+      where: {
+        libraryId,
+        status: 'pending',
+      } as any,
     });
-    return members.reduce((sum, m) => sum + (m.planAmount ?? 0), 0);
+    return payments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
   }
 
   // ── Members ───────────────────────────────────────────────────────────────
@@ -103,8 +130,8 @@ export class AnalyticsRepository {
       where: {
         libraryId,
         createdAt: {
-          $gte: new Date(range.from),
-          $lte: new Date(range.to + 'T23:59:59'),
+          $gte: this.toUTCStart(range.from),
+          $lte: this.toUTCEnd(range.to),
         },
       } as any,
     });
@@ -116,23 +143,20 @@ export class AnalyticsRepository {
   ): Promise<DailyMemberGrowth[]> {
     const repo = getDataSource().getMongoRepository(MemberModel);
 
-    // All members created up to end of range
     const members = await repo.find({
       where: {
         libraryId,
-        createdAt: { $lte: new Date(range.to + 'T23:59:59') },
+        createdAt: { $lte: this.toUTCEnd(range.to) },
       } as any,
     });
 
-    // Count members created before range start for baseline
     const baseline = members.filter(
-      m => new Date(m.createdAt).toISOString().split('T')[0] < range.from,
+      m => this.toISTDateString(new Date(m.createdAt)) < range.from,
     ).length;
 
-    // Group new members by date within range
     const newMap = new Map<string, number>();
     for (const m of members) {
-      const date = new Date(m.createdAt).toISOString().split('T')[0];
+      const date = this.toISTDateString(new Date(m.createdAt));
       if (date >= range.from && date <= range.to) {
         newMap.set(date, (newMap.get(date) ?? 0) + 1);
       }
@@ -153,7 +177,10 @@ export class AnalyticsRepository {
     return repo.count({
       where: {
         libraryId,
-        date: { $gte: range.from, $lte: range.to },
+        date: {
+          $gte: range.from,
+          $lte: range.to,
+        },
       } as any,
     });
   }
@@ -166,7 +193,10 @@ export class AnalyticsRepository {
     const records = await repo.find({
       where: {
         libraryId,
-        date: { $gte: range.from, $lte: range.to },
+        date: {
+          $gte: range.from,
+          $lte: range.to,
+        },
       } as any,
     });
 
@@ -187,7 +217,8 @@ export class AnalyticsRepository {
   ): Promise<{ date: string; checkins: number } | null> {
     const daily = await this.getDailyAttendance(libraryId, range);
     if (daily.length === 0) return null;
-    return daily.reduce((max, d) => (d.checkins > max.checkins ? d : max), daily[0]);
+    const peak = daily.reduce((max, d) => (d.checkins > max.checkins ? d : max), daily[0]);
+    return peak.checkins === 0 ? null : peak;
   }
 
   public async getUniqueVisitors(libraryId: string, range: DateRange): Promise<number> {
@@ -195,7 +226,10 @@ export class AnalyticsRepository {
     const records = await repo.find({
       where: {
         libraryId,
-        date: { $gte: range.from, $lte: range.to },
+        date: {
+          $gte: range.from,
+          $lte: range.to,
+        },
       } as any,
     });
     return new Set(records.map(r => r.studentId)).size;
@@ -217,19 +251,21 @@ export class AnalyticsRepository {
       paymentRepo.find({
         where: {
           libraryId,
-          paidAt: { $gte: new Date(range.from), $lte: new Date(range.to + 'T23:59:59') },
+          status: 'paid',
+          paidAt: {
+            $gte: this.toUTCStart(range.from),
+            $lte: this.toUTCEnd(range.to),
+          },
         } as any,
       }),
     ]);
 
-    // Group members by slot
     const slotMemberMap = new Map<string, number>();
     for (const m of members) {
       if (!m.slotId) continue;
       slotMemberMap.set(m.slotId, (slotMemberMap.get(m.slotId) ?? 0) + 1);
     }
 
-    // For revenue per slot we join via memberId
     const memberSlotMap = new Map<string, string>();
     for (const m of members) {
       if (m.slotId) {
@@ -256,7 +292,7 @@ export class AnalyticsRepository {
     }));
   }
 
-  // ── Seat occupancy ────────────────────────────────────────────────────────
+  // ── Seat Occupancy ────────────────────────────────────────────────────────
 
   public async getOccupiedSeatsCount(libraryId: string): Promise<number> {
     const repo = getDataSource().getMongoRepository(MemberModel);
@@ -272,7 +308,6 @@ export class AnalyticsRepository {
 
   // ── Utility ───────────────────────────────────────────────────────────────
 
-  // Returns previous period range for change% calculation
   public getPreviousRange(range: DateRange): DateRange {
     const from = new Date(range.from);
     const to = new Date(range.to);
@@ -285,7 +320,6 @@ export class AnalyticsRepository {
     };
   }
 
-  // Fills every date in range even if no data
   public fillDateRange(range: DateRange): string[] {
     const dates: string[] = [];
     const current = new Date(range.from);

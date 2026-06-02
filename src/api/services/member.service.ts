@@ -37,6 +37,7 @@ import { MemberInviteLinkRecord } from '../repositories/types/memberInviteLink.r
 import { SubmissionRecord } from '../repositories/types/memberInviteSubmission.repository.types';
 import { ListMemberPaymentsResult } from '../repositories/types/memberPayment.repository.types';
 import { sendStudentBookingStatusPush } from '../../loaders/cronLoader';
+import { StudentRecord } from '../repositories/types/auth.repository.types';
 
 export type ListMembersResult = {
   members: MemberWithFlags[];
@@ -53,6 +54,7 @@ export type InviteFlags = {
   pendingFeeAmount: number | null;
   previousEndDate: string | null;
   isDuplicate: boolean;
+  avatarUrl: string | null;
 };
 
 export type MemberWithFlags = MemberRecord & InviteFlags;
@@ -112,11 +114,16 @@ export class MemberService {
       const memberIds = result.members.map(m => m.id);
       const submissionMap = await this.memberInviteSubmissionRepository.findByMemberIds(memberIds);
 
+      const studentIds = result.members.map(m => m.studentId).filter(Boolean) as string[];
+      const students = await this.authRepository.findStudentsByIds(studentIds);
+      const studentMap = new Map(students.map(s => [s.id, s]));
+
       return {
-        members: result.members.map(m => this.mergeInviteFlags(m, submissionMap)),
+        members: result.members.map(m => this.mergeInviteFlags(m, submissionMap,studentMap)),
         page,
         limit,
         total: result.total,
+        
       };
     } catch (error) {
       if (error instanceof HttpError) {
@@ -140,7 +147,11 @@ export class MemberService {
       const submissionMap = await this.memberInviteSubmissionRepository.findByMemberIds([
         member.id,
       ]);
-      return this.mergeInviteFlags(member, submissionMap);
+       const student = member.studentId 
+      ? await this.authRepository.findStudentById(member.studentId) 
+      : null;
+    const studentMap = new Map(student ? [[student.id, student]] : []);
+      return this.mergeInviteFlags(member, submissionMap, studentMap);
     } catch (error) {
       if (error instanceof HttpError) {
         throw error;
@@ -878,7 +889,7 @@ export class MemberService {
       student = await this.authRepository.createStudent({
         name: fullName,
         phone: mobileNo,
-        gender: 'other',
+        gender: ('gender' in payload && payload.gender) ? payload.gender : 'other',
         password: hashedPassword,
         isPhoneVerified: false,
         hasJoinedLibrary: true,
@@ -995,6 +1006,7 @@ export class MemberService {
   private mergeInviteFlags(
     member: MemberRecord,
     submissionMap: Map<string, SubmissionRecord>,
+    studentMap?: Map<string, StudentRecord>,
   ): MemberWithFlags {
     const submission = member.id ? submissionMap.get(member.id) : undefined;
     return {
@@ -1006,6 +1018,7 @@ export class MemberService {
       pendingFeeAmount: submission?.pendingFeeAmount ?? null,
       previousEndDate: submission?.previousEndDate ?? null,
       isDuplicate: submission?.isDuplicate ?? false,
+       avatarUrl: studentMap?.get(member.studentId ?? '')?.avatarUrl ?? null,
     };
   }
 

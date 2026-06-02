@@ -176,6 +176,26 @@ export class AuthRepository {
     return this.mapStudent(student);
   }
 
+  public async findStudentsByIds(studentIds: string[]): Promise<StudentRecord[]> {
+  if (!studentIds.length) {
+    return [];
+  }
+
+  const objectIds = studentIds
+    .map(id => this.tryParseObjectId(id))
+    .filter((id): id is ObjectId => id !== null);
+
+  if (!objectIds.length) {
+    return [];
+  }
+
+  const students = await this.getStudentRepository().findBy({
+    _id: { $in: objectIds } as any,
+  });
+
+  return students.map(s => this.mapStudent(s));
+}
+
   public async createStudent(input: CreateStudentInput): Promise<StudentRecord> {
     const studentRepository = this.getStudentRepository();
     const student = studentRepository.create({

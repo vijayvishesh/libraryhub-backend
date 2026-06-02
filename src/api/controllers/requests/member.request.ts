@@ -68,6 +68,11 @@ export class AddMemberRequest {
   @IsString()
   @IsIn([...LIBRARY_PAYMENT_METHOD_ENUM])
   paymentMethod?: (typeof LIBRARY_PAYMENT_METHOD_ENUM)[number];
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['male', 'female', 'other'])
+  gender?: 'male' | 'female' | 'other';
 }
 
 export class UpdateMemberRequest {

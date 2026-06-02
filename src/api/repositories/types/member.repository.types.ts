@@ -29,6 +29,7 @@ export type MemberRecord = CreateMemberInput & {
   isNewUser?: boolean;
   paymentMethod?: string | null;         
   paymentScreenshotUrl?: string | null; 
+  avatarUrl?: string | null;
 };
 
 export type UpdateMemberInput = Partial<

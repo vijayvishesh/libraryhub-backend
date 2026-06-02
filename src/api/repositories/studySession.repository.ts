@@ -27,6 +27,7 @@ export class StudySessionRepository {
       notes: model.notes,
       revisionReminderDays: model.revisionReminderDays,
       revisionReminderDate: model.revisionReminderDate,
+      revisionReminderTime: model.revisionReminderTime ?? null,
       reminderSent: model.reminderSent ?? false,
       deletedAt: model.deletedAt,
       createdAt: model.createdAt,

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsDateString,
   IsHexColor,
   IsIn,
   IsInt,
@@ -72,6 +73,12 @@ export class SubjectRequest {
   @IsArray()
   @IsIn(VALID_DAYS, { each: true })
   days!: TimetableDay[];
+
+  @IsOptional()
+  @IsArray()
+  @IsDateString({}, { each: true })  
+  specificDates?: string[];
+
 
   @IsString()
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'startTime must be in HH:mm format e.g. 09:00' })

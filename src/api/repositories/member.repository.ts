@@ -491,6 +491,7 @@ console.log('[updateMemberByIdAndLibrary] saving member:', {
       isNewUser: member.isNewUser ?? false,
       paymentMethod:        member.paymentMethod ?? null,       
       paymentScreenshotUrl: member.paymentScreenshotUrl ?? null,
+      avatarUrl: null, 
     };
   }
 
@@ -525,7 +526,7 @@ console.log('[updateMemberByIdAndLibrary] saving member:', {
   }
   public async findStudentsByIds(
   studentIds: string[],
-): Promise<Map<string, { name: string; phone: string; email: string | null; gender: string }>> {
+): Promise<Map<string, { name: string; phone: string; email: string | null; gender: string; avatarUrl: string | null }>> {
   if (studentIds.length === 0) return new Map();
 
   const studentRepo = getDataSource().getMongoRepository(
@@ -536,13 +537,14 @@ console.log('[updateMemberByIdAndLibrary] saving member:', {
     where: { _id: { $in: studentIds.map(id => new ObjectId(id)) } } as any,
   });
 
-  const map = new Map<string, { name: string; phone: string; email: string | null; gender: string }>();
+  const map = new Map<string, { name: string; phone: string; email: string | null; gender: string; avatarUrl: string | null }>();
   for (const s of students) {
     map.set(s.id.toHexString(), {
       name: s.name,
       phone: s.phone,
       email: s.email ?? null,
       gender: s.gender,
+      avatarUrl: s.avatarUrl ?? null,
     });
   }
   return map;
@@ -551,7 +553,7 @@ console.log('[updateMemberByIdAndLibrary] saving member:', {
 // ── New: maps member and overrides with student data if linked ───────────
 private mapMemberWithStudent(
   member: MemberModel,
-  studentMap: Map<string, { name: string; phone: string; email: string | null; gender: string }>,
+  studentMap: Map<string, { name: string; phone: string; email: string | null; gender: string; avatarUrl: string | null }>,
 ): MemberRecord {
   const base = this.mapMember(member);
   const studentId = member.studentId;
@@ -566,6 +568,7 @@ private mapMemberWithStudent(
       if (student.email) {
         base.email = student.email;
       }
+      base.avatarUrl = student.avatarUrl ?? null;
     }
   }
 

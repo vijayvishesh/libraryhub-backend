@@ -18,6 +18,7 @@ export type TimetableReminder = {
 export type TimetableSubject = {
   subjectName: string;
   days: TimetableDay[];
+  specificDates?: string[]; 
   startTime: string;
   endTime: string;
   color: string;

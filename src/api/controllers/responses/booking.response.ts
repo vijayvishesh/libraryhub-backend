@@ -562,6 +562,10 @@ export class OwnerFeeCollectionItemData {
   @IsNumber()
   overdueDays!: number;
 
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string | null;
+
   constructor(params?: {
     memberId: string;
     bookingId: string | null;

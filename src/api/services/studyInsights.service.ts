@@ -85,23 +85,33 @@ export class StudyInsightsService {
     return { thisWeekMinutes, weekGraph };
   }
 
-  private calculateDayStreak(sessions: any[]): number {
-    if (sessions.length === 0) {
-      return 0;
+private calculateDayStreak(sessions: any[]): number {
+  if (sessions.length === 0) return 0;
+
+  const studyDays = new Set(
+    sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0])
+  );
+
+  // Always start from yesterday — today doesn't count until session is done
+  let streak = 0;
+  for (let i = 1; i < 365; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+
+    if (studyDays.has(dateStr)) {
+      streak++;
+    } else {
+      break;
     }
-    const studyDays = new Set(sessions.map(s => new Date(s.createdAt).toISOString().split('T')[0]));
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      if (studyDays.has(dateStr)) {
-        streak += 1;
-      } else {
-        break;
-      }
-    }
-    return streak;
   }
+
+  // Add today only if today's session is already completed
+  const today = new Date().toISOString().split('T')[0];
+  if (studyDays.has(today)) {
+    streak++;
+  }
+
+  return streak;
+}
 }

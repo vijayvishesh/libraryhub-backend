@@ -114,7 +114,7 @@ export class FeeCollectionService {
     };
   }
 
- private async listCollectedMembers(
+private async listCollectedMembers(
   libraryId: string,
   range: 'today' | 'week' | 'month' | 'lastMonth' | 'custom',
   page: number,
@@ -125,15 +125,19 @@ export class FeeCollectionService {
   const { start, end } = this.getCollectedDateRange(range, fromDate, toDate);
 
   const memberRepo = getDataSource().getMongoRepository(MemberModel);
+
+  // Filter on updatedAt (when owner activated/approved the member)
+  // AND status must be active — meaning payment was collected
   const whereFilter = {
     libraryId,
-    paidAt: { $gte: start, $lt: end },
+    status: 'active',
+    updatedAt: { $gte: start, $lt: end },
   };
 
   const [members, total] = await Promise.all([
     memberRepo.find({
       where: whereFilter,
-      order: { paidAt: 'DESC' },
+      order: { updatedAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     }),
@@ -172,21 +176,21 @@ export class FeeCollectionService {
             today: [
               {
                 $match: {
-                  paidAt: { $gte: startOfToday, $lt: startOfTomorrow },
+                  status: 'active',                                    // ← was checking paidAt
+                  updatedAt: { $gte: startOfToday, $lt: startOfTomorrow },
                   planAmount: { $gt: 0 },
                 },
               },
-
               { $group: { _id: null, amount: { $sum: '$planAmount' }, count: { $sum: 1 } } },
             ],
             month: [
               {
                 $match: {
-                  paidAt: { $gte: startOfMonth, $lt: startOfTomorrow },
+                  status: 'active',                                    // ← was checking paidAt
+                  updatedAt: { $gte: startOfMonth, $lt: startOfTomorrow },
                   planAmount: { $gt: 0 },
                 },
               },
-
               { $group: { _id: null, amount: { $sum: '$planAmount' }, count: { $sum: 1 } } },
             ],
             pending: [{ $match: { status: { $in: ['pending', 'expired'] } } }, { $count: 'count' }],
@@ -252,16 +256,19 @@ private getCollectedDateRange(
   }
 
   if (range === 'week') {
+    // ✅ Fixed — last 7 days including today, not Sunday-based
     const startOfWeek = new Date(startOfToday);
-    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay());
+    startOfWeek.setUTCDate(startOfWeek.getUTCDate() - 6);
     return { start: startOfWeek, end: startOfTomorrow };
   }
 
   if (range === 'month') {
+    // ✅ Calendar month start
     const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     return { start: startOfMonth, end: startOfTomorrow };
   }
 
+  // lastMonth
   const startOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
   const endOfLastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   return { start: startOfLastMonth, end: endOfLastMonth };

@@ -10,6 +10,7 @@ export type StudySessionRecord = {
   notes: string | null;
   revisionReminderDays: number | null;
   revisionReminderDate: Date | null;
+  revisionReminderTime: string | null;
   reminderSent: boolean;
   deletedAt: Date | null;
   createdAt: Date;
@@ -27,12 +28,14 @@ export type CreateStudySessionInput = {
   notes: string | null;
   revisionReminderDays: number | null;
   revisionReminderDate: Date | null;
+  revisionReminderTime?: string | null;
 };
 
 export type UpdateStudySessionInput = {
   notes?: string | null;
   revisionReminderDays?: number | null;
   revisionReminderDate?: Date | null;
+  revisionReminderTime?: string | null;
 };
 
 export type StudySessionStatsRecord = {

@@ -169,36 +169,34 @@ export class AnalyticsService {
       },
     };
   }
+private resolveDateRange(range: AnalyticsRange): DateRange {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
 
-  private resolveDateRange(range: AnalyticsRange): DateRange {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+  switch (range) {
+    case 'today':
+      return { from: todayStr, to: todayStr };
 
-    switch (range) {
-      case 'today':
-        return { from: todayStr, to: todayStr };
-
-      case 'week': {
-        const from = new Date(today);
-        from.setDate(today.getDate() - 6);
-        return { from: from.toISOString().split('T')[0], to: todayStr };
-      }
-
-      case 'month': {
-        const from = new Date(today);
-        from.setDate(today.getDate() - 29);
-        return { from: from.toISOString().split('T')[0], to: todayStr };
-      }
-
-      case 'year': {
-        const from = new Date(today);
-        from.setFullYear(today.getFullYear() - 1);
-        from.setDate(from.getDate() + 1);
-        return { from: from.toISOString().split('T')[0], to: todayStr };
-      }
-
-      default:
-        return { from: todayStr, to: todayStr };
+    case 'week': {
+      const from = new Date(today);
+      from.setDate(today.getDate() - 6);
+      return { from: from.toISOString().split('T')[0], to: todayStr };
     }
+
+    case 'month': {
+      // First day of current calendar month
+      const from = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { from: from.toISOString().split('T')[0], to: todayStr };
+    }
+
+    case 'year': {
+      // First day of current calendar year
+      const from = new Date(today.getFullYear(), 0, 1);
+      return { from: from.toISOString().split('T')[0], to: todayStr };
+    }
+
+    default:
+      return { from: todayStr, to: todayStr };
   }
+}
 }

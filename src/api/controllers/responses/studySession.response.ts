@@ -42,6 +42,9 @@ export class StudySessionData {
   @IsOptional() @IsNumber() revisionReminderDays?: number | null;
   @IsOptional() @IsDate() revisionReminderDate?: Date | null;
   @IsOptional()
+  @IsString()
+  revisionReminderTime?: string | null;
+  @IsOptional()
   @ValidateNested()
   @Type(() => SessionLibraryData)
   library?: SessionLibraryData | null;
@@ -65,6 +68,7 @@ export class StudySessionData {
     this.library = library || null;
     this.createdAt = params.createdAt;
     this.updatedAt = params.updatedAt;
+    this.revisionReminderTime = params.revisionReminderTime ?? null;
   }
 }
 

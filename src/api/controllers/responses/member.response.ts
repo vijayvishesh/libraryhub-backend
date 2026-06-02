@@ -113,7 +113,11 @@ export class MemberData {
 
   @IsOptional()
   @IsString()
-  paymentStatus?: string;              
+  paymentStatus?: string;  
+  
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string | null;
 
   constructor(data?: {
     id: string;
@@ -144,7 +148,7 @@ export class MemberData {
     isDuplicate?: boolean;
     paymentMethod?: string | null;        
     paymentScreenshotUrl?: string | null; 
-    
+    avatarUrl?: string | null;
   }) {
     if (!data) {
       return;
@@ -179,6 +183,7 @@ export class MemberData {
     this.paymentMethod = data.paymentMethod ?? null;
     this.paymentScreenshotUrl = data.paymentScreenshotUrl ?? null;
     this.paymentStatus = data.status === 'active' ? 'confirmed' : 'pending';
+    this.avatarUrl = data.avatarUrl ?? null;
     
   }
 }
