@@ -64,7 +64,7 @@ export class AuthUserData {
 
   @IsOptional()
   @IsString()
-  avatarUrl?: string | null;  // ← added
+  avatarUrl?: string | null; 
 
   constructor(
     id: string,

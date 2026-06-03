@@ -8,6 +8,29 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+export class AppUpdateStatusData {
+  @IsBoolean() requiresUpdate!: boolean;
+  @IsBoolean() forceUpdate!:    boolean;
+  @IsString()  latestVersion!:  string;
+  @IsString()  currentVersion!: string;
+  @IsString()  message!:        string;
+
+  constructor(params?: {
+    requiresUpdate: boolean;
+    forceUpdate:    boolean;
+    latestVersion:  string;
+    currentVersion: string;
+    message:        string;
+  }) {
+    if (!params) return;
+    this.requiresUpdate = params.requiresUpdate;
+    this.forceUpdate    = params.forceUpdate;
+    this.latestVersion  = params.latestVersion;
+    this.currentVersion = params.currentVersion;
+    this.message        = params.message;
+  }
+}
+
 export class SeatMapSeatData {
   @IsString()
   id!: string;
@@ -427,7 +450,12 @@ export class BookingListPayloadData {
   @IsNumber()
   todayStudyTime!: number;
 
-  constructor(bookings?: BookingData[], page?: number, limit?: number, total?: number, todayStudyTime?: number) {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AppUpdateStatusData)
+  appUpdate?: AppUpdateStatusData | null;
+
+  constructor(bookings?: BookingData[], page?: number, limit?: number, total?: number, todayStudyTime?: number, appUpdate?: AppUpdateStatusData | null) {
     if (
       !bookings ||
       typeof page !== 'number' ||
@@ -442,6 +470,7 @@ export class BookingListPayloadData {
     this.limit = limit;
     this.total = total;
     this.todayStudyTime = todayStudyTime ?? 0;
+     this.appUpdate      = appUpdate ?? null;
   }
 }
 

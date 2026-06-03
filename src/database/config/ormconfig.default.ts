@@ -32,6 +32,8 @@ import { MemberRenewalModel } from '../../api/models/memberRenewal.model';
 import { SubscriptionPlanModel } from '../../api/models/subscriptionPlan.model';
 import { LibrarySubscriptionModel } from '../../api/models/librarySubscription.model';
 import { MemberLeaveRequestModel } from '../../api/models/memberLeaveRequest.model';
+import { DeviceAppVersionModel } from '../../api/models/deviceAppVersion.model';
+import { AppVersionModel } from '../../api/models/appVersion.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -98,7 +100,9 @@ const createDataSource = (): DataSource =>
       MemberRenewalModel,
       SubscriptionPlanModel,   
       LibrarySubscriptionModel,
-      MemberLeaveRequestModel
+      MemberLeaveRequestModel,
+      AppVersionModel,
+      DeviceAppVersionModel,
     ],
     synchronize: true,
     logging: false,

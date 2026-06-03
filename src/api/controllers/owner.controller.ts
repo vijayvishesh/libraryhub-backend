@@ -38,6 +38,7 @@ import {
 } from './requests/member.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
+  AppUpdateStatusData,
   OwnerFeeCollectionApiResponse,
   OwnerFeeCollectionItemData,
   OwnerFeeCollectionPayloadData,
@@ -73,7 +74,8 @@ import {
   OwnerDashboardSeatsData,
   OwnerDashboardSubscriptionData,
 } from './responses/owner.response';
-// import { UpdateLibraryLogoRequest, UpdateLibraryPhotosRequest } from './requests/upload.request';
+import { AppVersionService } from '../services/appVersion.service';
+import { AppOs } from '../models/appVersion.model';
 
 @Service()
 @JsonController('/owner')
@@ -84,6 +86,7 @@ export class OwnerController {
     private readonly memberService: MemberService,
     private readonly activityService: ActivityService,
     private readonly bookingApprovalService: BookingApprovalService,
+     private readonly appVersionService: AppVersionService,
   ) {}
 
   @Get('/fee-collection')
@@ -206,9 +209,27 @@ export class OwnerController {
   @ResponseSchema(ErrorResponseModel, { statusCode: 500 })
   public async getDashboard(
     @CurrentUser({ required: true }) session: CurrentSessionData,
+     @QueryParam('platform') platform?: string,     
+  @QueryParam('appVersion') appVersion?: string, 
+  @QueryParam('deviceId') deviceId?: string,     
   ): Promise<OwnerDashboardApiResponse> {
     try {
       const dashboard = await this.ownerService.getDashboard(session.user.id);
+      let appUpdate: AppUpdateStatusData | null = null;
+    if (platform && appVersion && deviceId) {
+      try {
+        const status = await this.appVersionService.checkUpdateStatus(
+          session.user.id,
+          'OWNER',
+          platform as AppOs,
+          appVersion,
+          deviceId,
+        );
+        appUpdate = new AppUpdateStatusData(status);
+      } catch {
+        // non-critical
+      }
+    }
       return new OwnerDashboardApiResponse(
         new OwnerDashboardData({
           library: new OwnerDashboardLibraryData(
@@ -246,6 +267,7 @@ export class OwnerController {
               }),
           ),
           subscription: new OwnerDashboardSubscriptionData(dashboard.subscription),
+          appUpdate,
         }),
         200,
       );

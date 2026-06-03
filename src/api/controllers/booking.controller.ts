@@ -10,6 +10,7 @@ import {
   Patch,
   // Patch,
   Post,
+  QueryParam,
   QueryParams,
 } from 'routing-controllers';
 import { OpenAPI, ResponseSchema } from 'routing-controllers-openapi';
@@ -18,6 +19,7 @@ import { BookingResult, BookingService } from '../services/booking.service';
 import { CreateBookingRequest, ListMyBookingsQueryRequest, RenewBookingRequest, UpdateBookingPaymentRequest } from './requests/booking.request';
 import { CurrentSessionData } from './responses/auth.response';
 import {
+  AppUpdateStatusData,
   BookingCreateApiResponse,
   BookingData,
   BookingDetailApiResponse,
@@ -25,12 +27,13 @@ import {
   BookingListPayloadData,
 } from './responses/booking.response';
 import { ErrorResponseModel } from './responses/common.reponse';
-// import { UpdateStudentAvatarRequest } from './requests/upload.request';
+import { AppVersionService } from '../services/appVersion.service';
+import { AppOs } from '../models/appVersion.model';
 
 @Service()
 @JsonController('/v1/bookings')
 export class BookingController {
-  constructor(private readonly bookingService: BookingService) {}
+  constructor(private readonly bookingService: BookingService, private readonly appVersionService: AppVersionService,) {}
 
   @Post('/')
   @Authorized('STUDENT')
@@ -67,9 +70,26 @@ export class BookingController {
   public async listMyBookings(
     @CurrentUser({ required: true }) session: CurrentSessionData,
     @QueryParams() query: ListMyBookingsQueryRequest,
+    @QueryParam('platform') platform?: string,
+    @QueryParam('appVersion') appVersion?: string,
+    @QueryParam('deviceId') deviceId?: string,
   ): Promise<BookingListApiResponse> {
     try {
       const result = await this.bookingService.listMyBookings(session.user.id, query);
+       let appUpdate: AppUpdateStatusData | null = null;
+      if (platform && appVersion && deviceId) {
+        try {
+          const status = await this.appVersionService.checkUpdateStatus(
+            session.user.id,
+            'STUDENT',
+            platform as AppOs,
+            appVersion,
+            deviceId,
+          );
+          appUpdate = new AppUpdateStatusData(status);
+        } catch {
+          // non-critical — don't fail the booking response
+        }}
       return new BookingListApiResponse(
         new BookingListPayloadData(
           result.bookings.map(item => this.mapBookingData(item)),
@@ -77,6 +97,7 @@ export class BookingController {
           result.limit,
           result.total,
           result.todayStudyTime,
+          appUpdate,  
         ),
         200,
       );

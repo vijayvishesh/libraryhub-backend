@@ -1,6 +1,27 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+export class AppUpdateStatusData {
+  @IsBoolean() requiresUpdate!: boolean;
+  @IsBoolean() forceUpdate!:    boolean;
+  @IsString()  latestVersion!:  string;
+  @IsString()  currentVersion!: string;
+  @IsString()  message!:        string;
 
+  constructor(params?: {
+    requiresUpdate: boolean;
+    forceUpdate:    boolean;
+    latestVersion:  string;
+    currentVersion: string;
+    message:        string;
+  }) {
+    if (!params) return;
+    this.requiresUpdate = params.requiresUpdate;
+    this.forceUpdate    = params.forceUpdate;
+    this.latestVersion  = params.latestVersion;
+    this.currentVersion = params.currentVersion;
+    this.message        = params.message;
+  }
+}
 export class OwnerDashboardLibraryData {
   @IsString()
   name!: string;
@@ -237,6 +258,11 @@ export class OwnerDashboardData {
   @Type(() => OwnerDashboardSubscriptionData)
   subscription!: OwnerDashboardSubscriptionData;
 
+    @IsOptional()
+  @ValidateNested()
+  @Type(() => AppUpdateStatusData)
+  appUpdate?: AppUpdateStatusData | null; 
+
   constructor(params?: {
     // libraryId: string;
     library: OwnerDashboardLibraryData;
@@ -245,6 +271,7 @@ export class OwnerDashboardData {
     alerts: OwnerDashboardAlertsData;
     recentActivity: OwnerDashboardRecentActivityData[];
      subscription:   OwnerDashboardSubscriptionData;
+     appUpdate?:     AppUpdateStatusData | null; 
   }) {
     if (!params) {
       return;
@@ -256,6 +283,7 @@ export class OwnerDashboardData {
     this.alerts = params.alerts;
     this.recentActivity = params.recentActivity;
     this.subscription   = params.subscription; 
+     this.appUpdate      = params.appUpdate ?? null;
   }
 }
 
