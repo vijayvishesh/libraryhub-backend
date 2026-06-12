@@ -253,6 +253,7 @@ export class OwnerController {
             dashboard.alerts.overdue,
             dashboard.alerts.expiringSoon,
           ),
+          isWebViewApiNeedToCall: dashboard.isWebViewApiNeedToCall,
           recentActivity: dashboard.recentActivity.map(
             item =>
               new OwnerDashboardRecentActivityData({

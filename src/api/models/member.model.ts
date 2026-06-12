@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { Column, Entity, Index, ObjectIdColumn } from 'typeorm';
+import { BookingPaymentStatus } from './booking.model';  // ← import
 
 @Entity('members')
 @Index('idx_members_library_mobile_unique', ['libraryId', 'mobileNo'], { unique: true })
@@ -72,11 +73,20 @@ export class MemberModel {
   isNewUser?: boolean;
 
   @Column()
-  paymentMethod?: string | null;     
+  paymentMethod?: string | null;
 
   @Column()
-  paymentScreenshotUrl?: string | null; 
+  paymentScreenshotUrl?: string | null;
 
   @Column()
   avatarUrl?: string | null;
+
+  @Column()
+  paymentStatus?: BookingPaymentStatus | null;   
+
+  @Column()
+  paymentReminderSentAt?: Date | null;     
+  
+  @Column()
+reason?: string | null; 
 }

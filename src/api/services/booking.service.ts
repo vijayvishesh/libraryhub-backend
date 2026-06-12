@@ -34,6 +34,8 @@ import { sendOwnerBookingRequestPush, sendOwnerRenewalRequestPush } from '../../
 import { LibraryPaymentMethod } from '../constants/library.constants';
 import { MemberRenewalRepository } from '../repositories/memberRenewal.repository';
 import { LibraryPaymentMethodRepository } from '../repositories/libraryPaymentMethod.repository';
+import { BookingPaymentStatus } from '../models/booking.model';
+import { WebViewService } from './webView.service';
 
 export type { BookingResult, ListMyBookingsResult, PaymentMethodOption, SeatMapResult };
 
@@ -49,6 +51,7 @@ export class BookingService {
     private readonly studySessionRepository: StudySessionRepository,
     private readonly memberRenewalRepository: MemberRenewalRepository,
     private readonly libraryPaymentMethodRepository: LibraryPaymentMethodRepository,
+    private readonly webViewService: WebViewService,
   ) {}
 
   public async getLibrarySeatMap(
@@ -102,7 +105,6 @@ export class BookingService {
         throw new HttpError(409, 'LIBRARY_NOT_AVAILABLE');
       }
 
-      // Prevent duplicate active booking by same student in same library
       const existingBooking = await this.bookingRepository.findActiveStudentBookingInLibrary(
         student.id,
         library.id,
@@ -149,8 +151,6 @@ export class BookingService {
         throw new HttpError(409, 'SEAT_TAKEN');
       }
 
-      // Retire any expired-but-still-active bookings for this seat before
-      // inserting, so the partial unique index doesn't block re-booking.
       await this.bookingRepository.expireOldSeatBookings(
         library.id,
         selectedSeat.id,
@@ -158,6 +158,15 @@ export class BookingService {
       );
 
       const validUntil = this.addDaysIsoDate(startDate, (payload.duration || 1) * 30);
+
+      // Determine initial paymentStatus based on paymentMethod
+      const initialPaymentStatus: BookingPaymentStatus =
+        payload.paymentMethod === 'razorpay' && payload.razorpayPaymentId
+          ? 'paid'
+          : payload.paymentMethod === 'cash'
+          ? 'cash_pending'
+          : 'not_initiated'; // qr_code / upi — screenshot not uploaded yet
+
       const bookingToCreate: CreateBookingInput = {
         libraryId: library.id,
         studentId: student.id,
@@ -178,6 +187,7 @@ export class BookingService {
           payload.paymentMethod === 'razorpay' && payload.razorpayPaymentId
             ? 'confirmed'
             : 'pending_approval',
+        paymentStatus: initialPaymentStatus,
         checkedInAt: null,
         checkedOutAt: null,
         invoiceNo: this.buildInvoiceNo(),
@@ -189,6 +199,7 @@ export class BookingService {
 
       const booking = await this.bookingRepository.createBooking(bookingToCreate);
       await this.authRepository.updateStudentHasJoinedLibrary(student.id, true);
+
       try {
         await this.onBookingCreated(
           booking.id,
@@ -199,13 +210,13 @@ export class BookingService {
           payload,
           startDate,
           validUntil,
+          initialPaymentStatus,
         );
       } catch (sideEffectErr: any) {
-        // Side effect failure — booking was created successfully, don't rollback
         console.warn('[BookingService] Post-booking side-effect failed:', sideEffectErr?.message);
       }
 
-      return this.mapBookingResult(booking, library); //  pass library here
+      return this.mapBookingResult(booking, library);
     } catch (error) {
       this.rethrowBookingError(error, 'CREATE_BOOKING_FAILED');
     }
@@ -220,8 +231,15 @@ export class BookingService {
     payload: CreateBookingRequest,
     startDate: string,
     validUntil: string,
+    paymentStatus: BookingPaymentStatus,
   ): Promise<void> {
     try {
+
+       const pendingReason =
+      payload.paymentMethod === 'cash'     ? 'cash_payment_pending' :
+      payload.paymentScreenshotUrl         ? 'screenshot_uploaded'  :
+      payload.paymentMethod === 'upi' || payload.paymentMethod === 'qr_code' ? 'upi_payment_pending'  :
+                                             'waiting_approval';
       await this.syncMemberForBooking(
         student,
         library.id,
@@ -233,8 +251,10 @@ export class BookingService {
         'pending',
         bookingId,
         payload.duration || 1,
-        payload.paymentMethod ?? null,       
-        payload.paymentScreenshotUrl ?? null, 
+        payload.paymentMethod ?? null,
+        payload.paymentScreenshotUrl ?? null,
+        paymentStatus,
+        pendingReason
       );
     } catch (syncError) {
       console.warn('[BookingService] Failed to sync member for booking:', {
@@ -246,26 +266,27 @@ export class BookingService {
     }
 
     try {
-    await sendOwnerBookingRequestPush(library.ownerId, student.name, library.name,  bookingId);
-  } catch {
-  }
+      await sendOwnerBookingRequestPush(library.ownerId, student.name, library.name, bookingId);
+    } catch {
+    }
   }
 
-private async syncMemberForBooking(
-  student: { id: string; name: string; phone: string },
-  libraryId: string,
-  seatId: string,
-  slotId: string,
-  planAmount: number,
-  startDate: string,
-  endDate: string,
-  memberStatus: 'active' | 'pending' | 'expired' = 'active',
-  bookingId: string | null = null,
-  duration = 1,
-  paymentMethod?:       string | null,       
-  paymentScreenshotUrl?: string | null, 
-): Promise<void> {
-    // Find existing member FIRST before counting records
+  private async syncMemberForBooking(
+    student: { id: string; name: string; phone: string },
+    libraryId: string,
+    seatId: string,
+    slotId: string,
+    planAmount: number,
+    startDate: string,
+    endDate: string,
+    memberStatus: 'active' | 'pending' | 'expired' = 'active',
+    bookingId: string | null = null,
+    duration = 1,
+    paymentMethod?: string | null,
+    paymentScreenshotUrl?: string | null,
+    paymentStatus?: BookingPaymentStatus | null,
+    reason?: string | null, 
+  ): Promise<void> {
     let existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
       student.id,
       libraryId,
@@ -276,11 +297,6 @@ private async syncMemberForBooking(
         student.phone,
       );
     }
-
-    // isNewUser = true only if no member records exist anywhere else
-    // const allMemberRecords = await this.memberRepository.findAllMembersByPhone(student.phone);
-    // const otherLibraryRecords = allMemberRecords.filter(m => m.libraryId !== libraryId);
-    // const isNewUser = !existingMember && otherLibraryRecords.length === 0;
 
     if (!existingMember) {
       await this.memberRepository.createMember({
@@ -302,8 +318,9 @@ private async syncMemberForBooking(
         notes: null,
         isNewUser: false,
         isInviteSubmission: false,
-        paymentMethod:        paymentMethod ?? null,
+        paymentMethod: paymentMethod ?? null,
         paymentScreenshotUrl: paymentScreenshotUrl ?? null,
+        paymentStatus: paymentStatus ?? null,
       });
     } else {
       await this.memberRepository.updateMemberByIdAndLibrary(existingMember.id, libraryId, {
@@ -316,9 +333,10 @@ private async syncMemberForBooking(
         startDate,
         endDate,
         updatedAt: new Date(),
-        paymentMethod:        paymentMethod ?? null,
+        paymentMethod: paymentMethod ?? null,
         paymentScreenshotUrl: paymentScreenshotUrl ?? null,
-        // isNewUser intentionally NOT here — preserve original value
+        paymentStatus: paymentStatus ?? null,
+        reason: reason ?? null,
       });
     }
   }
@@ -337,14 +355,12 @@ private async syncMemberForBooking(
         limit,
       });
 
-      // Batch-fetch all libraries to avoid N+1 queries
       const libraryIds = [
         ...new Set(result.bookings.map((b: any) => b.libraryId?.toString()).filter(Boolean)),
       ];
       const libraries = await this.libraryRepository.findManyByIds(libraryIds);
       const libraryMap = new Map(libraries.map((l: any) => [l.id?.toString(), l]));
 
-      // Fetch today's study minutes (from sessions) and attendance data in parallel
       const today = new Date().toISOString().slice(0, 10);
       const confirmedLibraryIds = [
         ...new Set(
@@ -380,71 +396,68 @@ private async syncMemberForBooking(
           const attendanceFields = records.length > 0 ? this.computeAttendanceFields(records) : {};
           return { ...base, todayStudyTime, ...attendanceFields };
         }
-        // ✅ Always return todayStudyTime regardless of booking status
         return { ...base, todayStudyTime };
       });
-
+      const isWebViewApiNeedToCall = await this.webViewService.getWebViewApiConfig();
       return {
         bookings,
         page,
         limit,
         total: result.total,
         todayStudyTime,
+        isWebViewApiNeedToCall,
       };
     } catch (error) {
       this.rethrowBookingError(error, 'GET_MY_BOOKINGS_FAILED');
     }
   }
 
- public async getMyBookingById(studentId: string, bookingId: string): Promise<BookingResult> {
-  try {
-    const booking = await this.bookingRepository.findStudentBookingById(
-      studentId.trim(),
-      bookingId.trim(),
-    );
-    if (!booking) {
-      throw new NotFoundError('BOOKING_NOT_FOUND');
-    }
-
-    const library = await this.libraryRepository.findLibraryById(booking.libraryId);
-    const base    = this.mapBookingResult(booking, library);
-
-    // Always fetch todayStudyTime — not dependent on library or booking status
-    const todayStudyTime = await this.studySessionRepository
-      .sumTodayDurationMinutes(studentId.trim());
-
-    if (booking.status === 'confirmed') {
-      const today = new Date().toISOString().slice(0, 10);
-      const records = await this.attendanceRepository.findAllByStudentAndDate(
+  public async getMyBookingById(studentId: string, bookingId: string): Promise<BookingResult> {
+    try {
+      const booking = await this.bookingRepository.findStudentBookingById(
         studentId.trim(),
-        booking.libraryId,
-        today,
+        bookingId.trim(),
+      );
+      if (!booking) {
+        throw new NotFoundError('BOOKING_NOT_FOUND');
+      }
+
+      const library = await this.libraryRepository.findLibraryById(booking.libraryId);
+      const base = this.mapBookingResult(booking, library);
+
+      const todayStudyTime = await this.studySessionRepository.sumTodayDurationMinutes(
+        studentId.trim(),
       );
 
-      const attendanceFields = records.length > 0
-        ? this.computeAttendanceFields(records)
-        : {};
+      if (booking.status === 'confirmed') {
+        const today = new Date().toISOString().slice(0, 10);
+        const records = await this.attendanceRepository.findAllByStudentAndDate(
+          studentId.trim(),
+          booking.libraryId,
+          today,
+        );
 
-      const latestRecord    = records[records.length - 1];
-      const todayAttendance = latestRecord
-        ? {
-            checkInTime:  new Date(latestRecord.checkInTime).toISOString(),
-            checkOutTime: latestRecord.checkOutTime
-              ? new Date(latestRecord.checkOutTime).toISOString()
-              : null,
-            status: latestRecord.status,
-          }
-        : undefined;
+        const attendanceFields = records.length > 0 ? this.computeAttendanceFields(records) : {};
 
-      return { ...base, todayStudyTime, todayAttendance, ...attendanceFields };
+        const latestRecord = records[records.length - 1];
+        const todayAttendance = latestRecord
+          ? {
+              checkInTime: new Date(latestRecord.checkInTime).toISOString(),
+              checkOutTime: latestRecord.checkOutTime
+                ? new Date(latestRecord.checkOutTime).toISOString()
+                : null,
+              status: latestRecord.status,
+            }
+          : undefined;
+
+        return { ...base, todayStudyTime, todayAttendance, ...attendanceFields };
+      }
+
+      return { ...base, todayStudyTime };
+    } catch (error) {
+      this.rethrowBookingError(error, 'GET_MY_BOOKING_FAILED');
     }
-
-    return { ...base, todayStudyTime };
-
-  } catch (error) {
-    this.rethrowBookingError(error, 'GET_MY_BOOKING_FAILED');
   }
-}
 
   private resolveSeatSelection(
     seatMap: SeatMapItem[],
@@ -532,7 +545,6 @@ private async syncMemberForBooking(
       this.memberRepository.findActiveMemberSeatStatus(library.id, slotType, sectionId),
     ]);
 
-    // Merge: booking status takes priority, then member status
     const seatStatusMap = new Map<string, SeatStatus>(bookingSeatStatus);
     for (const [seatId, status] of memberSeatStatus) {
       if (!seatStatusMap.has(seatId)) {
@@ -547,7 +559,6 @@ private async syncMemberForBooking(
         return this.buildSeatMapFromInventory(seatInventory, seatStatusMap);
       }
     } catch {
-      // fallback to computed seat map when inventory is not ready
     }
 
     return buildSeatMap(library.seating, library.totalSeats, seatStatusMap, sectionId);
@@ -561,17 +572,6 @@ private async syncMemberForBooking(
 
     return slot;
   }
-
-  // private resolveLibraryPaymentMethods(library: LibraryRecord): PaymentMethodOption[] {
-  //   if (library.paymentMethods && library.paymentMethods.length > 0) {
-  //     return library.paymentMethods;
-  //   }
-
-  //   return [
-  //     { type: 'upi', enabled: true, label: 'UPI' },
-  //     { type: 'cash', enabled: true, label: 'Cash' },
-  //   ];
-  // }
 
   private async getLibraryOrThrow(libraryId: string): Promise<LibraryRecord> {
     const library = await this.libraryRepository.findLibraryById(libraryId.trim());
@@ -602,6 +602,7 @@ private async syncMemberForBooking(
       libraryAddress: string;
       duration: number;
       paymentScreenshotUrl?: string | null;
+      studentId?: string | null;  
     },
     library?: LibraryRecord | null,
   ): BookingResult {
@@ -627,8 +628,10 @@ private async syncMemberForBooking(
       libraryLatitude: library?.location?.coordinates?.[1] ?? null,
       libraryLongitude: library?.location?.coordinates?.[0] ?? null,
       duration: booking.duration,
-      studentId: null,
+      studentId: booking.studentId ?? null,
       paymentScreenshotUrl: booking.paymentScreenshotUrl ?? null,
+      paymentStatus: (booking as any).paymentStatus ?? null,
+      paymentReminderSentAt: (booking as any).paymentReminderSentAt ?? null,
     };
   }
 
@@ -693,289 +696,269 @@ private async syncMemberForBooking(
     throw new InternalServerError(defaultMessage);
   }
 
-public async renewMembership(
-  sessionUserId: string,
-  payload: RenewBookingRequest,
-): Promise<BookingResult> {
-  try {
-    const isOwnerRenewing = payload.renewedBy === 'owner';
-    let studentId: string;
+  public async renewMembership(
+    sessionUserId: string,
+    payload: RenewBookingRequest,
+  ): Promise<BookingResult> {
+    try {
+      const isOwnerRenewing = payload.renewedBy === 'owner';
+      let studentId: string;
 
-    if (isOwnerRenewing) {
-      if (!payload.memberId) {
-        throw new HttpError(400, 'MEMBER_ID_REQUIRED_FOR_OWNER_RENEWAL');
+      if (isOwnerRenewing) {
+        if (!payload.memberId) {
+          throw new HttpError(400, 'MEMBER_ID_REQUIRED_FOR_OWNER_RENEWAL');
+        }
+
+        const member = await this.memberRepository.findMemberByIdAndLibrary(
+          payload.memberId,
+          payload.libraryId,
+        );
+        if (!member) {
+          throw new HttpError(404, 'MEMBER_NOT_FOUND');
+        }
+
+        if (!member.studentId) {
+          throw new HttpError(400, 'MEMBER_HAS_NO_LINKED_STUDENT');
+        }
+
+        studentId = member.studentId;
+      } else {
+        studentId = sessionUserId;
       }
 
-      const member = await this.memberRepository.findMemberByIdAndLibrary(
-        payload.memberId,
+      const student = await this.authRepository.findStudentById(studentId);
+      if (!student) throw new NotFoundError('STUDENT_NOT_FOUND');
+
+      const library = await this.getLibraryOrThrow(payload.libraryId);
+
+      const existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
+        studentId,
         payload.libraryId,
       );
-      if (!member) {
-        throw new HttpError(404, 'MEMBER_NOT_FOUND');
-      }
+      if (!existingMember) throw new HttpError(404, 'MEMBER_NOT_FOUND');
 
-      if (!member.studentId) {
-        throw new HttpError(400, 'MEMBER_HAS_NO_LINKED_STUDENT');
-      }
-
-      studentId = member.studentId;
-    } else {
-      studentId = sessionUserId;
-    }
-
-    // 1. Validate student
-    const student = await this.authRepository.findStudentById(studentId);
-    if (!student) throw new NotFoundError('STUDENT_NOT_FOUND');
-
-    // 2. Validate library
-    const library = await this.getLibraryOrThrow(payload.libraryId);
-
-    // 3. Find existing member record (must exist for renewal)
-    const existingMember = await this.memberRepository.findMemberByStudentIdAndLibrary(
-      studentId,
-      payload.libraryId,
-    );
-    if (!existingMember) throw new HttpError(404, 'MEMBER_NOT_FOUND');
-
-    // 4. Find current/last booking for history tracking
-    const currentBooking = await this.bookingRepository.findLatestBookingByStudentAndLibrary(
-      studentId,
-      payload.libraryId,
-    );
-
-    // 5. Resolve slot
-    const slot = this.getLibrarySlotOrThrow(library, payload.slotId);
-
-    // 6. Resolve seat — keep old seat if student doesn't change it
-    const resolvedSeatId = payload.seatId ?? existingMember.seatId;
-    const resolvedSectionId = this.resolveSectionIdForLibrary(library, payload.sectionId);
-
-    // 7. Build seat map and validate seat availability
-    const seatMap = await this.resolveSeatMapWithFallback(
-      library,
-      slot.slotType,
-      resolvedSectionId || undefined,
-    );
-    if (seatMap.length === 0) {
-      throw new HttpError(409, 'NO_SEAT_AVAILABLE');
-    }
-
-    // 8. Resolve seat selection
-    const selectedSeat = this.resolveSeatSelection(
-      seatMap,
-      resolvedSeatId || undefined,
-      payload.autoAllocate ?? false,
-      student.gender,
-    );
-
-    // 9. Check seat conflict — allow same student to renew same seat
-    const conflictingBooking = await this.bookingRepository.findActiveSeatBooking(
-      library.id,
-      slot.slotType,
-      selectedSeat.id,
-    );
-    if (conflictingBooking && conflictingBooking.studentId !== studentId) {
-      throw new HttpError(409, 'SEAT_TAKEN');
-    }
-
-    // 10. Calculate dates
-    const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
-    this.assertValidIsoDate(startDate);
-    const duration  = payload.duration || 1;
-    const validUntil = this.addDaysIsoDate(startDate, duration * 30);
-    const planAmount = slot.pricePerMonth * duration;
-
-    // 11. Determine statuses based on who is renewing
-    //     Owner → immediately active + confirmed
-    //     Student → pending until owner approves
-    const newBookingStatus = isOwnerRenewing ? 'confirmed' : 'pending_approval';
-    const newMemberStatus  = isOwnerRenewing ? 'active'    : 'pending';
-
-    // 12. Update member status immediately
-    await this.memberRepository.updateMemberByIdAndLibrary(
-      existingMember.id,
-      payload.libraryId,
-      {
-        status:               newMemberStatus,
-        seatId:               selectedSeat.id,
-        slotId:               slot.slotType,
-        startDate,
-        endDate:              validUntil,
-        duration,
-        planAmount,
-        paymentMethod:        payload.paymentMethod ?? null,
-        paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
-        updatedAt:            new Date(),
-      },
-    );
-
-    // ✅ 13. Mark OLD booking as expired — NEW
-    if (currentBooking?.id) {
-      await this.bookingRepository.updateBookingStatus(
-        currentBooking.id,
-        'expired',  // not checked_out — that's for attendance only
+      const currentBooking = await this.bookingRepository.findLatestBookingByStudentAndLibrary(
+        studentId,
+        payload.libraryId,
       );
-    }
 
-    // 14. Expire old seat bookings (partial unique index cleanup)
-    await this.bookingRepository.expireOldSeatBookings(
-      library.id,
-      selectedSeat.id,
-      slot.slotType,
-    );
+      const slot = this.getLibrarySlotOrThrow(library, payload.slotId);
+      const resolvedSeatId = payload.seatId ?? existingMember.seatId;
+      const resolvedSectionId = this.resolveSectionIdForLibrary(library, payload.sectionId);
 
-    // 15. Create new booking record
-    const newBooking = await this.bookingRepository.createBooking({
-      libraryId:     library.id,
-      studentId:     student.id,
-      libraryName:   library.name,
-      libraryAddress:`${library.address}, ${library.city}`,
-      slotType:      slot.slotType,
-      slotName:      slot.name,
-      slotStartTime: slot.startTime,
-      slotEndTime:   slot.endTime,
-      seatId:        selectedSeat.id,
-      sectionId:     selectedSeat.sectionId,
-      paymentMethod: payload.paymentMethod as LibraryPaymentMethod,
-      amount:        planAmount,
-      duration,
-      startDate,
-      validUntil,
-      status:        newBookingStatus,
-      checkedInAt:   null,
-      checkedOutAt:  null,
-      invoiceNo:     this.buildInvoiceNo(),
-      paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
-    });
+      const seatMap = await this.resolveSeatMapWithFallback(
+        library,
+        slot.slotType,
+        resolvedSectionId || undefined,
+      );
+      if (seatMap.length === 0) {
+        throw new HttpError(409, 'NO_SEAT_AVAILABLE');
+      }
 
-    console.log('[renewMembership] new booking created:', {
-      bookingId: newBooking.id,
-      studentId: student.id,
-      paymentMethod: payload.paymentMethod,
-      paymentScreenshotUrl: payload.paymentScreenshotUrl,
-      savedScreenshotUrl: newBooking.paymentScreenshotUrl,
-    });
+      const selectedSeat = this.resolveSeatSelection(
+        seatMap,
+        resolvedSeatId || undefined,
+        payload.autoAllocate ?? false,
+        student.gender,
+      );
 
-    // ✅ 16. Update member with new bookingId + payment info — UPDATED
-    await this.memberRepository.updateMemberByIdAndLibrary(
-      existingMember.id,
-      payload.libraryId,
-      {
-        bookingId:            newBooking.id,
-        paymentMethod:        payload.paymentMethod ?? null,
-        paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
-        updatedAt:            new Date(),
-      },
-    );
-    console.log('[renewMembership] member record updated:', {
-      memberId: existingMember.id,
-      paymentMethod: payload.paymentMethod ?? null,
-      paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
-    });
-    // 17. Save renewal history record
-    await this.memberRenewalRepository.createRenewal({
-      memberId:          existingMember.id,
-      studentId:         student.id,
-      libraryId:         library.id,
-      previousBookingId: currentBooking?.id     || null,
-      previousSeatId:    existingMember.seatId,
-      previousSlotId:    existingMember.slotId,
-      previousEndDate:   existingMember.endDate,
-      newBookingId:      newBooking.id,
-      newSeatId:         selectedSeat.id,
-      newSlotId:         slot.slotType,
-      newSlotName:       slot.name,
-      newStartDate:      startDate,
-      newEndDate:        validUntil,
-      duration,
-      planAmount,
-      paymentMethod:     payload.paymentMethod,
-      renewedBy:         payload.renewedBy,
-      status:            isOwnerRenewing ? 'approved' : 'pending',
-    });
+      const conflictingBooking = await this.bookingRepository.findActiveSeatBooking(
+        library.id,
+        slot.slotType,
+        selectedSeat.id,
+      );
+      if (conflictingBooking && conflictingBooking.studentId !== studentId) {
+        throw new HttpError(409, 'SEAT_TAKEN');
+      }
 
-    try {
-    await sendOwnerRenewalRequestPush(
-      library.ownerId,
-      student.name,
-      library.name,
-      existingMember.id,
-      payload.paymentMethod,
-      payload.paymentScreenshotUrl ?? null,
-    );
-  } catch (err: any) {
-    console.log('Push notification failed:', err.message);
-  }
-    return this.mapBookingResult(newBooking, library);
-  } catch (error) {
-    this.rethrowBookingError(error, 'RENEW_MEMBERSHIP_FAILED');
-  }
-}
+      const startDate = payload.startDate || new Date().toISOString().slice(0, 10);
+      this.assertValidIsoDate(startDate);
+      const duration = payload.duration || 1;
+      const validUntil = this.addDaysIsoDate(startDate, duration * 30);
+      const planAmount = slot.pricePerMonth * duration;
 
-public async updateBookingPayment(
-  studentId: string,
-  bookingId: string,
-  paymentMethod: string,
-  paymentScreenshotUrl?: string | null,
-): Promise<BookingResult> {
-  try {
-    const updated = await this.bookingRepository.updatePaymentInfo(
-      bookingId,
-      studentId,
-      paymentMethod,
-      paymentScreenshotUrl,
-    );
+      const newBookingStatus = isOwnerRenewing ? 'confirmed' : 'pending_approval';
+      const newMemberStatus = isOwnerRenewing ? 'active' : 'pending';
 
-    if (!updated) {
-      throw new HttpError(404, 'BOOKING_NOT_FOUND_OR_NOT_UPDATABLE');
-    }
+      // Determine paymentStatus for renewal
+      const renewalPaymentStatus: BookingPaymentStatus = isOwnerRenewing
+        ? 'paid'
+        : payload.paymentMethod === 'cash'
+        ? 'cash_pending'
+        : 'not_initiated';
 
-    // Sync paymentMethod + screenshotUrl to member table
-    const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
-      studentId,
-      updated.libraryId,
-    );
-    if (member) {
       await this.memberRepository.updateMemberByIdAndLibrary(
-        member.id,
-        updated.libraryId,
+        existingMember.id,
+        payload.libraryId,
         {
-          paymentMethod:        paymentMethod ?? null,
-          paymentScreenshotUrl: paymentScreenshotUrl ?? null,
-          updatedAt:            new Date(),
+          status: newMemberStatus,
+          seatId: selectedSeat.id,
+          slotId: slot.slotType,
+          startDate,
+          endDate: validUntil,
+          duration,
+          planAmount,
+          paymentMethod: payload.paymentMethod ?? null,
+          paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
+          paymentStatus: renewalPaymentStatus,
+          updatedAt: new Date(),
         },
       );
+
+      if (currentBooking?.id) {
+        await this.bookingRepository.updateBookingStatus(currentBooking.id, 'expired');
+      }
+
+      await this.bookingRepository.expireOldSeatBookings(
+        library.id,
+        selectedSeat.id,
+        slot.slotType,
+      );
+
+      const newBooking = await this.bookingRepository.createBooking({
+        libraryId: library.id,
+        studentId: student.id,
+        libraryName: library.name,
+        libraryAddress: `${library.address}, ${library.city}`,
+        slotType: slot.slotType,
+        slotName: slot.name,
+        slotStartTime: slot.startTime,
+        slotEndTime: slot.endTime,
+        seatId: selectedSeat.id,
+        sectionId: selectedSeat.sectionId,
+        paymentMethod: payload.paymentMethod as LibraryPaymentMethod,
+        amount: planAmount,
+        duration,
+        startDate,
+        validUntil,
+        status: newBookingStatus,
+        paymentStatus: renewalPaymentStatus,
+        checkedInAt: null,
+        checkedOutAt: null,
+        invoiceNo: this.buildInvoiceNo(),
+        paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
+      });
+
+      await this.memberRepository.updateMemberByIdAndLibrary(existingMember.id, payload.libraryId, {
+        bookingId: newBooking.id,
+        paymentMethod: payload.paymentMethod ?? null,
+        paymentScreenshotUrl: payload.paymentScreenshotUrl ?? null,
+        paymentStatus: renewalPaymentStatus,
+        updatedAt: new Date(),
+      });
+
+      await this.memberRenewalRepository.createRenewal({
+        memberId: existingMember.id,
+        studentId: student.id,
+        libraryId: library.id,
+        previousBookingId: currentBooking?.id || null,
+        previousSeatId: existingMember.seatId,
+        previousSlotId: existingMember.slotId,
+        previousEndDate: existingMember.endDate,
+        newBookingId: newBooking.id,
+        newSeatId: selectedSeat.id,
+        newSlotId: slot.slotType,
+        newSlotName: slot.name,
+        newStartDate: startDate,
+        newEndDate: validUntil,
+        duration,
+        planAmount,
+        paymentMethod: payload.paymentMethod,
+        renewedBy: payload.renewedBy,
+        status: isOwnerRenewing ? 'approved' : 'pending',
+      });
+
+      try {
+        await sendOwnerRenewalRequestPush(
+          library.ownerId,
+          student.name,
+          library.name,
+          existingMember.id,
+          payload.paymentMethod,
+          payload.paymentScreenshotUrl ?? null,
+        );
+      } catch (err: any) {
+        console.log('Push notification failed:', err.message);
+      }
+
+      return this.mapBookingResult(newBooking, library);
+    } catch (error) {
+      this.rethrowBookingError(error, 'RENEW_MEMBERSHIP_FAILED');
+    }
+  }
+
+  public async updateBookingPayment(
+    studentId: string,
+    bookingId: string,
+    paymentMethod: string,
+    paymentScreenshotUrl?: string | null,
+  ): Promise<BookingResult> {
+    try {
+      const updated = await this.bookingRepository.updatePaymentInfo(
+        bookingId,
+        studentId,
+        paymentMethod,
+        paymentScreenshotUrl,
+      );
+
+      if (!updated) {
+        throw new HttpError(404, 'BOOKING_NOT_FOUND_OR_NOT_UPDATABLE');
+      }
+
+      // Determine new paymentStatus
+      const newPaymentStatus: BookingPaymentStatus = paymentScreenshotUrl
+        ? 'screenshot_uploaded'
+        : paymentMethod === 'cash'
+        ? 'cash_pending'
+        : 'not_initiated';
+
+      // Update paymentStatus on booking
+      await this.bookingRepository.updateBookingFields(bookingId, {
+        paymentStatus: newPaymentStatus,
+        updatedAt: new Date(),
+      });
+
+      // Sync to member
+      const member = await this.memberRepository.findMemberByStudentIdAndLibrary(
+        studentId,
+        updated.libraryId,
+      );
+      if (member) {
+        await this.memberRepository.updateMemberByIdAndLibrary(member.id, updated.libraryId, {
+          paymentMethod: paymentMethod ?? null,
+          paymentScreenshotUrl: paymentScreenshotUrl ?? null,
+          paymentStatus: newPaymentStatus,
+          updatedAt: new Date(),
+        });
+      }
+
+      const library = await this.libraryRepository.findLibraryById(updated.libraryId);
+      return this.mapBookingResult(updated, library);
+    } catch (error) {
+      this.rethrowBookingError(error, 'UPDATE_BOOKING_PAYMENT_FAILED');
+    }
+  }
+
+  private async resolveLibraryPaymentMethodsWithNewTable(
+    library: LibraryRecord,
+  ): Promise<PaymentMethodOption[]> {
+    const pmRecord = await this.libraryPaymentMethodRepository.findByLibraryId(library.id);
+
+    if (pmRecord && pmRecord.methods.length > 0) {
+      return pmRecord.methods.map(m => ({
+        type: m.type,
+        enabled: m.enabled,
+        label: m.label,
+      }));
     }
 
-    const library = await this.libraryRepository.findLibraryById(updated.libraryId);
-    return this.mapBookingResult(updated, library);
-  } catch (error) {
-    this.rethrowBookingError(error, 'UPDATE_BOOKING_PAYMENT_FAILED');
-  }
-}
-private async resolveLibraryPaymentMethodsWithNewTable(
-  library: LibraryRecord,
-): Promise<PaymentMethodOption[]> {
-  // 1. Try the dedicated library_payment_methods table first
-  const pmRecord = await this.libraryPaymentMethodRepository.findByLibraryId(library.id);
+    if (library.paymentMethods && library.paymentMethods.length > 0) {
+      return library.paymentMethods;
+    }
 
-  if (pmRecord && pmRecord.methods.length > 0) {
-    return pmRecord.methods.map(m => ({
-      type: m.type,
-      enabled: m.enabled,
-      label: m.label,
-    }));
+    return [
+      { type: 'upi', enabled: true, label: 'UPI' },
+      { type: 'cash', enabled: true, label: 'Cash' },
+    ];
   }
-
-  // 2. Fallback to embedded paymentMethods in libraries table
-  if (library.paymentMethods && library.paymentMethods.length > 0) {
-    return library.paymentMethods;
-  }
-
-  // 3. Default
-  return [
-    { type: 'upi', enabled: true, label: 'UPI' },
-    { type: 'cash', enabled: true, label: 'Cash' },
-  ];
-}
 }

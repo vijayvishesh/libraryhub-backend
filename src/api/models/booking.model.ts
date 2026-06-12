@@ -13,6 +13,14 @@ export type BookingStatus =
   | 'rejected'
   | 'expired';
 
+export type BookingPaymentStatus =
+  | 'not_initiated'
+  | 'cash_pending'
+  | 'screenshot_uploaded'
+  | 'reminder_sent'
+  | 'paid'
+  | 'failed';
+
 @Entity('bookings')
 @Index('idx_bookings_student_created_at', ['studentId', 'createdAt'])
 @Index('idx_bookings_library_slot_seat', ['libraryId', 'slotType', 'seatId'])
@@ -69,6 +77,12 @@ export class BookingModel {
 
   @Column()
   status!: BookingStatus;
+
+  @Column()
+  paymentStatus?: BookingPaymentStatus | null; 
+
+  @Column()
+  paymentReminderSentAt?: Date | null;          
 
   @Column()
   checkedInAt!: Date | null;

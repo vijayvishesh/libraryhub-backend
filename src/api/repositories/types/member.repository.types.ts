@@ -1,3 +1,5 @@
+import { BookingPaymentStatus } from '../../models/booking.model';
+
 export type CreateMemberInput = {
   fullName: string;
   mobileNo: string;
@@ -17,8 +19,11 @@ export type CreateMemberInput = {
   notes: string | null;
   isInviteSubmission?: boolean;
   isNewUser?: boolean;
-  paymentMethod?: string | null;     
+  paymentMethod?: string | null;
   paymentScreenshotUrl?: string | null;
+  paymentStatus?: BookingPaymentStatus | null;
+  paymentReminderSentAt?: Date | null;
+  reason?: string | null;
 };
 
 export type MemberRecord = CreateMemberInput & {
@@ -27,17 +32,20 @@ export type MemberRecord = CreateMemberInput & {
   updatedAt: Date;
   isInviteSubmission?: boolean;
   isNewUser?: boolean;
-  paymentMethod?: string | null;         
-  paymentScreenshotUrl?: string | null; 
+  paymentMethod?: string | null;
+  paymentScreenshotUrl?: string | null;
+  paymentStatus?: BookingPaymentStatus | null;
+  paymentReminderSentAt?: Date | null;
   avatarUrl?: string | null;
 };
 
-export type UpdateMemberInput = Partial<
+export type UpdateMemberInput = Partial<                     // ← fixed: was missing 
   Omit<CreateMemberInput, 'libraryId'> & {
     updatedAt: Date;
-    paymentMethod?: string | null;       
+    paymentMethod?: string | null;
     paymentScreenshotUrl?: string | null;
-
+    paymentStatus?: BookingPaymentStatus | null;
+    paymentReminderSentAt?: Date | null;
   }
 >;
 
@@ -61,7 +69,6 @@ export type MemberMsgResponse = {
   studentId?: string | null;
 };
 
-// In member.repository.types.ts
 export type ListInactiveMembersQuery = {
   libraryId: string;
   type?: 'expired' | 'overdue' | 'inactive';

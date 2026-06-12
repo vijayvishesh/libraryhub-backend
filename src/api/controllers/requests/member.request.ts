@@ -73,6 +73,10 @@ export class AddMemberRequest {
   @IsString()
   @IsIn(['male', 'female', 'other'])
   gender?: 'male' | 'female' | 'other';
+
+    @IsOptional()
+  @IsString()
+  reason?: string; 
 }
 
 export class UpdateMemberRequest {
@@ -135,6 +139,10 @@ export class UpdateMemberRequest {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 export class ListMembersQueryRequest {
@@ -247,6 +255,10 @@ export class SubmitMemberViaInviteLinkRequest {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 

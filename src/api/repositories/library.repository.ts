@@ -393,4 +393,18 @@ export class LibraryRepository {
   private getLibraryRepository(): MongoRepository<LibraryModel> {
     return getDataSource().getMongoRepository(LibraryModel);
   }
+  public async findLibraryByStudentId(studentId: string): Promise<LibraryRecord | null> {
+  const bookingRepo = getDataSource().getMongoRepository(
+    (await import('../models/booking.model')).BookingModel,
+  );
+
+  const booking = await bookingRepo.findOneBy({
+    studentId,
+    status: 'confirmed',
+  });
+
+  if (!booking) return null;
+
+  return this.findLibraryById(booking.libraryId);
+}
 }

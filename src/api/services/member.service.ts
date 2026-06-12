@@ -245,6 +245,7 @@ export class MemberService {
           endDate: resolvedEndDate,
           notes: payload.notes === undefined ? undefined : payload.notes.trim() || null,
           updatedAt: new Date(),
+           reason: payload.reason === undefined ? undefined : payload.reason?.trim() || null,
         },
       );
 
@@ -397,6 +398,7 @@ export class MemberService {
         endDate:   newEndDate,
         duration,
         planAmount: newAmount,
+        paymentStatus:  'paid', 
         updatedAt:  new Date(),
       },
     );
@@ -430,6 +432,10 @@ export class MemberService {
         member.bookingId,
         paymentMethod as LibraryPaymentMethod | undefined,
       );
+    await this.bookingRepository.updateBookingFields(member.bookingId, {
+    paymentStatus: 'paid',
+    updatedAt: new Date(),
+  });
     }
 
     // ✅ Only send push if member is actually active (not back-dated expired)
@@ -969,6 +975,7 @@ export class MemberService {
       notes,
       isNewUser,
       isInviteSubmission: false,
+       reason: payload.reason ?? null, 
     });
 
     if (!member) {

@@ -48,6 +48,8 @@ export type BookingResult = {
   libraryLatitude: number | null;
   libraryLongitude: number | null;
   studentId: string | null;
+    paymentStatus?: string | null;           // ← new
+  paymentReminderSentAt?: Date | null; 
   paymentScreenshotUrl: string | null;
   todayStudyTime?: number; // total minutes from today's study sessions
    todayAttendance?: TodayAttendance;
@@ -61,4 +63,5 @@ export type ListMyBookingsResult = {
   limit: number;
   total: number;
   todayStudyTime: number;
+  isWebViewApiNeedToCall: boolean;
 };

@@ -34,6 +34,7 @@ import { LibrarySubscriptionModel } from '../../api/models/librarySubscription.m
 import { MemberLeaveRequestModel } from '../../api/models/memberLeaveRequest.model';
 import { DeviceAppVersionModel } from '../../api/models/deviceAppVersion.model';
 import { AppVersionModel } from '../../api/models/appVersion.model';
+import { WebViewModel } from '../../api/models/webView.model';
 
 let appDataSource: DataSource | null = null;
 let isConnected = false;
@@ -103,6 +104,7 @@ const createDataSource = (): DataSource =>
       MemberLeaveRequestModel,
       AppVersionModel,
       DeviceAppVersionModel,
+      WebViewModel
     ],
     synchronize: true,
     logging: false,

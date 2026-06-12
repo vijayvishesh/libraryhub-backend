@@ -17,6 +17,7 @@ import {
 } from './types/owner.service.types';
 import { LibrarySubscriptionRepository } from '../repositories/librarySubscription.repository';
 import { MemberRepository } from '../repositories/member.repository';
+import { WebViewService } from './webView.service';
 
 export type { OwnerDashboardResult };
 
@@ -28,6 +29,7 @@ export class OwnerService {
     private readonly activityService: ActivityService,
     private readonly librarySubscriptionRepository: LibrarySubscriptionRepository, 
     private readonly memberRepository: MemberRepository, 
+    private readonly webViewService: WebViewService,
   ) {}
 
   public async getDashboard(ownerId: string): Promise<OwnerDashboardResult> {
@@ -55,7 +57,7 @@ export class OwnerService {
       
       const today = new Date().toISOString().slice(0, 10);
       let subscription: OwnerDashboardSubscription;
-
+      const isWebViewApiNeedToCall = await this.webViewService.getWebViewApiConfig();
       if (activeSub) {
         const endMs = new Date(activeSub.endDate).getTime();
         const todayMs = new Date(today).getTime();
@@ -97,6 +99,7 @@ export class OwnerService {
           capacity: library.totalSeats,
           libraryId: library.id,
         },
+        isWebViewApiNeedToCall,  
         revenue,
         seats: {
           total: totalSeatCount,
@@ -107,6 +110,7 @@ export class OwnerService {
         alerts,
         recentActivity,
         subscription,
+      
       };
 
       await redisCache.set(cacheKey, result, 300);

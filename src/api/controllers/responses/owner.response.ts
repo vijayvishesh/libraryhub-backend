@@ -263,6 +263,10 @@ export class OwnerDashboardData {
   @Type(() => AppUpdateStatusData)
   appUpdate?: AppUpdateStatusData | null; 
 
+  @IsOptional()
+@IsBoolean()
+isWebViewApiNeedToCall?: boolean;
+
   constructor(params?: {
     // libraryId: string;
     library: OwnerDashboardLibraryData;
@@ -272,6 +276,7 @@ export class OwnerDashboardData {
     recentActivity: OwnerDashboardRecentActivityData[];
      subscription:   OwnerDashboardSubscriptionData;
      appUpdate?:     AppUpdateStatusData | null; 
+     isWebViewApiNeedToCall?: boolean;
   }) {
     if (!params) {
       return;
@@ -284,6 +289,7 @@ export class OwnerDashboardData {
     this.recentActivity = params.recentActivity;
     this.subscription   = params.subscription; 
      this.appUpdate      = params.appUpdate ?? null;
+     this.isWebViewApiNeedToCall = params.isWebViewApiNeedToCall ?? false;
   }
 }
 

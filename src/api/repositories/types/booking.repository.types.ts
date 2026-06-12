@@ -1,5 +1,5 @@
 import { LibraryPaymentMethod, LibrarySlotType } from '../../constants/library.constants';
-import { BookingStatus } from '../../models/booking.model';
+import { BookingPaymentStatus, BookingStatus } from '../../models/booking.model';
 
 export type CreateBookingInput = {
   libraryId: string;
@@ -18,6 +18,8 @@ export type CreateBookingInput = {
   startDate: string;
   validUntil: string;
   status: BookingStatus;
+  paymentStatus?: BookingPaymentStatus | null;   // ← new
+  paymentReminderSentAt?: Date | null;            // ← new
   checkedInAt: Date | null;
   checkedOutAt: Date | null;
   invoiceNo: string;

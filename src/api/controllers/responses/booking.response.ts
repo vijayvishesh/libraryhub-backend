@@ -342,6 +342,13 @@ export class BookingData {
     totalDuration: number;
   };
 
+  @IsOptional()
+@IsString()
+paymentStatus?: string | null;
+
+@IsOptional()
+@IsString()
+paymentReminderSentAt?: string | null;
   constructor(params?: {
     id: string;
     libraryId: string;
@@ -366,6 +373,8 @@ export class BookingData {
     duration: number;
     todayStudyTime?: number;
     libraryStatus?: string;
+    paymentStatus?: string | null;          
+  paymentReminderSentAt?: Date | null;    
     todayAttendance?: { checkInTime: string; checkOutTime: string | null; status: string };
     libraryUsage?: {
       sessions: Array<{ checkInTime: string; checkoutTime: string | null; duration: number }>;
@@ -399,6 +408,10 @@ export class BookingData {
     this.latitude = params.libraryLatitude ?? undefined;
     this.longitude = params.libraryLongitude ?? undefined;
     this.duration = params.duration ?? 1;
+    this.paymentStatus = params.paymentStatus ?? null;
+this.paymentReminderSentAt = params.paymentReminderSentAt
+  ? params.paymentReminderSentAt.toISOString()
+  : null;
     if (params.todayStudyTime) {
       this.todayStudyTime = params.todayStudyTime;
     }
@@ -455,7 +468,11 @@ export class BookingListPayloadData {
   @Type(() => AppUpdateStatusData)
   appUpdate?: AppUpdateStatusData | null;
 
-  constructor(bookings?: BookingData[], page?: number, limit?: number, total?: number, todayStudyTime?: number, appUpdate?: AppUpdateStatusData | null) {
+  @IsOptional()
+@IsBoolean()
+isWebViewApiNeedToCall?: boolean;
+
+  constructor(bookings?: BookingData[], page?: number, limit?: number, total?: number, todayStudyTime?: number, appUpdate?: AppUpdateStatusData | null, isWebViewApiNeedToCall?: boolean) {
     if (
       !bookings ||
       typeof page !== 'number' ||
@@ -471,6 +488,7 @@ export class BookingListPayloadData {
     this.total = total;
     this.todayStudyTime = todayStudyTime ?? 0;
      this.appUpdate      = appUpdate ?? null;
+     this.isWebViewApiNeedToCall = isWebViewApiNeedToCall ?? false;
   }
 }
 

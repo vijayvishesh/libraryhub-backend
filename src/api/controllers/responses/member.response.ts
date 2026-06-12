@@ -8,7 +8,6 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-// import { env } from '../../../env';
 
 export class MemberData {
   @IsString()
@@ -105,19 +104,27 @@ export class MemberData {
 
   @IsOptional()
   @IsString()
-  paymentMethod?: string | null;       
+  paymentMethod?: string | null;
 
   @IsOptional()
   @IsString()
-  paymentScreenshotUrl?: string | null; 
+  paymentScreenshotUrl?: string | null;
 
   @IsOptional()
   @IsString()
-  paymentStatus?: string;  
-  
+  paymentStatus?: string | null;
+
+  @IsOptional()
+  @IsString()
+  paymentReminderSentAt?: string | null;
+
   @IsOptional()
   @IsString()
   avatarUrl?: string | null;
+
+    @IsOptional()
+  @IsString()
+  reason?: string | null;
 
   constructor(data?: {
     id: string;
@@ -146,9 +153,12 @@ export class MemberData {
     pendingFeeAmount?: number | null;
     previousEndDate?: string | null;
     isDuplicate?: boolean;
-    paymentMethod?: string | null;        
-    paymentScreenshotUrl?: string | null; 
+    paymentMethod?: string | null;
+    paymentScreenshotUrl?: string | null;
+    paymentStatus?: string | null;
+    paymentReminderSentAt?: Date | null;
     avatarUrl?: string | null;
+    reason?: string | null 
   }) {
     if (!data) {
       return;
@@ -182,9 +192,12 @@ export class MemberData {
     this.isDuplicate = data.isDuplicate ?? false;
     this.paymentMethod = data.paymentMethod ?? null;
     this.paymentScreenshotUrl = data.paymentScreenshotUrl ?? null;
-    this.paymentStatus = data.status === 'active' ? 'confirmed' : 'pending';
+    this.paymentStatus = data.paymentStatus ?? null;   
+     this.reason = data.reason ?? null;                       
+    this.paymentReminderSentAt = data.paymentReminderSentAt
+      ? new Date(data.paymentReminderSentAt).toISOString()
+      : null;
     this.avatarUrl = data.avatarUrl ?? null;
-    
   }
 }
 
@@ -458,6 +471,7 @@ export class MemberInviteLinkApiResponse {
     this.data = data;
   }
 }
+
 export class RenewalReminderTabCounts {
   @IsNumber()
   today!: number;
@@ -544,10 +558,10 @@ export class MemberPaymentData {
   createdAt!: string;
 
   @IsString()
-  type!: string; 
+  type!: string;
 
   @IsString()
-  status!: string; 
+  status!: string;
 
   constructor(data?: {
     id: string;
@@ -558,10 +572,10 @@ export class MemberPaymentData {
     endDate: string;
     paidAt: Date;
     createdAt: Date;
-    paymentMethod?:        string | null;   
-    paymentScreenshotUrl?: string | null;   
-    type?:                 string;          
-    status?:               string;          
+    paymentMethod?: string | null;
+    paymentScreenshotUrl?: string | null;
+    type?: string;
+    status?: string;
   }) {
     if (!data) {
       return;
@@ -572,8 +586,8 @@ export class MemberPaymentData {
     this.duration = data.duration;
     this.startDate = data.startDate;
     this.endDate = data.endDate;
-    this.type = data.type?? 'first_join';
-    this.status= data.status?? 'pending';
+    this.type = data.type ?? 'first_join';
+    this.status = data.status ?? 'pending';
     this.paidAt = data.paidAt.toISOString();
     this.createdAt = data.createdAt.toISOString();
   }
@@ -653,7 +667,7 @@ export class InactiveMemberData {
   status!: string;
 
   @IsString()
-  memberType!: 'expired' | 'overdue' | 'inactive'; // derived type
+  memberType!: 'expired' | 'overdue' | 'inactive';
 
   @IsOptional()
   @IsNumber()
@@ -726,7 +740,6 @@ export class InactiveMembersListPayloadData {
   @IsNumber()
   total!: number;
 
-  // Summary counts always returned regardless of filter
   @IsNumber()
   expiredCount!: number;
 

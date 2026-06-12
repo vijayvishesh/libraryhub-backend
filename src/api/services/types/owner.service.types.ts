@@ -34,6 +34,7 @@ export type OwnerDashboardResult = {
     capacity: number;
     libraryId: string;
   };
+  isWebViewApiNeedToCall: boolean;
   revenue: OwnerDashboardRevenue;
   seats: OwnerDashboardSeats;
   alerts: OwnerDashboardAlerts;

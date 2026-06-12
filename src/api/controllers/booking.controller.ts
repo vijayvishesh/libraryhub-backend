@@ -98,6 +98,7 @@ export class BookingController {
           result.total,
           result.todayStudyTime,
           appUpdate,  
+          result.isWebViewApiNeedToCall ?? false,
         ),
         200,
       );
@@ -144,6 +145,8 @@ export class BookingController {
       time: params.time,
       sectionId: params.sectionId,
       paymentMethod: params.paymentMethod,
+      paymentStatus: params.paymentStatus ?? null,            // ← new
+    paymentReminderSentAt: params.paymentReminderSentAt ?? null, 
       amount: params.amount,
       date: params.date,
       validUntil: params.validUntil,
